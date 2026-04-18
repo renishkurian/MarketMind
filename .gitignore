@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
+
+# Node
+node_modules/
+frontend/node_modules/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+
+# MarketMind Specific
+backend/archive/
+backend/data/*.csv
+backend/data/*.zip
+scratch/
+*.log

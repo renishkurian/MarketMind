@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-dark-bg: #0A0E1A;
+  --color-dark-card: #111827;
+  --color-dark-border: #1F2937;
+  --color-dark-text: #F9FAFB;
+  --color-dark-muted: #6B7280;
+
+  --color-light-bg: #F8FAFC;
+  --color-light-card: #FFFFFF;
+  --color-light-border: #E2E8F0;
+  --color-light-text: #0F172A;
+  --color-light-muted: #64748B;
+
+  --color-signal-buy: #10B981;
+  --color-signal-hold: #F59E0B;
+  --color-signal-sell: #EF4444;
+
+  --color-accent: #3B82F6;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  body {
+    @apply antialiased transition-colors duration-300;
+  }
+}
+
+.dark body {
+  @apply bg-dark-bg text-dark-text;
+}
+
+body {
+  @apply bg-light-bg text-light-text;
+}
+
+.flash-green {
+  animation: flashGreen 1s ease-out;
+}
+
+.flash-red {
+  animation: flashRed 1s ease-out;
+}
+
+@keyframes flashGreen {
+  0% { background-color: rgba(16, 185, 129, 0.4); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flashRed {
+  0% { background-color: rgba(239, 68, 68, 0.4); }
+  100% { background-color: transparent; }
+}
