@@ -5,7 +5,7 @@ import {
   ArrowLeft, ArrowUpRight, ArrowDownRight, ArrowRight,
   Activity, Brain, TrendingUp, TrendingDown, Minus,
   RefreshCw, AlertTriangle, CheckCircle, BarChart2,
-  Clock, Shield, Sun, Moon, Layers, BookOpen, Briefcase
+  Clock, Layers, BookOpen, Briefcase
 } from 'lucide-react';
 
 import SignalBadge from '../components/SignalBadge';
@@ -134,7 +134,7 @@ const AIInsightPanel = ({ insight, loading, error }) => {
 export default function DeepDive() {
   const { symbol } = useParams();
   const navigate = useNavigate();
-  const { stocks, marketStatus, theme, toggleTheme } = useStockStore();
+  const { stocks, marketStatus, theme } = useStockStore();
 
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);

@@ -86,6 +86,11 @@ const StockTable = ({ stocks, showType = false }) => {
                         <div className="flex flex-col">
                           <span className="font-mono text-xs font-bold text-dark-text">{stock.quantity} Qty</span>
                           <span className="font-mono text-[10px] text-dark-muted">@ ₹{stock.avg_buy_price}</span>
+                          {stock.buy_date && (
+                            <span className="font-mono text-[10px] text-dark-muted/60">
+                              since {new Date(stock.buy_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-dark-muted">—</span>
