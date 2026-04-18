@@ -19,6 +19,9 @@ const StockTable = ({ stocks, showType = false }) => {
               <th className="px-5 py-4 font-semibold uppercase tracking-wider text-[11px] text-center">Short Term</th>
               <th className="px-5 py-4 font-semibold uppercase tracking-wider text-[11px] text-center">Long Term</th>
               <th className="px-5 py-4 font-semibold uppercase tracking-wider text-[11px] text-center">Confidence</th>
+              {stocks.some(s => s.quantity) && (
+                <th className="px-5 py-4 font-semibold uppercase tracking-wider text-[11px] text-right">Position</th>
+              )}
               <th className="px-5 py-4 font-semibold uppercase tracking-wider text-[11px] text-center">Status</th>
             </tr>
           </thead>
@@ -77,6 +80,18 @@ const StockTable = ({ stocks, showType = false }) => {
                       <span className="text-[10px] font-mono font-bold w-8">{sig.confidence_pct?.toFixed(0) || 0}%</span>
                     </div>
                   </td>
+                  {stocks.some(s => s.quantity) && (
+                    <td className="px-5 py-4 text-right">
+                      {stock.quantity ? (
+                        <div className="flex flex-col">
+                          <span className="font-mono text-xs font-bold text-dark-text">{stock.quantity} Qty</span>
+                          <span className="font-mono text-[10px] text-dark-muted">@ ₹{stock.avg_buy_price}</span>
+                        </div>
+                      ) : (
+                        <span className="text-dark-muted">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-5 py-4 text-center">
                     {showType && (
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${

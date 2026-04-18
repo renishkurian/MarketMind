@@ -37,6 +37,11 @@ class StockMaster(Base):
     type = Column(Enum('PORTFOLIO','WATCHLIST'), nullable=False, index=True)
     added_date = Column(Date, nullable=False)
     is_active = Column(Boolean, default=True)
+    
+    # Portfolio specific fields
+    quantity = Column(Numeric(14,4))
+    avg_buy_price = Column(Numeric(10,2))
+    buy_date = Column(Date)
 
 class PriceHistory(Base):
     __tablename__ = "price_history"

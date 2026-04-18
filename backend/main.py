@@ -120,6 +120,9 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
                 "company_name": stock.company_name,
                 "sector": stock.sector,
                 "type": stock.type,
+                "quantity": float(stock.quantity) if stock.quantity else None,
+                "avg_buy_price": float(stock.avg_buy_price) if stock.avg_buy_price else None,
+                "buy_date": str(stock.buy_date) if stock.buy_date else None,
                 "signal": _serialize_signal(signal)
             }
             snapshot.append(item)
@@ -565,6 +568,15 @@ async def get_stock_insight(symbol: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+from pydantic import BaseModel
+class BhavcopySyncRequest(BaseModel):
+    from_date: str
+    to_date: Optional[str] = None
+    exchange: Optional[str] = 'NSE'
+
+class InsightGenerateRequest(BaseModel):
+    skill_id: Optional[str] = None
+
 @app.post("/api/stock/{symbol}/insight/generate")
 async def trigger_insight_generation(
     symbol: str, 
@@ -643,16 +655,6 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
 
 
 # ── Bhavcopy Manual Sync ──────────────────────────────────────────────────────
-from pydantic import BaseModel
-
-class BhavcopySyncRequest(BaseModel):
-    from_date: str
-    to_date: Optional[str] = None
-    exchange: Optional[str] = 'NSE'
-
-class InsightGenerateRequest(BaseModel):
-    skill_id: Optional[str] = None
-
 @app.post("/api/market/bhavcopy/sync")
 async def manual_bhavcopy_sync(req: BhavcopySyncRequest, admin: str = Depends(get_current_admin)):
     """Manually trigger Bhavcopy download for a single date or a range."""
