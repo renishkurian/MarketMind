@@ -65,10 +65,10 @@ export default function PortfolioTable({ stocks }) {
           bVal = b.buy_date ?? '';
           break;
         case 'profit_pct': {
-          const aCur = aSig.current_price ?? 0;
-          const bCur = bSig.current_price ?? 0;
-          aVal = a.avg_buy_price ? ((aCur - a.avg_buy_price) / a.avg_buy_price) * 100 : null;
-          bVal = b.avg_buy_price ? ((bCur - b.avg_buy_price) / b.avg_buy_price) * 100 : null;
+          const aCur = aSig.current_price;   // null if no price yet
+          const bCur = bSig.current_price;
+          aVal = (a.avg_buy_price && aCur) ? ((aCur - parseFloat(a.avg_buy_price)) / parseFloat(a.avg_buy_price)) * 100 : null;
+          bVal = (b.avg_buy_price && bCur) ? ((bCur - parseFloat(b.avg_buy_price)) / parseFloat(b.avg_buy_price)) * 100 : null;
           if (aVal === null) aVal = -Infinity;
           if (bVal === null) bVal = -Infinity;
           break;
@@ -114,9 +114,12 @@ export default function PortfolioTable({ stocks }) {
               const flashClass = stock._lastPriceChange === 'up' ? 'flash-green'
                 : stock._lastPriceChange === 'down' ? 'flash-red' : '';
 
-              const curPrice = sig.current_price ?? 0;
-              const avgBuy = stock.avg_buy_price ?? 0;
-              const profitPct = avgBuy > 0 ? ((curPrice - avgBuy) / avgBuy) * 100 : null;
+              // Only compute profit when we have a real live/last-close price
+              const curPrice = sig.current_price;   // null → no data yet
+              const avgBuy = stock.avg_buy_price ? parseFloat(stock.avg_buy_price) : null;
+              const profitPct = (curPrice && avgBuy)
+                ? ((curPrice - avgBuy) / avgBuy) * 100
+                : null;
               const isProfit = profitPct !== null && profitPct >= 0;
 
               return (
