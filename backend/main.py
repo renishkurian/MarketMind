@@ -113,8 +113,33 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
             .where(StockMaster.is_active == True)
         )
         rows = result.all()
+
+        # Fetch latest close price from price_history as fallback (for closed-market periods)
+        from sqlalchemy import func as sqlfunc
+        ph_sub = (
+            select(
+                PriceHistory.symbol,
+                sqlfunc.max(PriceHistory.date).label("max_date")
+            )
+            .group_by(PriceHistory.symbol)
+            .subquery()
+        )
+        ph_result = await db.execute(
+            select(PriceHistory.symbol, PriceHistory.close)
+            .join(ph_sub, (PriceHistory.symbol == ph_sub.c.symbol) & (PriceHistory.date == ph_sub.c.max_date))
+        )
+        last_close_map = {row.symbol: float(row.close) for row in ph_result.all()}
+
         snapshot = []
         for stock, signal in rows:
+            sig_data = _serialize_signal(signal)
+            # If signal has no current_price, fall back to last known close from price_history
+            if sig_data and not sig_data.get("current_price"):
+                sig_data["current_price"] = last_close_map.get(stock.symbol)
+            elif sig_data is None:
+                fallback_price = last_close_map.get(stock.symbol)
+                if fallback_price:
+                    sig_data = {"current_price": fallback_price}
             item = {
                 "symbol": stock.symbol,
                 "company_name": stock.company_name,
@@ -123,7 +148,7 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
                 "quantity": float(stock.quantity) if stock.quantity else None,
                 "avg_buy_price": float(stock.avg_buy_price) if stock.avg_buy_price else None,
                 "buy_date": str(stock.buy_date) if stock.buy_date else None,
-                "signal": _serialize_signal(signal)
+                "signal": sig_data
             }
             snapshot.append(item)
 
