@@ -25,6 +25,8 @@ export default function PortfolioTable({ stocks }) {
   const navigate = useNavigate();
   const [sortField, setSortField] = useState('buy_date');
   const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -33,6 +35,7 @@ export default function PortfolioTable({ stocks }) {
       setSortField(field);
       setSortDir('asc');
     }
+    setPage(1);
   };
 
   const hasPosition = stocks.some(s => s.quantity);
@@ -86,6 +89,9 @@ export default function PortfolioTable({ stocks }) {
     });
   }, [stocks, sortField, sortDir]);
 
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
@@ -109,7 +115,7 @@ export default function PortfolioTable({ stocks }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-dark-border">
-            {sorted.map((stock) => {
+            {paginated.map((stock) => {
               const sig = stock.signal || {};
               const flashClass = stock._lastPriceChange === 'up' ? 'flash-green'
                 : stock._lastPriceChange === 'down' ? 'flash-red' : '';
@@ -240,6 +246,55 @@ export default function PortfolioTable({ stocks }) {
           </tbody>
         </table>
       </div>
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-5 py-3 border-t border-dark-border bg-gray-900/40">
+          <span className="text-xs text-dark-muted font-mono">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-dark-card border border-dark-border hover:border-accent hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              ← Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, idx) =>
+                p === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-dark-muted text-xs">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                      page === p
+                        ? 'bg-accent border-accent text-white shadow-lg shadow-accent/20'
+                        : 'bg-dark-card border-dark-border hover:border-accent hover:text-accent'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )
+            }
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-dark-card border border-dark-border hover:border-accent hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
