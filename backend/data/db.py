@@ -43,6 +43,17 @@ class StockMaster(Base):
     avg_buy_price = Column(Numeric(10,2))
     buy_date = Column(Date)
 
+class PortfolioTransaction(Base):
+    __tablename__ = "portfolio_transactions"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    symbol = Column(String(20), index=True, nullable=False)
+    isin = Column(String(12), index=True)
+    quantity = Column(Numeric(14,4), nullable=False)
+    buy_price = Column(Numeric(10,2), nullable=False)
+    buy_date = Column(Date, nullable=False)
+    status = Column(Enum('OPEN', 'CLOSED'), default='OPEN', nullable=False)
+
 class PriceHistory(Base):
     __tablename__ = "price_history"
     

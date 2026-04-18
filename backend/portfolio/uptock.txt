@@ -1,0 +1,5139 @@
+{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 39613.0,
+                "openQty": 140.0,
+                "avgRate": 17.164285714285715,
+                "openAmt": 2403.0,
+                "unrealizedPnL": 37210.0,
+                "unrealizedPnLPercent": 1548.481065334998,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "03-01-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 33954.0,
+                "openQty": 120.0,
+                "avgRate": 17.28083333333333,
+                "openAmt": 2073.7,
+                "unrealizedPnL": 31880.3,
+                "unrealizedPnLPercent": 1537.3631672855283,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-01-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 28295.0,
+                "openQty": 100.0,
+                "avgRate": 16.61,
+                "openAmt": 1661.0,
+                "unrealizedPnL": 26634.0,
+                "unrealizedPnLPercent": 1603.4918723660446,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-01-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 19806.5,
+                "openQty": 70.0,
+                "avgRate": 12.895,
+                "openAmt": 902.65,
+                "unrealizedPnL": 18903.85,
+                "unrealizedPnLPercent": 2094.261341605273,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-04-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 76396.5,
+                "openQty": 270.0,
+                "avgRate": 14.75537037037037,
+                "openAmt": 3983.95,
+                "unrealizedPnL": 72412.55,
+                "unrealizedPnLPercent": 1817.6068976769286,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-04-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543534",
+                "scpName": "Aether Industries Limited",
+                "isin": "INE0BWX01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1180.15,
+                "closingAmount": 7080.900000000001,
+                "openQty": 6.0,
+                "avgRate": 996.25,
+                "openAmt": 5977.5,
+                "unrealizedPnL": 1103.4000000000005,
+                "unrealizedPnLPercent": 18.459222082810548,
+                "symbol": "AETHER",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-06-2023"
+            },
+            {
+                "scpCode": "543534",
+                "scpName": "Aether Industries Limited",
+                "isin": "INE0BWX01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1180.15,
+                "closingAmount": 7080.900000000001,
+                "openQty": 6.0,
+                "avgRate": 809.5,
+                "openAmt": 4857.0,
+                "unrealizedPnL": 2223.9000000000005,
+                "unrealizedPnLPercent": 45.787523162445964,
+                "symbol": "AETHER",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-03-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "533278",
+                "scpName": "COAL INDIA",
+                "isin": "INE522F01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 438.7,
+                "closingAmount": 10967.5,
+                "openQty": 25.0,
+                "avgRate": 384.1,
+                "openAmt": 9602.5,
+                "unrealizedPnL": 1365.0,
+                "unrealizedPnLPercent": 14.215048164540484,
+                "symbol": "COALINDIA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "30-01-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "540678",
+                "scpName": "Cochin Shipyard Limited",
+                "isin": "INE704P01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1561.45,
+                "closingAmount": 12491.6,
+                "openQty": 8.0,
+                "avgRate": 2463.51875,
+                "openAmt": 19708.15,
+                "unrealizedPnL": -7216.550000000001,
+                "unrealizedPnLPercent": -36.617084810091264,
+                "symbol": "COCHINSHIP",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-08-2024"
+            },
+            {
+                "scpCode": "540678",
+                "scpName": "Cochin Shipyard Limited",
+                "isin": "INE704P01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1561.45,
+                "closingAmount": 6245.8,
+                "openQty": 4.0,
+                "avgRate": 1787.95,
+                "openAmt": 7151.8,
+                "unrealizedPnL": -906.0,
+                "unrealizedPnLPercent": -12.668139489359323,
+                "symbol": "COCHINSHIP",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "24-09-2024"
+            },
+            {
+                "scpCode": "540678",
+                "scpName": "Cochin Shipyard Limited",
+                "isin": "INE704P01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1561.45,
+                "closingAmount": 12491.6,
+                "openQty": 8.0,
+                "avgRate": 1459.75,
+                "openAmt": 11678.0,
+                "unrealizedPnL": 813.6000000000004,
+                "unrealizedPnLPercent": 6.966946394930643,
+                "symbol": "COCHINSHIP",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-03-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532541",
+                "scpName": "COFORGE LIMITED",
+                "isin": "INE591G01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1316.7,
+                "closingAmount": 6583.5,
+                "openQty": 5.0,
+                "avgRate": 525.33,
+                "openAmt": 2626.65,
+                "unrealizedPnL": 3956.85,
+                "unrealizedPnLPercent": 150.6424533150591,
+                "symbol": "COFORGE",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "20-01-2021"
+            },
+            {
+                "scpCode": "532541",
+                "scpName": "COFORGE LIMITED",
+                "isin": "INE591G01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1316.7,
+                "closingAmount": 6583.5,
+                "openQty": 5.0,
+                "avgRate": 1768.5,
+                "openAmt": 8842.5,
+                "unrealizedPnL": -2259.0,
+                "unrealizedPnLPercent": -25.547073791348602,
+                "symbol": "COFORGE",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "06-06-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532528",
+                "scpName": "DATAM GLOB",
+                "isin": "INE365B01017",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 747.7,
+                "closingAmount": 29908.0,
+                "openQty": 40.0,
+                "avgRate": 284.0,
+                "openAmt": 11360.0,
+                "unrealizedPnL": 18548.0,
+                "unrealizedPnLPercent": 163.27464788732397,
+                "symbol": "DATAMATICS",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "27-07-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500124",
+                "scpName": "DR.REDDY~S LABORATORIES LTD.",
+                "isin": "INE089A01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1235.4,
+                "closingAmount": 6177.0,
+                "openQty": 5.0,
+                "avgRate": 1284.2,
+                "openAmt": 6421.0,
+                "unrealizedPnL": -244.0,
+                "unrealizedPnLPercent": -3.8000311477962936,
+                "symbol": "DRREDDY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-11-2024"
+            },
+            {
+                "scpCode": "500124",
+                "scpName": "DR.REDDY~S LABORATORIES LTD.",
+                "isin": "INE089A01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1235.4,
+                "closingAmount": 21001.800000000003,
+                "openQty": 17.0,
+                "avgRate": 1184.3500000000001,
+                "openAmt": 20133.95,
+                "unrealizedPnL": 867.8500000000022,
+                "unrealizedPnLPercent": 4.310381221767225,
+                "symbol": "DRREDDY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "29-01-2025"
+            },
+            {
+                "scpCode": "500124",
+                "scpName": "DR.REDDY~S LABORATORIES LTD.",
+                "isin": "INE089A01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1235.4,
+                "closingAmount": 12354.0,
+                "openQty": 10.0,
+                "avgRate": 1090.15,
+                "openAmt": 10901.5,
+                "unrealizedPnL": 1452.5,
+                "unrealizedPnLPercent": 13.323854515433656,
+                "symbol": "DRREDDY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-04-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543320",
+                "scpName": "ETERNAL LIMITED",
+                "isin": "INE758T01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.6,
+                "closingAmount": 5052.0,
+                "openQty": 20.0,
+                "avgRate": 126.675,
+                "openAmt": 2533.5,
+                "unrealizedPnL": 2518.5,
+                "unrealizedPnLPercent": 99.40793368857312,
+                "symbol": "ETERNAL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-07-2021"
+            },
+            {
+                "scpCode": "543320",
+                "scpName": "ETERNAL LIMITED",
+                "isin": "INE758T01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.6,
+                "closingAmount": 2778.6,
+                "openQty": 11.0,
+                "avgRate": 89.43636363636364,
+                "openAmt": 983.8,
+                "unrealizedPnL": 1794.8,
+                "unrealizedPnLPercent": 182.4354543606424,
+                "symbol": "ETERNAL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-01-2022"
+            },
+            {
+                "scpCode": "543320",
+                "scpName": "ETERNAL LIMITED",
+                "isin": "INE758T01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.6,
+                "closingAmount": 252.6,
+                "openQty": 1.0,
+                "avgRate": 66.3,
+                "openAmt": 66.3,
+                "unrealizedPnL": 186.3,
+                "unrealizedPnLPercent": 280.9954751131222,
+                "symbol": "ETERNAL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            },
+            {
+                "scpCode": "543320",
+                "scpName": "ETERNAL LIMITED",
+                "isin": "INE758T01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.6,
+                "closingAmount": 3536.4,
+                "openQty": 14.0,
+                "avgRate": 55.01428571428572,
+                "openAmt": 770.2,
+                "unrealizedPnL": 2766.2,
+                "unrealizedPnLPercent": 359.1534666320436,
+                "symbol": "ETERNAL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-07-2022"
+            },
+            {
+                "scpCode": "543320",
+                "scpName": "ETERNAL LIMITED",
+                "isin": "INE758T01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.6,
+                "closingAmount": 252.6,
+                "openQty": 1.0,
+                "avgRate": 62.35,
+                "openAmt": 62.35,
+                "unrealizedPnL": 190.25,
+                "unrealizedPnLPercent": 305.1323175621492,
+                "symbol": "ETERNAL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "03-11-2022"
+            },
+            {
+                "scpCode": "543320",
+                "scpName": "ETERNAL LIMITED",
+                "isin": "INE758T01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.6,
+                "closingAmount": 2526.0,
+                "openQty": 10.0,
+                "avgRate": 56.4,
+                "openAmt": 564.0,
+                "unrealizedPnL": 1962.0,
+                "unrealizedPnLPercent": 347.8723404255319,
+                "symbol": "ETERNAL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-01-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 6
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532809",
+                "scpName": "FSL",
+                "isin": "INE684F01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 239.25,
+                "closingAmount": 11962.5,
+                "openQty": 50.0,
+                "avgRate": 183.65,
+                "openAmt": 9182.5,
+                "unrealizedPnL": 2780.0,
+                "unrealizedPnLPercent": 30.274979580724203,
+                "symbol": "FSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-01-2022"
+            },
+            {
+                "scpCode": "532809",
+                "scpName": "FSL",
+                "isin": "INE684F01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 239.25,
+                "closingAmount": 4785.0,
+                "openQty": 20.0,
+                "avgRate": 156.05,
+                "openAmt": 3121.0,
+                "unrealizedPnL": 1664.0,
+                "unrealizedPnLPercent": 53.316244793335464,
+                "symbol": "FSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "31-01-2022"
+            },
+            {
+                "scpCode": "532809",
+                "scpName": "FSL",
+                "isin": "INE684F01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 239.25,
+                "closingAmount": 2392.5,
+                "openQty": 10.0,
+                "avgRate": 111.75,
+                "openAmt": 1117.5,
+                "unrealizedPnL": 1275.0,
+                "unrealizedPnLPercent": 114.09395973154362,
+                "symbol": "FSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-06-2022"
+            },
+            {
+                "scpCode": "532809",
+                "scpName": "FSL",
+                "isin": "INE684F01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 239.25,
+                "closingAmount": 4785.0,
+                "openQty": 20.0,
+                "avgRate": 97.6,
+                "openAmt": 1952.0,
+                "unrealizedPnL": 2833.0,
+                "unrealizedPnLPercent": 145.1331967213115,
+                "symbol": "FSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            },
+            {
+                "scpCode": "532809",
+                "scpName": "FSL",
+                "isin": "INE684F01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 239.25,
+                "closingAmount": 717.75,
+                "openQty": 3.0,
+                "avgRate": 104.2,
+                "openAmt": 312.6,
+                "unrealizedPnL": 405.15,
+                "unrealizedPnLPercent": 129.60652591170822,
+                "symbol": "FSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "03-11-2022"
+            },
+            {
+                "scpCode": "532809",
+                "scpName": "FSL",
+                "isin": "INE684F01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 239.25,
+                "closingAmount": 2392.5,
+                "openQty": 10.0,
+                "avgRate": 102.7,
+                "openAmt": 1027.0,
+                "unrealizedPnL": 1365.5,
+                "unrealizedPnLPercent": 132.96007789678677,
+                "symbol": "FSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-01-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 6
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543384",
+                "scpName": "FSN E-Commerce Ventures Limite",
+                "isin": "INE388Y01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 269.65,
+                "closingAmount": 539.3,
+                "openQty": 2.0,
+                "avgRate": 2205.5,
+                "openAmt": 4411.0,
+                "unrealizedPnL": -3871.7,
+                "unrealizedPnLPercent": -87.77374744955792,
+                "symbol": "NYKAA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "10-11-2021"
+            },
+            {
+                "scpCode": "543384",
+                "scpName": "FSN E-Commerce Ventures Limite",
+                "isin": "INE388Y01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 269.65,
+                "closingAmount": 2696.5,
+                "openQty": 10.0,
+                "avgRate": 0.0,
+                "openAmt": 0.0,
+                "unrealizedPnL": 2696.5,
+                "unrealizedPnLPercent": null,
+                "symbol": "NYKAA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "10-11-2022"
+            },
+            {
+                "scpCode": "543384",
+                "scpName": "FSN E-Commerce Ventures Limite",
+                "isin": "INE388Y01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 269.65,
+                "closingAmount": 1348.25,
+                "openQty": 5.0,
+                "avgRate": 144.3,
+                "openAmt": 721.5,
+                "unrealizedPnL": 626.75,
+                "unrealizedPnLPercent": 86.86763686763686,
+                "symbol": "NYKAA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-02-2023"
+            },
+            {
+                "scpCode": "543384",
+                "scpName": "FSN E-Commerce Ventures Limite",
+                "isin": "INE388Y01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 269.65,
+                "closingAmount": 5393.0,
+                "openQty": 20.0,
+                "avgRate": 127.05,
+                "openAmt": 2541.0,
+                "unrealizedPnL": 2852.0,
+                "unrealizedPnLPercent": 112.2392758756395,
+                "symbol": "NYKAA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-05-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 4
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "519600",
+                "scpName": "CCL PRODUTS",
+                "isin": "INE421D01022",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1088.6,
+                "closingAmount": 22860.6,
+                "openQty": 21.0,
+                "avgRate": 471.4190476190476,
+                "openAmt": 9899.8,
+                "unrealizedPnL": 12960.8,
+                "unrealizedPnLPercent": 130.91981656195074,
+                "symbol": "CCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "28-07-2021"
+            },
+            {
+                "scpCode": "519600",
+                "scpName": "CCL PRODUTS",
+                "isin": "INE421D01022",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1088.6,
+                "closingAmount": 14151.8,
+                "openQty": 13.0,
+                "avgRate": 376.61538461538464,
+                "openAmt": 4896.0,
+                "unrealizedPnL": 9255.8,
+                "unrealizedPnLPercent": 189.04820261437908,
+                "symbol": "CCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "26-08-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "CDSL",
+                "scpName": "CENTRAL DEPO SER (I) LTD",
+                "isin": "INE736A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "NSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1393.2,
+                "closingAmount": 11145.6,
+                "openQty": 8.0,
+                "avgRate": 1269.95,
+                "openAmt": 10159.6,
+                "unrealizedPnL": 986.0,
+                "unrealizedPnLPercent": 9.705106500255916,
+                "symbol": "CDSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "29-01-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532155",
+                "scpName": "GAIL INDIA",
+                "isin": "INE129A01019",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 157.8,
+                "closingAmount": 1893.6000000000001,
+                "openQty": 12.0,
+                "avgRate": 229.25,
+                "openAmt": 2751.0,
+                "unrealizedPnL": -857.3999999999999,
+                "unrealizedPnLPercent": -31.16684841875681,
+                "symbol": "GAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "18-07-2024"
+            },
+            {
+                "scpCode": "532155",
+                "scpName": "GAIL INDIA",
+                "isin": "INE129A01019",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 157.8,
+                "closingAmount": 1578.0,
+                "openQty": 10.0,
+                "avgRate": 219.0,
+                "openAmt": 2190.0,
+                "unrealizedPnL": -612.0,
+                "unrealizedPnLPercent": -27.945205479452056,
+                "symbol": "GAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-07-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "542851",
+                "scpName": "Gensol Engineering Limited",
+                "isin": "INE06H201014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "16-04-2026",
+                "closingRate": 25.51,
+                "closingAmount": 51.02,
+                "openQty": 2.0,
+                "avgRate": 839.0,
+                "openAmt": 1678.0,
+                "unrealizedPnL": -1626.98,
+                "unrealizedPnLPercent": -96.95947556615018,
+                "symbol": "GENSOL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543245",
+                "scpName": "GLAND",
+                "isin": "INE068V01023",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1795.8,
+                "closingAmount": 3591.6,
+                "openQty": 2.0,
+                "avgRate": 2086.0,
+                "openAmt": 4172.0,
+                "unrealizedPnL": -580.4000000000001,
+                "unrealizedPnLPercent": -13.9117929050815,
+                "symbol": "GLAND",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-11-2020"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "590095",
+                "scpName": "GOLDBEES",
+                "isin": "INF204KB17I5",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 124.81,
+                "closingAmount": 109832.8,
+                "openQty": 880.0,
+                "avgRate": 80.92,
+                "openAmt": 71209.6,
+                "unrealizedPnL": 38623.2,
+                "unrealizedPnLPercent": 54.23875432525951,
+                "symbol": "GOLDBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-04-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "501455",
+                "scpName": "GREAVES COTT",
+                "isin": "INE224A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 161.4,
+                "closingAmount": 3228.0,
+                "openQty": 20.0,
+                "avgRate": 178.26500000000001,
+                "openAmt": 3565.3,
+                "unrealizedPnL": -337.3000000000002,
+                "unrealizedPnLPercent": -9.460634448713998,
+                "symbol": "GREAVESCOT",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "24-06-2021"
+            },
+            {
+                "scpCode": "501455",
+                "scpName": "GREAVES COTT",
+                "isin": "INE224A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 161.4,
+                "closingAmount": 3873.6000000000004,
+                "openQty": 24.0,
+                "avgRate": 232.52916666666667,
+                "openAmt": 5580.7,
+                "unrealizedPnL": -1707.0999999999995,
+                "unrealizedPnLPercent": -30.589352590176848,
+                "symbol": "GREAVESCOT",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "14-01-2022"
+            },
+            {
+                "scpCode": "501455",
+                "scpName": "GREAVES COTT",
+                "isin": "INE224A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 161.4,
+                "closingAmount": 322.8,
+                "openQty": 2.0,
+                "avgRate": 155.85,
+                "openAmt": 311.7,
+                "unrealizedPnL": 11.100000000000023,
+                "unrealizedPnLPercent": 3.561116458132828,
+                "symbol": "GREAVESCOT",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-06-2022"
+            },
+            {
+                "scpCode": "501455",
+                "scpName": "GREAVES COTT",
+                "isin": "INE224A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 161.4,
+                "closingAmount": 4035.0,
+                "openQty": 25.0,
+                "avgRate": 137.3,
+                "openAmt": 3432.5,
+                "unrealizedPnL": 602.5,
+                "unrealizedPnLPercent": 17.55280407865987,
+                "symbol": "GREAVESCOT",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            },
+            {
+                "scpCode": "501455",
+                "scpName": "GREAVES COTT",
+                "isin": "INE224A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 161.4,
+                "closingAmount": 1614.0,
+                "openQty": 10.0,
+                "avgRate": 136.35,
+                "openAmt": 1363.5,
+                "unrealizedPnL": 250.5,
+                "unrealizedPnLPercent": 18.371837183718373,
+                "symbol": "GREAVESCOT",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-01-2023"
+            },
+            {
+                "scpCode": "501455",
+                "scpName": "GREAVES COTT",
+                "isin": "INE224A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 161.4,
+                "closingAmount": 3228.0,
+                "openQty": 20.0,
+                "avgRate": 136.3,
+                "openAmt": 2726.0,
+                "unrealizedPnL": 502.0,
+                "unrealizedPnLPercent": 18.415260454878943,
+                "symbol": "GREAVESCOT",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-06-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 6
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "533230",
+                "scpName": "HDFCMFGETF",
+                "isin": "INF179KC1981",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 128.84,
+                "closingAmount": 12884.0,
+                "openQty": 100.0,
+                "avgRate": 80.49,
+                "openAmt": 8049.0,
+                "unrealizedPnL": 4835.0,
+                "unrealizedPnLPercent": 60.06957386010685,
+                "symbol": "HDFCGOLD",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-04-2025"
+            },
+            {
+                "scpCode": "533230",
+                "scpName": "HDFCMFGETF",
+                "isin": "INF179KC1981",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 128.84,
+                "closingAmount": 78592.40000000001,
+                "openQty": 610.0,
+                "avgRate": 82.44775409836065,
+                "openAmt": 50293.13,
+                "unrealizedPnL": 28299.27000000001,
+                "unrealizedPnLPercent": 56.26865935764987,
+                "symbol": "HDFCGOLD",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-04-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500186",
+                "scpName": "HIND.OIL EXP",
+                "isin": "INE345A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 158.75,
+                "closingAmount": 2857.5,
+                "openQty": 18.0,
+                "avgRate": 141.20555555555555,
+                "openAmt": 2541.7,
+                "unrealizedPnL": 315.8000000000002,
+                "unrealizedPnLPercent": 12.42475508517922,
+                "symbol": "HINDOILEXP",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-08-2021"
+            },
+            {
+                "scpCode": "500186",
+                "scpName": "HIND.OIL EXP",
+                "isin": "INE345A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 158.75,
+                "closingAmount": 6032.5,
+                "openQty": 38.0,
+                "avgRate": 201.0671052631579,
+                "openAmt": 7640.55,
+                "unrealizedPnL": -1608.0500000000002,
+                "unrealizedPnLPercent": -21.046259758787002,
+                "symbol": "HINDOILEXP",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-09-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500104",
+                "scpName": "HINDUSTAN PETROLEUM CORP. LTD.",
+                "isin": "INE094A01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 370.95,
+                "closingAmount": 4822.349999999999,
+                "openQty": 13.0,
+                "avgRate": 390.0,
+                "openAmt": 5070.0,
+                "unrealizedPnL": -247.65000000000055,
+                "unrealizedPnLPercent": -4.884615384615396,
+                "symbol": "HINDPETRO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-08-2024"
+            },
+            {
+                "scpCode": "500104",
+                "scpName": "HINDUSTAN PETROLEUM CORP. LTD.",
+                "isin": "INE094A01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 370.95,
+                "closingAmount": 2967.6,
+                "openQty": 8.0,
+                "avgRate": 371.8,
+                "openAmt": 2974.4,
+                "unrealizedPnL": -6.800000000000182,
+                "unrealizedPnLPercent": -0.2286175363098501,
+                "symbol": "HINDPETRO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "14-08-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500106",
+                "scpName": "IFCI LTD",
+                "isin": "INE039A01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 61.22,
+                "closingAmount": 6122.0,
+                "openQty": 100.0,
+                "avgRate": 71.54,
+                "openAmt": 7154.0,
+                "unrealizedPnL": -1032.0,
+                "unrealizedPnLPercent": -14.425496225887615,
+                "symbol": "IFCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "18-07-2024"
+            },
+            {
+                "scpCode": "500106",
+                "scpName": "IFCI LTD",
+                "isin": "INE039A01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 61.22,
+                "closingAmount": 3061.0,
+                "openQty": 50.0,
+                "avgRate": 67.85,
+                "openAmt": 3392.5,
+                "unrealizedPnL": -331.5,
+                "unrealizedPnLPercent": -9.771554900515845,
+                "symbol": "IFCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-07-2024"
+            },
+            {
+                "scpCode": "500106",
+                "scpName": "IFCI LTD",
+                "isin": "INE039A01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 61.22,
+                "closingAmount": 367.32,
+                "openQty": 6.0,
+                "avgRate": 66.33,
+                "openAmt": 397.98,
+                "unrealizedPnL": -30.660000000000025,
+                "unrealizedPnLPercent": -7.703904718830098,
+                "symbol": "IFCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "27-09-2024"
+            },
+            {
+                "scpCode": "500106",
+                "scpName": "IFCI LTD",
+                "isin": "INE039A01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 61.22,
+                "closingAmount": 244.88,
+                "openQty": 4.0,
+                "avgRate": 64.0,
+                "openAmt": 256.0,
+                "unrealizedPnL": -11.120000000000005,
+                "unrealizedPnLPercent": -4.343750000000002,
+                "symbol": "IFCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-10-2024"
+            },
+            {
+                "scpCode": "500106",
+                "scpName": "IFCI LTD",
+                "isin": "INE039A01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 61.22,
+                "closingAmount": 1224.4,
+                "openQty": 20.0,
+                "avgRate": 55.339999999999996,
+                "openAmt": 1106.8,
+                "unrealizedPnL": 117.60000000000014,
+                "unrealizedPnLPercent": 10.625225876400446,
+                "symbol": "IFCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "30-01-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "540750",
+                "scpName": "Indian Energy Exchange Limited",
+                "isin": "INE022Q01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 135.65,
+                "closingAmount": 406.95000000000005,
+                "openQty": 3.0,
+                "avgRate": 782.65,
+                "openAmt": 2347.95,
+                "unrealizedPnL": -1940.9999999999998,
+                "unrealizedPnLPercent": -82.6678591963202,
+                "symbol": "IEX",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-10-2021"
+            },
+            {
+                "scpCode": "540750",
+                "scpName": "Indian Energy Exchange Limited",
+                "isin": "INE022Q01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 135.65,
+                "closingAmount": 135.65,
+                "openQty": 1.0,
+                "avgRate": 707.6,
+                "openAmt": 707.6,
+                "unrealizedPnL": -571.95,
+                "unrealizedPnLPercent": -80.82956472583382,
+                "symbol": "IEX",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2021"
+            },
+            {
+                "scpCode": "540750",
+                "scpName": "Indian Energy Exchange Limited",
+                "isin": "INE022Q01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 135.65,
+                "closingAmount": 1085.2,
+                "openQty": 8.0,
+                "avgRate": 0.0,
+                "openAmt": 0.0,
+                "unrealizedPnL": 1085.2,
+                "unrealizedPnLPercent": null,
+                "symbol": "IEX",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "03-12-2021"
+            },
+            {
+                "scpCode": "540750",
+                "scpName": "Indian Energy Exchange Limited",
+                "isin": "INE022Q01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 135.65,
+                "closingAmount": 1356.5,
+                "openQty": 10.0,
+                "avgRate": 158.35,
+                "openAmt": 1583.5,
+                "unrealizedPnL": -227.0,
+                "unrealizedPnLPercent": -14.335333122829175,
+                "symbol": "IEX",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-07-2022"
+            },
+            {
+                "scpCode": "540750",
+                "scpName": "Indian Energy Exchange Limited",
+                "isin": "INE022Q01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 135.65,
+                "closingAmount": 1356.5,
+                "openQty": 10.0,
+                "avgRate": 144.55,
+                "openAmt": 1445.5,
+                "unrealizedPnL": -89.0,
+                "unrealizedPnLPercent": -6.157039086821169,
+                "symbol": "IEX",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "03-11-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543257",
+                "scpName": "Indian Railway Finance",
+                "isin": "INE053F01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 104.85,
+                "closingAmount": 2935.7999999999997,
+                "openQty": 28.0,
+                "avgRate": 179.4,
+                "openAmt": 5023.2,
+                "unrealizedPnL": -2087.4,
+                "unrealizedPnLPercent": -41.5551839464883,
+                "symbol": "IRFC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-02-2024"
+            },
+            {
+                "scpCode": "543257",
+                "scpName": "Indian Railway Finance",
+                "isin": "INE053F01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 104.85,
+                "closingAmount": 5242.5,
+                "openQty": 50.0,
+                "avgRate": 153.15,
+                "openAmt": 7657.5,
+                "unrealizedPnL": -2415.0,
+                "unrealizedPnLPercent": -31.537708129285015,
+                "symbol": "IRFC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-02-2024"
+            },
+            {
+                "scpCode": "543257",
+                "scpName": "Indian Railway Finance",
+                "isin": "INE053F01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 104.85,
+                "closingAmount": 5242.5,
+                "openQty": 50.0,
+                "avgRate": 138.6,
+                "openAmt": 6930.0,
+                "unrealizedPnL": -1687.5,
+                "unrealizedPnLPercent": -24.350649350649352,
+                "symbol": "IRFC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "12-02-2024"
+            },
+            {
+                "scpCode": "543257",
+                "scpName": "Indian Railway Finance",
+                "isin": "INE053F01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 104.85,
+                "closingAmount": 24325.199999999997,
+                "openQty": 232.0,
+                "avgRate": 153.95000000000002,
+                "openAmt": 35716.4,
+                "unrealizedPnL": -11391.200000000004,
+                "unrealizedPnLPercent": -31.89347190646315,
+                "symbol": "IRFC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-02-2024"
+            },
+            {
+                "scpCode": "543257",
+                "scpName": "Indian Railway Finance",
+                "isin": "INE053F01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 104.85,
+                "closingAmount": 1363.05,
+                "openQty": 13.0,
+                "avgRate": 125.25,
+                "openAmt": 1628.25,
+                "unrealizedPnL": -265.20000000000005,
+                "unrealizedPnLPercent": -16.287425149700603,
+                "symbol": "IRFC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-04-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544026",
+                "scpName": "Indian Renewable Energy Develo",
+                "isin": "INE202E01016",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 132.95,
+                "closingAmount": 2260.1499999999996,
+                "openQty": 17.0,
+                "avgRate": 193.5935294117647,
+                "openAmt": 3291.09,
+                "unrealizedPnL": -1030.9400000000005,
+                "unrealizedPnLPercent": -31.32518405756149,
+                "symbol": "IREDA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532508",
+                "scpName": "JSL",
+                "isin": "INE220G01021",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.9,
+                "closingAmount": 7879.0,
+                "openQty": 10.0,
+                "avgRate": 199.65,
+                "openAmt": 1996.5,
+                "unrealizedPnL": 5882.5,
+                "unrealizedPnLPercent": 294.6406210869021,
+                "symbol": "JSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "27-10-2021"
+            },
+            {
+                "scpCode": "532508",
+                "scpName": "JSL",
+                "isin": "INE220G01021",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.9,
+                "closingAmount": 6303.2,
+                "openQty": 8.0,
+                "avgRate": 99.5,
+                "openAmt": 796.0,
+                "unrealizedPnL": 5507.2,
+                "unrealizedPnLPercent": 691.859296482412,
+                "symbol": "JSL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543398",
+                "scpName": "Latent View Analytics Limited",
+                "isin": "INE0I7C01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 310.7,
+                "closingAmount": 4349.8,
+                "openQty": 14.0,
+                "avgRate": 506.0,
+                "openAmt": 7084.0,
+                "unrealizedPnL": -2734.2,
+                "unrealizedPnLPercent": -38.59683794466403,
+                "symbol": "LATENTVIEW",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-02-2024"
+            },
+            {
+                "scpCode": "543398",
+                "scpName": "Latent View Analytics Limited",
+                "isin": "INE0I7C01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 310.7,
+                "closingAmount": 1864.1999999999998,
+                "openQty": 6.0,
+                "avgRate": 464.75,
+                "openAmt": 2788.5,
+                "unrealizedPnL": -924.3000000000002,
+                "unrealizedPnLPercent": -33.146853146853154,
+                "symbol": "LATENTVIEW",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-03-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "540900",
+                "scpName": "NEWGEN",
+                "isin": "INE619B01017",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 483.6,
+                "closingAmount": 3385.2000000000003,
+                "openQty": 7.0,
+                "avgRate": 421.2,
+                "openAmt": 2948.4,
+                "unrealizedPnL": 436.8000000000002,
+                "unrealizedPnLPercent": 14.81481481481482,
+                "symbol": "NEWGEN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "27-05-2021"
+            },
+            {
+                "scpCode": "540900",
+                "scpName": "NEWGEN",
+                "isin": "INE619B01017",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 483.6,
+                "closingAmount": 3385.2000000000003,
+                "openQty": 7.0,
+                "avgRate": 0.0,
+                "openAmt": 0.0,
+                "unrealizedPnL": 3385.2000000000003,
+                "unrealizedPnLPercent": null,
+                "symbol": "NEWGEN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "12-01-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 1103.28,
+                "openQty": 4.0,
+                "avgRate": 272.17,
+                "openAmt": 1088.68,
+                "unrealizedPnL": 14.599999999999909,
+                "unrealizedPnLPercent": 1.3410735937098053,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "16-08-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 7722.96,
+                "openQty": 28.0,
+                "avgRate": 283.09000000000003,
+                "openAmt": 7926.52,
+                "unrealizedPnL": -203.5600000000004,
+                "unrealizedPnLPercent": -2.568087887244344,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-09-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 1103.28,
+                "openQty": 4.0,
+                "avgRate": 291.65,
+                "openAmt": 1166.6,
+                "unrealizedPnL": -63.319999999999936,
+                "unrealizedPnLPercent": -5.427738727927305,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "26-09-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 23168.88,
+                "openQty": 84.0,
+                "avgRate": 292.45,
+                "openAmt": 24565.8,
+                "unrealizedPnL": -1396.9199999999983,
+                "unrealizedPnLPercent": -5.686442126859285,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "27-09-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 13791.0,
+                "openQty": 50.0,
+                "avgRate": 277.91,
+                "openAmt": 13895.5,
+                "unrealizedPnL": -104.5,
+                "unrealizedPnLPercent": -0.7520420279946746,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 5516.4,
+                "openQty": 20.0,
+                "avgRate": 276.86,
+                "openAmt": 5537.2,
+                "unrealizedPnL": -20.800000000000182,
+                "unrealizedPnLPercent": -0.37564111825471685,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-10-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 11032.8,
+                "openQty": 40.0,
+                "avgRate": 269.99,
+                "openAmt": 10799.6,
+                "unrealizedPnL": 233.1999999999989,
+                "unrealizedPnLPercent": 2.1593392347864633,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 2758.2,
+                "openQty": 10.0,
+                "avgRate": 265.5,
+                "openAmt": 2655.0,
+                "unrealizedPnL": 103.19999999999982,
+                "unrealizedPnLPercent": 3.887005649717507,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-11-2024"
+            },
+            {
+                "scpCode": "590103",
+                "scpName": "NIFTY BEES",
+                "isin": "INF204KB14I2",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 275.82,
+                "closingAmount": 55164.0,
+                "openQty": 200.0,
+                "avgRate": 246.905,
+                "openAmt": 49381.0,
+                "unrealizedPnL": 5783.0,
+                "unrealizedPnLPercent": 11.710981956622993,
+                "symbol": "NIFTYBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "07-04-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 9
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "N1443",
+                "scpName": "NIPPONAMC - NETFSILVER",
+                "isin": "INF204KC1402",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 238.16,
+                "closingAmount": 2381.6,
+                "openQty": 10.0,
+                "avgRate": 158.95999999999998,
+                "openAmt": 1589.6,
+                "unrealizedPnL": 792.0,
+                "unrealizedPnLPercent": 49.8238550578762,
+                "symbol": "SILVERBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-10-2025"
+            },
+            {
+                "scpCode": "N1443",
+                "scpName": "NIPPONAMC - NETFSILVER",
+                "isin": "INF204KC1402",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 238.16,
+                "closingAmount": 23816.0,
+                "openQty": 100.0,
+                "avgRate": 174.0,
+                "openAmt": 17400.0,
+                "unrealizedPnL": 6416.0,
+                "unrealizedPnLPercent": 36.87356321839081,
+                "symbol": "SILVERBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "14-10-2025"
+            },
+            {
+                "scpCode": "N1443",
+                "scpName": "NIPPONAMC - NETFSILVER",
+                "isin": "INF204KC1402",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 238.16,
+                "closingAmount": 17862.0,
+                "openQty": 75.0,
+                "avgRate": 142.2,
+                "openAmt": 10665.0,
+                "unrealizedPnL": 7197.0,
+                "unrealizedPnLPercent": 67.48241912798875,
+                "symbol": "SILVERBEES",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "31-10-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532698",
+                "scpName": "NITINSPINNER",
+                "isin": "INE229H01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 419.7,
+                "closingAmount": 4197.0,
+                "openQty": 10.0,
+                "avgRate": 186.6,
+                "openAmt": 1866.0,
+                "unrealizedPnL": 2331.0,
+                "unrealizedPnLPercent": 124.91961414790997,
+                "symbol": "NITINSPIN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-07-2021"
+            },
+            {
+                "scpCode": "532698",
+                "scpName": "NITINSPINNER",
+                "isin": "INE229H01012",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 419.7,
+                "closingAmount": 8394.0,
+                "openQty": 20.0,
+                "avgRate": 247.625,
+                "openAmt": 4952.5,
+                "unrealizedPnL": 3441.5,
+                "unrealizedPnLPercent": 69.49015648662292,
+                "symbol": "NITINSPIN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "30-07-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544289",
+                "scpName": "NTPC GREEN ENERGY LIMITED",
+                "isin": "INE0ONG01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 111.56,
+                "closingAmount": 15395.28,
+                "openQty": 138.0,
+                "avgRate": 108.0,
+                "openAmt": 14904.0,
+                "unrealizedPnL": 491.28000000000065,
+                "unrealizedPnLPercent": 3.2962962962963007,
+                "symbol": "NTPCGREEN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "27-11-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532555",
+                "scpName": "NTPC LTD",
+                "isin": "INE733E01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 393.65,
+                "closingAmount": 5904.75,
+                "openQty": 15.0,
+                "avgRate": 427.65,
+                "openAmt": 6414.75,
+                "unrealizedPnL": -510.0,
+                "unrealizedPnLPercent": -7.950426750847655,
+                "symbol": "NTPC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-09-2024"
+            },
+            {
+                "scpCode": "532555",
+                "scpName": "NTPC LTD",
+                "isin": "INE733E01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 393.65,
+                "closingAmount": 3936.5,
+                "openQty": 10.0,
+                "avgRate": 420.3,
+                "openAmt": 4203.0,
+                "unrealizedPnL": -266.5,
+                "unrealizedPnLPercent": -6.340709017368547,
+                "symbol": "NTPC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            },
+            {
+                "scpCode": "532555",
+                "scpName": "NTPC LTD",
+                "isin": "INE733E01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 393.65,
+                "closingAmount": 7873.0,
+                "openQty": 20.0,
+                "avgRate": 398.525,
+                "openAmt": 7970.5,
+                "unrealizedPnL": -97.5,
+                "unrealizedPnLPercent": -1.2232607741045103,
+                "symbol": "NTPC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2024"
+            },
+            {
+                "scpCode": "532555",
+                "scpName": "NTPC LTD",
+                "isin": "INE733E01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 393.65,
+                "closingAmount": 3936.5,
+                "openQty": 10.0,
+                "avgRate": 370.15,
+                "openAmt": 3701.5,
+                "unrealizedPnL": 235.0,
+                "unrealizedPnLPercent": 6.348777522625962,
+                "symbol": "NTPC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-11-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 4
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544225",
+                "scpName": "OLA ELECTRIC MOBILITY LTD",
+                "isin": "INE0LXG01040",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 40.83,
+                "closingAmount": 3878.85,
+                "openQty": 95.0,
+                "avgRate": 117.67421052631578,
+                "openAmt": 11179.05,
+                "unrealizedPnL": -7300.199999999999,
+                "unrealizedPnLPercent": -65.30250781595932,
+                "symbol": "OLAELEC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "13-08-2024"
+            },
+            {
+                "scpCode": "544225",
+                "scpName": "OLA ELECTRIC MOBILITY LTD",
+                "isin": "INE0LXG01040",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 40.83,
+                "closingAmount": 1020.75,
+                "openQty": 25.0,
+                "avgRate": 109.98,
+                "openAmt": 2749.5,
+                "unrealizedPnL": -1728.75,
+                "unrealizedPnLPercent": -62.875068194217135,
+                "symbol": "OLAELEC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "14-08-2024"
+            },
+            {
+                "scpCode": "544225",
+                "scpName": "OLA ELECTRIC MOBILITY LTD",
+                "isin": "INE0LXG01040",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 40.83,
+                "closingAmount": 1224.8999999999999,
+                "openQty": 30.0,
+                "avgRate": 88.25,
+                "openAmt": 2647.5,
+                "unrealizedPnL": -1422.6000000000001,
+                "unrealizedPnLPercent": -53.73371104815865,
+                "symbol": "OLAELEC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-10-2024"
+            },
+            {
+                "scpCode": "544225",
+                "scpName": "OLA ELECTRIC MOBILITY LTD",
+                "isin": "INE0LXG01040",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 40.83,
+                "closingAmount": 2041.5,
+                "openQty": 50.0,
+                "avgRate": 53.22,
+                "openAmt": 2661.0,
+                "unrealizedPnL": -619.5,
+                "unrealizedPnLPercent": -23.280721533258173,
+                "symbol": "OLAELEC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-03-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 4
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532439",
+                "scpName": "OLECTRA GREENTECH LTD",
+                "isin": "INE260D01016",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1226.25,
+                "closingAmount": 12262.5,
+                "openQty": 10.0,
+                "avgRate": 289.975,
+                "openAmt": 2899.75,
+                "unrealizedPnL": 9362.75,
+                "unrealizedPnLPercent": 322.8812828692129,
+                "symbol": "OLECTRA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "29-07-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543396",
+                "scpName": "One97 Communications Ltd",
+                "isin": "INE982J01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1161.75,
+                "closingAmount": 6970.5,
+                "openQty": 6.0,
+                "avgRate": 2150.0,
+                "openAmt": 12900.0,
+                "unrealizedPnL": -5929.5,
+                "unrealizedPnLPercent": -45.96511627906977,
+                "symbol": "PAYTM",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-11-2021"
+            },
+            {
+                "scpCode": "543396",
+                "scpName": "One97 Communications Ltd",
+                "isin": "INE982J01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1161.75,
+                "closingAmount": 2323.5,
+                "openQty": 2.0,
+                "avgRate": 921.1,
+                "openAmt": 1842.2,
+                "unrealizedPnL": 481.29999999999995,
+                "unrealizedPnLPercent": 26.12637064379546,
+                "symbol": "PAYTM",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "31-01-2022"
+            },
+            {
+                "scpCode": "543396",
+                "scpName": "One97 Communications Ltd",
+                "isin": "INE982J01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1161.75,
+                "closingAmount": 5808.75,
+                "openQty": 5.0,
+                "avgRate": 406.75,
+                "openAmt": 2033.75,
+                "unrealizedPnL": 3775.0,
+                "unrealizedPnLPercent": 185.6177012907191,
+                "symbol": "PAYTM",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "02-04-2024"
+            },
+            {
+                "scpCode": "543396",
+                "scpName": "One97 Communications Ltd",
+                "isin": "INE982J01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1161.75,
+                "closingAmount": 4647.0,
+                "openQty": 4.0,
+                "avgRate": 703.95,
+                "openAmt": 2815.8,
+                "unrealizedPnL": 1831.1999999999998,
+                "unrealizedPnLPercent": 65.03302791391434,
+                "symbol": "PAYTM",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-10-2024"
+            },
+            {
+                "scpCode": "543396",
+                "scpName": "One97 Communications Ltd",
+                "isin": "INE982J01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1161.75,
+                "closingAmount": 2323.5,
+                "openQty": 2.0,
+                "avgRate": 737.25,
+                "openAmt": 1474.5,
+                "unrealizedPnL": 849.0,
+                "unrealizedPnLPercent": 57.578840284842315,
+                "symbol": "PAYTM",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500312",
+                "scpName": "ONG CORP LTD",
+                "isin": "INE213A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 283.95,
+                "closingAmount": 2839.5,
+                "openQty": 10.0,
+                "avgRate": 316.25,
+                "openAmt": 3162.5,
+                "unrealizedPnL": -323.0,
+                "unrealizedPnLPercent": -10.213438735177865,
+                "symbol": "ONGC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "15-07-2024"
+            },
+            {
+                "scpCode": "500312",
+                "scpName": "ONG CORP LTD",
+                "isin": "INE213A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 283.95,
+                "closingAmount": 5679.0,
+                "openQty": 20.0,
+                "avgRate": 331.15,
+                "openAmt": 6623.0,
+                "unrealizedPnL": -944.0,
+                "unrealizedPnLPercent": -14.253359504756153,
+                "symbol": "ONGC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "18-07-2024"
+            },
+            {
+                "scpCode": "500312",
+                "scpName": "ONG CORP LTD",
+                "isin": "INE213A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 283.95,
+                "closingAmount": 2839.5,
+                "openQty": 10.0,
+                "avgRate": 309.0,
+                "openAmt": 3090.0,
+                "unrealizedPnL": -250.5,
+                "unrealizedPnLPercent": -8.106796116504853,
+                "symbol": "ONGC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-07-2024"
+            },
+            {
+                "scpCode": "500312",
+                "scpName": "ONG CORP LTD",
+                "isin": "INE213A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 283.95,
+                "closingAmount": 3407.3999999999996,
+                "openQty": 12.0,
+                "avgRate": 262.95,
+                "openAmt": 3155.4,
+                "unrealizedPnL": 251.99999999999955,
+                "unrealizedPnLPercent": 7.986309184255546,
+                "symbol": "ONGC",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "31-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 4
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543390",
+                "scpName": "PB Fintech Limited",
+                "isin": "INE417T01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1600.65,
+                "closingAmount": 3201.3,
+                "openQty": 2.0,
+                "avgRate": 1317.15,
+                "openAmt": 2634.3,
+                "unrealizedPnL": 567.0,
+                "unrealizedPnLPercent": 21.523744448240517,
+                "symbol": "POLICYBZR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "16-11-2021"
+            },
+            {
+                "scpCode": "543390",
+                "scpName": "PB Fintech Limited",
+                "isin": "INE417T01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1600.65,
+                "closingAmount": 3201.3,
+                "openQty": 2.0,
+                "avgRate": 981.85,
+                "openAmt": 1963.7,
+                "unrealizedPnL": 1237.6000000000001,
+                "unrealizedPnLPercent": 63.02388348525743,
+                "symbol": "POLICYBZR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-12-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "506590",
+                "scpName": "PHIL CAR BLK",
+                "isin": "INE602A01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 285.05,
+                "closingAmount": 1425.25,
+                "openQty": 5.0,
+                "avgRate": 435.45,
+                "openAmt": 2177.25,
+                "unrealizedPnL": -752.0,
+                "unrealizedPnLPercent": -34.53898266161442,
+                "symbol": "PCBL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-11-2024"
+            },
+            {
+                "scpCode": "506590",
+                "scpName": "PHIL CAR BLK",
+                "isin": "INE602A01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 285.05,
+                "closingAmount": 2850.5,
+                "openQty": 10.0,
+                "avgRate": 402.1,
+                "openAmt": 4021.0,
+                "unrealizedPnL": -1170.5,
+                "unrealizedPnLPercent": -29.109674210395426,
+                "symbol": "PCBL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-11-2024"
+            },
+            {
+                "scpCode": "506590",
+                "scpName": "PHIL CAR BLK",
+                "isin": "INE602A01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 285.05,
+                "closingAmount": 2850.5,
+                "openQty": 10.0,
+                "avgRate": 366.85,
+                "openAmt": 3668.5,
+                "unrealizedPnL": -818.0,
+                "unrealizedPnLPercent": -22.29794193812185,
+                "symbol": "PCBL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "30-01-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 272.52,
+                "openQty": 36.0,
+                "avgRate": 108.0,
+                "openAmt": 3888.0,
+                "unrealizedPnL": -3615.48,
+                "unrealizedPnLPercent": -92.99074074074073,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-01-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 484.48,
+                "openQty": 64.0,
+                "avgRate": 113.2,
+                "openAmt": 7244.8,
+                "unrealizedPnL": -6760.32,
+                "unrealizedPnLPercent": -93.31272084805653,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-01-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 3028.0,
+                "openQty": 400.0,
+                "avgRate": 0.0,
+                "openAmt": 0.0,
+                "unrealizedPnL": 3028.0,
+                "unrealizedPnLPercent": null,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-02-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 378.5,
+                "openQty": 50.0,
+                "avgRate": 20.1,
+                "openAmt": 1005.0,
+                "unrealizedPnL": -626.5,
+                "unrealizedPnLPercent": -62.33830845771144,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "14-03-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 151.4,
+                "openQty": 20.0,
+                "avgRate": 17.8,
+                "openAmt": 356.0,
+                "unrealizedPnL": -204.6,
+                "unrealizedPnLPercent": -57.471910112359545,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "26-07-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 166.54000000000002,
+                "openQty": 22.0,
+                "avgRate": 17.86,
+                "openAmt": 392.92,
+                "unrealizedPnL": -226.38,
+                "unrealizedPnLPercent": -57.6147816349384,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-08-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 757.0,
+                "openQty": 100.0,
+                "avgRate": 18.37,
+                "openAmt": 1837.0,
+                "unrealizedPnL": -1080.0,
+                "unrealizedPnLPercent": -58.7915078933043,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 340.65000000000003,
+                "openQty": 45.0,
+                "avgRate": 17.55,
+                "openAmt": 789.75,
+                "unrealizedPnL": -449.09999999999997,
+                "unrealizedPnLPercent": -56.86609686609686,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-10-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 454.20000000000005,
+                "openQty": 60.0,
+                "avgRate": 16.66,
+                "openAmt": 999.6,
+                "unrealizedPnL": -545.4,
+                "unrealizedPnLPercent": -54.56182472989195,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 529.9,
+                "openQty": 70.0,
+                "avgRate": 16.25,
+                "openAmt": 1137.5,
+                "unrealizedPnL": -607.6,
+                "unrealizedPnLPercent": -53.41538461538462,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-11-2024"
+            },
+            {
+                "scpCode": "540642",
+                "scpName": "SALASAR TECHNO ENGG. LTD.",
+                "isin": "INE170V01027",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 7.57,
+                "closingAmount": 280.09000000000003,
+                "openQty": 37.0,
+                "avgRate": 8.1,
+                "openAmt": 299.7,
+                "unrealizedPnL": -19.609999999999957,
+                "unrealizedPnLPercent": -6.543209876543196,
+                "symbol": "SALASAR",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-03-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 11
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "523598",
+                "scpName": "SHIPPING COR",
+                "isin": "INE109A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 305.85,
+                "closingAmount": 3670.2000000000003,
+                "openQty": 12.0,
+                "avgRate": 290.0,
+                "openAmt": 3480.0,
+                "unrealizedPnL": 190.20000000000027,
+                "unrealizedPnLPercent": 5.4655172413793185,
+                "symbol": "SCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-07-2024"
+            },
+            {
+                "scpCode": "523598",
+                "scpName": "SHIPPING COR",
+                "isin": "INE109A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 305.85,
+                "closingAmount": 3058.5,
+                "openQty": 10.0,
+                "avgRate": 216.545,
+                "openAmt": 2165.45,
+                "unrealizedPnL": 893.0500000000002,
+                "unrealizedPnLPercent": 41.24085063150847,
+                "symbol": "SCI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "23-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "511218",
+                "scpName": "SHRIRAM TRANSPORT",
+                "isin": "INE721A01047",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1036.5,
+                "closingAmount": 19693.5,
+                "openQty": 19.0,
+                "avgRate": 537.0,
+                "openAmt": 10203.0,
+                "unrealizedPnL": 9490.5,
+                "unrealizedPnLPercent": 93.01675977653632,
+                "symbol": "SHRIRAMFIN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "29-01-2025"
+            },
+            {
+                "scpCode": "511218",
+                "scpName": "SHRIRAM TRANSPORT",
+                "isin": "INE721A01047",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1036.5,
+                "closingAmount": 10365.0,
+                "openQty": 10.0,
+                "avgRate": 674.65,
+                "openAmt": 6746.5,
+                "unrealizedPnL": 3618.5,
+                "unrealizedPnLPercent": 53.63521826132068,
+                "symbol": "SHRIRAMFIN",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-03-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543299",
+                "scpName": "Shyam Metalics and Energy LTD",
+                "isin": "INE810G01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 864.8,
+                "closingAmount": 8648.0,
+                "openQty": 10.0,
+                "avgRate": 388.45,
+                "openAmt": 3884.5,
+                "unrealizedPnL": 4763.5,
+                "unrealizedPnLPercent": 122.6283949028189,
+                "symbol": "SHYAMMETL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "24-06-2021"
+            },
+            {
+                "scpCode": "543299",
+                "scpName": "Shyam Metalics and Energy LTD",
+                "isin": "INE810G01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 864.8,
+                "closingAmount": 4324.0,
+                "openQty": 5.0,
+                "avgRate": 278.55,
+                "openAmt": 1392.75,
+                "unrealizedPnL": 2931.25,
+                "unrealizedPnLPercent": 210.46490755699153,
+                "symbol": "SHYAMMETL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-07-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "532784",
+                "scpName": "SOBHA DEV",
+                "isin": "INE671H01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1332.5,
+                "closingAmount": 5330.0,
+                "openQty": 4.0,
+                "avgRate": 615.3375,
+                "openAmt": 2461.35,
+                "unrealizedPnL": 2868.65,
+                "unrealizedPnLPercent": 116.54782944319176,
+                "symbol": "SOBHA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "26-07-2021"
+            },
+            {
+                "scpCode": "532784",
+                "scpName": "SOBHA DEV",
+                "isin": "INE671H01015",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1332.5,
+                "closingAmount": 1332.5,
+                "openQty": 1.0,
+                "avgRate": 557.35,
+                "openAmt": 557.35,
+                "unrealizedPnL": 775.15,
+                "unrealizedPnLPercent": 139.07777877455817,
+                "symbol": "SOBHA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-06-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500113",
+                "scpName": "STEEL AUTHOR",
+                "isin": "INE114A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 173.5,
+                "closingAmount": 694.0,
+                "openQty": 4.0,
+                "avgRate": 131.375,
+                "openAmt": 525.5,
+                "unrealizedPnL": 168.5,
+                "unrealizedPnLPercent": 32.06470028544244,
+                "symbol": "SAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "06-05-2021"
+            },
+            {
+                "scpCode": "500113",
+                "scpName": "STEEL AUTHOR",
+                "isin": "INE114A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 173.5,
+                "closingAmount": 867.5,
+                "openQty": 5.0,
+                "avgRate": 147.2,
+                "openAmt": 736.0,
+                "unrealizedPnL": 131.5,
+                "unrealizedPnLPercent": 17.866847826086957,
+                "symbol": "SAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "10-05-2021"
+            },
+            {
+                "scpCode": "500113",
+                "scpName": "STEEL AUTHOR",
+                "isin": "INE114A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 173.5,
+                "closingAmount": 347.0,
+                "openQty": 2.0,
+                "avgRate": 124.7,
+                "openAmt": 249.4,
+                "unrealizedPnL": 97.6,
+                "unrealizedPnLPercent": 39.13392141138733,
+                "symbol": "SAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-05-2021"
+            },
+            {
+                "scpCode": "500113",
+                "scpName": "STEEL AUTHOR",
+                "isin": "INE114A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 173.5,
+                "closingAmount": 1735.0,
+                "openQty": 10.0,
+                "avgRate": 120.7,
+                "openAmt": 1207.0,
+                "unrealizedPnL": 528.0,
+                "unrealizedPnLPercent": 43.74482187241094,
+                "symbol": "SAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "24-05-2021"
+            },
+            {
+                "scpCode": "500113",
+                "scpName": "STEEL AUTHOR",
+                "isin": "INE114A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 173.5,
+                "closingAmount": 4511.0,
+                "openQty": 26.0,
+                "avgRate": 66.66538461538461,
+                "openAmt": 1733.3,
+                "unrealizedPnL": 2777.7,
+                "unrealizedPnLPercent": 160.25500490394046,
+                "symbol": "SAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            },
+            {
+                "scpCode": "500113",
+                "scpName": "STEEL AUTHOR",
+                "isin": "INE114A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 173.5,
+                "closingAmount": 173.5,
+                "openQty": 1.0,
+                "avgRate": 84.85,
+                "openAmt": 84.85,
+                "unrealizedPnL": 88.65,
+                "unrealizedPnLPercent": 104.47849145550974,
+                "symbol": "SAIL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-01-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 6
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500570",
+                "scpName": "TATA MOTORS",
+                "isin": "INE155A01022",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 360.15,
+                "closingAmount": 3601.5,
+                "openQty": 10.0,
+                "avgRate": 343.92296999999996,
+                "openAmt": 3439.2297,
+                "unrealizedPnL": 162.27030000000013,
+                "unrealizedPnLPercent": 4.718216407586854,
+                "symbol": "TMPV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "13-10-2021"
+            },
+            {
+                "scpCode": "500570",
+                "scpName": "TATA MOTORS",
+                "isin": "INE155A01022",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 360.15,
+                "closingAmount": 1440.6,
+                "openQty": 4.0,
+                "avgRate": 273.1968,
+                "openAmt": 1092.7872,
+                "unrealizedPnL": 347.8127999999999,
+                "unrealizedPnLPercent": 31.828044838006882,
+                "symbol": "TMPV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            },
+            {
+                "scpCode": "500570",
+                "scpName": "TATA MOTORS",
+                "isin": "INE155A01022",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 360.15,
+                "closingAmount": 1800.75,
+                "openQty": 5.0,
+                "avgRate": 265.34101999999996,
+                "openAmt": 1326.7051,
+                "unrealizedPnL": 474.0449000000001,
+                "unrealizedPnLPercent": 35.730992516724335,
+                "symbol": "TMPV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-01-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544569",
+                "scpName": "Tata Motors Limited",
+                "isin": "INE1TAE01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 439.15,
+                "closingAmount": 4391.5,
+                "openQty": 10.0,
+                "avgRate": 155.60202999999998,
+                "openAmt": 1556.0203,
+                "unrealizedPnL": 2835.4797,
+                "unrealizedPnLPercent": 182.22639511836704,
+                "symbol": "TMCV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "13-10-2021"
+            },
+            {
+                "scpCode": "544569",
+                "scpName": "Tata Motors Limited",
+                "isin": "INE1TAE01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 439.15,
+                "closingAmount": 1756.6,
+                "openQty": 4.0,
+                "avgRate": 123.6032,
+                "openAmt": 494.4128,
+                "unrealizedPnL": 1262.1871999999998,
+                "unrealizedPnLPercent": 255.29015430021227,
+                "symbol": "TMCV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            },
+            {
+                "scpCode": "544569",
+                "scpName": "Tata Motors Limited",
+                "isin": "INE1TAE01010",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 439.15,
+                "closingAmount": 2195.75,
+                "openQty": 5.0,
+                "avgRate": 120.04898,
+                "openAmt": 600.2449,
+                "unrealizedPnL": 1595.5050999999999,
+                "unrealizedPnLPercent": 265.809022284071,
+                "symbol": "TMCV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-01-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500470",
+                "scpName": "TATA STL",
+                "isin": "INE081A01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 212.05,
+                "closingAmount": 1060.25,
+                "openQty": 5.0,
+                "avgRate": 135.6,
+                "openAmt": 678.0,
+                "unrealizedPnL": 382.25,
+                "unrealizedPnLPercent": 56.379056047197636,
+                "symbol": "TATASTEEL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-01-2024"
+            },
+            {
+                "scpCode": "500470",
+                "scpName": "TATA STL",
+                "isin": "INE081A01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 212.05,
+                "closingAmount": 424.1,
+                "openQty": 2.0,
+                "avgRate": 140.6,
+                "openAmt": 281.2,
+                "unrealizedPnL": 142.90000000000003,
+                "unrealizedPnLPercent": 50.81792318634425,
+                "symbol": "TATASTEEL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "09-02-2024"
+            },
+            {
+                "scpCode": "500470",
+                "scpName": "TATA STL",
+                "isin": "INE081A01020",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 212.05,
+                "closingAmount": 4453.05,
+                "openQty": 21.0,
+                "avgRate": 139.7,
+                "openAmt": 2933.7,
+                "unrealizedPnL": 1519.3500000000004,
+                "unrealizedPnLPercent": 51.78954903364353,
+                "symbol": "TATASTEEL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "12-02-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "N1524",
+                "scpName": "TATAAML-TATSILV",
+                "isin": "INF277KA1984",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "NSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 24.16,
+                "closingAmount": 22952.0,
+                "openQty": 950.0,
+                "avgRate": 16.89,
+                "openAmt": 16045.5,
+                "unrealizedPnL": 6906.5,
+                "unrealizedPnLPercent": 43.043220840734165,
+                "symbol": "TATSILV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "10-10-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543321",
+                "scpName": "Tatva Chintan Pharma Chem Limi",
+                "isin": "INE0GK401011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1275.1,
+                "closingAmount": 12751.0,
+                "openQty": 10.0,
+                "avgRate": 2320.82,
+                "openAmt": 23208.2,
+                "unrealizedPnL": -10457.2,
+                "unrealizedPnLPercent": -45.05821218362476,
+                "symbol": "TATVA",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "29-07-2021"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "507205",
+                "scpName": "TILAKNAG IND(BSE INDONEXT)",
+                "isin": "INE133E01013",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 470.0,
+                "closingAmount": 4700.0,
+                "openQty": 10.0,
+                "avgRate": 121.9,
+                "openAmt": 1219.0,
+                "unrealizedPnL": 3481.0,
+                "unrealizedPnLPercent": 285.5619360131255,
+                "symbol": "TI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-02-2023"
+            },
+            {
+                "scpCode": "507205",
+                "scpName": "TILAKNAG IND(BSE INDONEXT)",
+                "isin": "INE133E01013",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 470.0,
+                "closingAmount": 14100.0,
+                "openQty": 30.0,
+                "avgRate": 136.21,
+                "openAmt": 4086.3,
+                "unrealizedPnL": 10013.7,
+                "unrealizedPnLPercent": 245.05542911680496,
+                "symbol": "TI",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "05-05-2023"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "542904",
+                "scpName": "UJJIVANSMALLFINANCBANK",
+                "isin": "INE551W01018",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 58.77,
+                "closingAmount": 587.7,
+                "openQty": 10.0,
+                "avgRate": 37.160000000000004,
+                "openAmt": 371.6,
+                "unrealizedPnL": 216.10000000000002,
+                "unrealizedPnLPercent": 58.15392895586653,
+                "symbol": "UJJIVANSFB",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "31-10-2024"
+            },
+            {
+                "scpCode": "542904",
+                "scpName": "UJJIVANSMALLFINANCBANK",
+                "isin": "INE551W01018",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 58.77,
+                "closingAmount": 11754.0,
+                "openQty": 200.0,
+                "avgRate": 38.78,
+                "openAmt": 7756.0,
+                "unrealizedPnL": 3998.0,
+                "unrealizedPnLPercent": 51.547189272821036,
+                "symbol": "UJJIVANSFB",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-11-2024"
+            },
+            {
+                "scpCode": "542904",
+                "scpName": "UJJIVANSMALLFINANCBANK",
+                "isin": "INE551W01018",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 58.77,
+                "closingAmount": 9285.66,
+                "openQty": 158.0,
+                "avgRate": 35.5,
+                "openAmt": 5609.0,
+                "unrealizedPnL": 3676.66,
+                "unrealizedPnLPercent": 65.54929577464789,
+                "symbol": "UJJIVANSFB",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "12-11-2024"
+            },
+            {
+                "scpCode": "542904",
+                "scpName": "UJJIVANSMALLFINANCBANK",
+                "isin": "INE551W01018",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 58.77,
+                "closingAmount": 5877.0,
+                "openQty": 100.0,
+                "avgRate": 34.27,
+                "openAmt": 3427.0,
+                "unrealizedPnL": 2450.0,
+                "unrealizedPnLPercent": 71.49110008754013,
+                "symbol": "UJJIVANSFB",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-11-2024"
+            },
+            {
+                "scpCode": "542904",
+                "scpName": "UJJIVANSMALLFINANCBANK",
+                "isin": "INE551W01018",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 58.77,
+                "closingAmount": 5877.0,
+                "openQty": 100.0,
+                "avgRate": 35.3,
+                "openAmt": 3530.0,
+                "unrealizedPnL": 2347.0,
+                "unrealizedPnLPercent": 66.48725212464589,
+                "symbol": "UJJIVANSFB",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "30-01-2025"
+            },
+            {
+                "scpCode": "542904",
+                "scpName": "UJJIVANSMALLFINANCBANK",
+                "isin": "INE551W01018",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 58.77,
+                "closingAmount": 4113.900000000001,
+                "openQty": 70.0,
+                "avgRate": 36.2,
+                "openAmt": 2534.0,
+                "unrealizedPnL": 1579.9000000000005,
+                "unrealizedPnLPercent": 62.348066298342566,
+                "symbol": "UJJIVANSFB",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-03-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 6
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500295",
+                "scpName": "VEDANTA LTD",
+                "isin": "INE205A01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.6,
+                "closingAmount": 4725.6,
+                "openQty": 6.0,
+                "avgRate": 442.3,
+                "openAmt": 2653.8,
+                "unrealizedPnL": 2071.8,
+                "unrealizedPnLPercent": 78.06918381189239,
+                "symbol": "VEDL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "26-07-2024"
+            },
+            {
+                "scpCode": "500295",
+                "scpName": "VEDANTA LTD",
+                "isin": "INE205A01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.6,
+                "closingAmount": 26778.4,
+                "openQty": 34.0,
+                "avgRate": 431.25,
+                "openAmt": 14662.5,
+                "unrealizedPnL": 12115.900000000001,
+                "unrealizedPnLPercent": 82.63188405797102,
+                "symbol": "VEDL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-08-2024"
+            },
+            {
+                "scpCode": "500295",
+                "scpName": "VEDANTA LTD",
+                "isin": "INE205A01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.6,
+                "closingAmount": 9451.2,
+                "openQty": 12.0,
+                "avgRate": 457.2166666666667,
+                "openAmt": 5486.6,
+                "unrealizedPnL": 3964.6000000000004,
+                "unrealizedPnLPercent": 72.25968723799804,
+                "symbol": "VEDL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-10-2024"
+            },
+            {
+                "scpCode": "500295",
+                "scpName": "VEDANTA LTD",
+                "isin": "INE205A01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.6,
+                "closingAmount": 7876.0,
+                "openQty": 10.0,
+                "avgRate": 429.45,
+                "openAmt": 4294.5,
+                "unrealizedPnL": 3581.5,
+                "unrealizedPnLPercent": 83.39736872744209,
+                "symbol": "VEDL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "29-01-2025"
+            },
+            {
+                "scpCode": "500295",
+                "scpName": "VEDANTA LTD",
+                "isin": "INE205A01025",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 787.6,
+                "closingAmount": 1575.2,
+                "openQty": 2.0,
+                "avgRate": 410.1,
+                "openAmt": 820.2,
+                "unrealizedPnL": 755.0,
+                "unrealizedPnLPercent": 92.05071933674714,
+                "symbol": "VEDL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-04-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "514162",
+                "scpName": "WELSPUN INDI",
+                "isin": "INE192B01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 125.45,
+                "closingAmount": 627.25,
+                "openQty": 5.0,
+                "avgRate": 96.75,
+                "openAmt": 483.75,
+                "unrealizedPnL": 143.5,
+                "unrealizedPnLPercent": 29.6640826873385,
+                "symbol": "WELSPUNLIV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "10-05-2021"
+            },
+            {
+                "scpCode": "514162",
+                "scpName": "WELSPUN INDI",
+                "isin": "INE192B01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 125.45,
+                "closingAmount": 627.25,
+                "openQty": 5.0,
+                "avgRate": 98.0,
+                "openAmt": 490.0,
+                "unrealizedPnL": 137.25,
+                "unrealizedPnLPercent": 28.01020408163265,
+                "symbol": "WELSPUNLIV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "19-05-2021"
+            },
+            {
+                "scpCode": "514162",
+                "scpName": "WELSPUN INDI",
+                "isin": "INE192B01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 125.45,
+                "closingAmount": 1254.5,
+                "openQty": 10.0,
+                "avgRate": 86.25,
+                "openAmt": 862.5,
+                "unrealizedPnL": 392.0,
+                "unrealizedPnLPercent": 45.44927536231884,
+                "symbol": "WELSPUNLIV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-06-2021"
+            },
+            {
+                "scpCode": "514162",
+                "scpName": "WELSPUN INDI",
+                "isin": "INE192B01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 125.45,
+                "closingAmount": 1881.75,
+                "openQty": 15.0,
+                "avgRate": 66.0,
+                "openAmt": 990.0,
+                "unrealizedPnL": 891.75,
+                "unrealizedPnLPercent": 90.07575757575758,
+                "symbol": "WELSPUNLIV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "01-06-2022"
+            },
+            {
+                "scpCode": "514162",
+                "scpName": "WELSPUN INDI",
+                "isin": "INE192B01031",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 125.45,
+                "closingAmount": 4390.75,
+                "openQty": 35.0,
+                "avgRate": 68.75,
+                "openAmt": 2406.25,
+                "unrealizedPnL": 1984.5,
+                "unrealizedPnLPercent": 82.47272727272727,
+                "symbol": "WELSPUNLIV",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "543534",
+                "scpName": "Aether Industries Limited",
+                "isin": "INE0BWX01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1180.15,
+                "closingAmount": 7080.900000000001,
+                "openQty": 6.0,
+                "avgRate": 996.25,
+                "openAmt": 5977.5,
+                "unrealizedPnL": 1103.4000000000005,
+                "unrealizedPnLPercent": 18.459222082810548,
+                "symbol": "AETHER",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-06-2023"
+            },
+            {
+                "scpCode": "543534",
+                "scpName": "Aether Industries Limited",
+                "isin": "INE0BWX01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1180.15,
+                "closingAmount": 7080.900000000001,
+                "openQty": 6.0,
+                "avgRate": 809.5,
+                "openAmt": 4857.0,
+                "unrealizedPnL": 2223.9000000000005,
+                "unrealizedPnLPercent": 45.787523162445964,
+                "symbol": "AETHER",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-03-2024"
+            }{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 39613.0,
+                "openQty": 140.0,
+                "avgRate": 17.164285714285715,
+                "openAmt": 2403.0,
+                "unrealizedPnL": 37210.0,
+                "unrealizedPnLPercent": 1548.481065334998,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "03-01-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 33954.0,
+                "openQty": 120.0,
+                "avgRate": 17.28083333333333,
+                "openAmt": 2073.7,
+                "unrealizedPnL": 31880.3,
+                "unrealizedPnLPercent": 1537.3631672855283,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-01-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 28295.0,
+                "openQty": 100.0,
+                "avgRate": 16.61,
+                "openAmt": 1661.0,
+                "unrealizedPnL": 26634.0,
+                "unrealizedPnLPercent": 1603.4918723660446,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-01-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 19806.5,
+                "openQty": 70.0,
+                "avgRate": 12.895,
+                "openAmt": 902.65,
+                "unrealizedPnL": 18903.85,
+                "unrealizedPnLPercent": 2094.261341605273,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-04-2022"
+            },
+            {
+                "scpCode": "540879",
+                "scpName": "APOLLO MICRO SYSTEMS LTD",
+                "isin": "INE713T01028",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 282.95,
+                "closingAmount": 76396.5,
+                "openQty": 270.0,
+                "avgRate": 14.75537037037037,
+                "openAmt": 3983.95,
+                "unrealizedPnL": 72412.55,
+                "unrealizedPnLPercent": 1817.6068976769286,
+                "symbol": "APOLLO",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-04-2022"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544261",
+                "scpName": "ARKADE DEVELOPERS LIMITED",
+                "isin": "INE0QRL01017",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 116.82,
+                "closingAmount": 3504.6,
+                "openQty": 30.0,
+                "avgRate": 177.47333333333333,
+                "openAmt": 5324.2,
+                "unrealizedPnL": -1819.6,
+                "unrealizedPnLPercent": -34.176026445287555,
+                "symbol": "ARKADE",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "24-09-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500477",
+                "scpName": "ASHOK LEYLND",
+                "isin": "INE208A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 174.75,
+                "closingAmount": 349.5,
+                "openQty": 2.0,
+                "avgRate": 162.85,
+                "openAmt": 325.7,
+                "unrealizedPnL": 23.80000000000001,
+                "unrealizedPnLPercent": 7.307338041142159,
+                "symbol": "ASHOKLEY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "16-06-2023"
+            },
+            {
+                "scpCode": "500477",
+                "scpName": "ASHOK LEYLND",
+                "isin": "INE208A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 174.75,
+                "closingAmount": 3145.5,
+                "openQty": 18.0,
+                "avgRate": 222.10111111111112,
+                "openAmt": 3997.82,
+                "unrealizedPnL": -852.3200000000002,
+                "unrealizedPnLPercent": -21.319619192459893,
+                "symbol": "ASHOKLEY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            },
+            {
+                "scpCode": "500477",
+                "scpName": "ASHOK LEYLND",
+                "isin": "INE208A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 174.75,
+                "closingAmount": 1747.5,
+                "openQty": 10.0,
+                "avgRate": 208.71999999999997,
+                "openAmt": 2087.2,
+                "unrealizedPnL": -339.6999999999998,
+                "unrealizedPnLPercent": -16.27539287083173,
+                "symbol": "ASHOKLEY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "30-01-2025"
+            },
+            {
+                "scpCode": "500477",
+                "scpName": "ASHOK LEYLND",
+                "isin": "INE208A01029",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 174.75,
+                "closingAmount": 5242.5,
+                "openQty": 30.0,
+                "avgRate": 0.0,
+                "openAmt": 0.0,
+                "unrealizedPnL": 5242.5,
+                "unrealizedPnLPercent": null,
+                "symbol": "ASHOKLEY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "16-07-2025"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 4
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544252",
+                "scpName": "BAJAJ HOUSING FINANCE LTD",
+                "isin": "INE377Y01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 91.83,
+                "closingAmount": 4591.5,
+                "openQty": 50.0,
+                "avgRate": 159.78,
+                "openAmt": 7989.0,
+                "unrealizedPnL": -3397.5,
+                "unrealizedPnLPercent": -42.52722493428464,
+                "symbol": "BAJAJHFL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "16-09-2024"
+            },
+            {
+                "scpCode": "544252",
+                "scpName": "BAJAJ HOUSING FINANCE LTD",
+                "isin": "INE377Y01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 91.83,
+                "closingAmount": 1836.6,
+                "openQty": 20.0,
+                "avgRate": 142.77,
+                "openAmt": 2855.4,
+                "unrealizedPnL": -1018.8000000000002,
+                "unrealizedPnLPercent": -35.67976465644043,
+                "symbol": "BAJAJHFL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            },
+            {
+                "scpCode": "544252",
+                "scpName": "BAJAJ HOUSING FINANCE LTD",
+                "isin": "INE377Y01014",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 91.83,
+                "closingAmount": 4591.5,
+                "openQty": 50.0,
+                "avgRate": 138.48,
+                "openAmt": 6924.0,
+                "unrealizedPnL": -2332.5,
+                "unrealizedPnLPercent": -33.68717504332756,
+                "symbol": "BAJAJHFL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500547",
+                "scpName": "BHARAT PETROLEUM CORPORATION L",
+                "isin": "INE029A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 312.05,
+                "closingAmount": 1248.2,
+                "openQty": 4.0,
+                "avgRate": 493.05,
+                "openAmt": 1972.2,
+                "unrealizedPnL": -724.0,
+                "unrealizedPnLPercent": -36.710272791806105,
+                "symbol": "BPCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "06-09-2021"
+            },
+            {
+                "scpCode": "500547",
+                "scpName": "BHARAT PETROLEUM CORPORATION L",
+                "isin": "INE029A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 312.05,
+                "closingAmount": 312.05,
+                "openQty": 1.0,
+                "avgRate": 431.6,
+                "openAmt": 431.6,
+                "unrealizedPnL": -119.55000000000001,
+                "unrealizedPnLPercent": -27.699258572752548,
+                "symbol": "BPCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "10-11-2021"
+            },
+            {
+                "scpCode": "500547",
+                "scpName": "BHARAT PETROLEUM CORPORATION L",
+                "isin": "INE029A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 312.05,
+                "closingAmount": 624.1,
+                "openQty": 2.0,
+                "avgRate": 417.1,
+                "openAmt": 834.2,
+                "unrealizedPnL": -210.10000000000002,
+                "unrealizedPnLPercent": -25.185806760968592,
+                "symbol": "BPCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-11-2021"
+            },
+            {
+                "scpCode": "500547",
+                "scpName": "BHARAT PETROLEUM CORPORATION L",
+                "isin": "INE029A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 312.05,
+                "closingAmount": 1248.2,
+                "openQty": 4.0,
+                "avgRate": 313.325,
+                "openAmt": 1253.3,
+                "unrealizedPnL": -5.099999999999909,
+                "unrealizedPnLPercent": -0.4069257161094637,
+                "symbol": "BPCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "04-07-2022"
+            },
+            {
+                "scpCode": "500547",
+                "scpName": "BHARAT PETROLEUM CORPORATION L",
+                "isin": "INE029A01011",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 312.05,
+                "closingAmount": 3432.55,
+                "openQty": 11.0,
+                "avgRate": 0.0,
+                "openAmt": 0.0,
+                "unrealizedPnL": 3432.55,
+                "unrealizedPnLPercent": null,
+                "symbol": "BPCL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "21-06-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 5
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "524332",
+                "scpName": "BHATINDA CH.(BSE INDONEXT)",
+                "isin": "INE412G01024",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 33.44,
+                "closingAmount": 1605.12,
+                "openQty": 48.0,
+                "avgRate": 51.4,
+                "openAmt": 2467.2,
+                "unrealizedPnL": -862.0799999999999,
+                "unrealizedPnLPercent": -34.94163424124513,
+                "symbol": "BCLIND",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "07-11-2023"
+            },
+            {
+                "scpCode": "524332",
+                "scpName": "BHATINDA CH.(BSE INDONEXT)",
+                "isin": "INE412G01024",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 33.44,
+                "closingAmount": 1672.0,
+                "openQty": 50.0,
+                "avgRate": 55.9,
+                "openAmt": 2795.0,
+                "unrealizedPnL": -1123.0,
+                "unrealizedPnLPercent": -40.17889087656529,
+                "symbol": "BCLIND",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-11-2023"
+            },
+            {
+                "scpCode": "524332",
+                "scpName": "BHATINDA CH.(BSE INDONEXT)",
+                "isin": "INE412G01024",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 33.44,
+                "closingAmount": 1672.0,
+                "openQty": 50.0,
+                "avgRate": 58.05,
+                "openAmt": 2902.5,
+                "unrealizedPnL": -1230.5,
+                "unrealizedPnLPercent": -42.39448751076658,
+                "symbol": "BCLIND",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "14-03-2024"
+            },
+            {
+                "scpCode": "524332",
+                "scpName": "BHATINDA CH.(BSE INDONEXT)",
+                "isin": "INE412G01024",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 33.44,
+                "closingAmount": 1371.04,
+                "openQty": 41.0,
+                "avgRate": 59.800000000000004,
+                "openAmt": 2451.8,
+                "unrealizedPnL": -1080.7600000000002,
+                "unrealizedPnLPercent": -44.08026755852843,
+                "symbol": "BCLIND",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-03-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 4
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "500103",
+                "scpName": "BHEL",
+                "isin": "INE257A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 316.7,
+                "closingAmount": 633.4,
+                "openQty": 2.0,
+                "avgRate": 262.275,
+                "openAmt": 524.55,
+                "unrealizedPnL": 108.85000000000002,
+                "unrealizedPnLPercent": 20.75112000762559,
+                "symbol": "BHEL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "11-09-2024"
+            },
+            {
+                "scpCode": "500103",
+                "scpName": "BHEL",
+                "isin": "INE257A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 316.7,
+                "closingAmount": 3167.0,
+                "openQty": 10.0,
+                "avgRate": 263.45,
+                "openAmt": 2634.5,
+                "unrealizedPnL": 532.5,
+                "unrealizedPnLPercent": 20.21256405390017,
+                "symbol": "BHEL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            },
+            {
+                "scpCode": "500103",
+                "scpName": "BHEL",
+                "isin": "INE257A01026",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 316.7,
+                "closingAmount": 2533.6,
+                "openQty": 8.0,
+                "avgRate": 258.3,
+                "openAmt": 2066.4,
+                "unrealizedPnL": 467.1999999999998,
+                "unrealizedPnLPercent": 22.609368950832355,
+                "symbol": "BHEL",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "17-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544226",
+                "scpName": "BRAINBEES SOLUTIONS LTD",
+                "isin": "INE02RE01045",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.4,
+                "closingAmount": 1514.4,
+                "openQty": 6.0,
+                "avgRate": 677.0500000000001,
+                "openAmt": 4062.3,
+                "unrealizedPnL": -2547.9,
+                "unrealizedPnLPercent": -62.7206262462152,
+                "symbol": "FIRSTCRY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "13-08-2024"
+            },
+            {
+                "scpCode": "544226",
+                "scpName": "BRAINBEES SOLUTIONS LTD",
+                "isin": "INE02RE01045",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.4,
+                "closingAmount": 7572.0,
+                "openQty": 30.0,
+                "avgRate": 648.7,
+                "openAmt": 19461.0,
+                "unrealizedPnL": -11889.0,
+                "unrealizedPnLPercent": -61.091413596423614,
+                "symbol": "FIRSTCRY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-08-2024"
+            },
+            {
+                "scpCode": "544226",
+                "scpName": "BRAINBEES SOLUTIONS LTD",
+                "isin": "INE02RE01045",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.4,
+                "closingAmount": 1009.6,
+                "openQty": 4.0,
+                "avgRate": 641.075,
+                "openAmt": 2564.3,
+                "unrealizedPnL": -1554.7000000000003,
+                "unrealizedPnLPercent": -60.62863159536717,
+                "symbol": "FIRSTCRY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544226",
+                "scpName": "BRAINBEES SOLUTIONS LTD",
+                "isin": "INE02RE01045",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.4,
+                "closingAmount": 1514.4,
+                "openQty": 6.0,
+                "avgRate": 677.0500000000001,
+                "openAmt": 4062.3,
+                "unrealizedPnL": -2547.9,
+                "unrealizedPnLPercent": -62.7206262462152,
+                "symbol": "FIRSTCRY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "13-08-2024"
+            },
+            {
+                "scpCode": "544226",
+                "scpName": "BRAINBEES SOLUTIONS LTD",
+                "isin": "INE02RE01045",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.4,
+                "closingAmount": 7572.0,
+                "openQty": 30.0,
+                "avgRate": 648.7,
+                "openAmt": 19461.0,
+                "unrealizedPnL": -11889.0,
+                "unrealizedPnLPercent": -61.091413596423614,
+                "symbol": "FIRSTCRY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "22-08-2024"
+            },
+            {
+                "scpCode": "544226",
+                "scpName": "BRAINBEES SOLUTIONS LTD",
+                "isin": "INE02RE01045",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 252.4,
+                "closingAmount": 1009.6,
+                "openQty": 4.0,
+                "avgRate": 641.075,
+                "openAmt": 2564.3,
+                "unrealizedPnL": -1554.7000000000003,
+                "unrealizedPnLPercent": -60.62863159536717,
+                "symbol": "FIRSTCRY",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-10-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 3
+        }
+    }
+}{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "534804",
+                "scpName": "CARE RATING",
+                "isin": "INE752H01013",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1621.0,
+                "closingAmount": 3242.0,
+                "openQty": 2.0,
+                "avgRate": 995.1,
+                "openAmt": 1990.2,
+                "unrealizedPnL": 1251.8,
+                "unrealizedPnLPercent": 62.898201185810464,
+                "symbol": "CARERATING",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-01-2024"
+            },
+            {
+                "scpCode": "534804",
+                "scpName": "CARE RATING",
+                "isin": "INE752H01013",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1621.0,
+                "closingAmount": 3242.0,
+                "openQty": 2.0,
+                "avgRate": 1151.45,
+                "openAmt": 2302.9,
+                "unrealizedPnL": 939.0999999999999,
+                "unrealizedPnLPercent": 40.779017760215375,
+                "symbol": "CARERATING",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-04-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}
