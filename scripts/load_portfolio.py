@@ -3,6 +3,7 @@ import aiomysql
 import os
 import sys
 import re
+import pandas as pd
 import yfinance as yf
 from datetime import datetime
 from dotenv import load_dotenv
@@ -28,6 +29,18 @@ async def extract_and_load(filepath):
         print(f"File {filepath} not found!")
         return
 
+    print("Fetching global ISIN to NSE Symbol mapping from legacy Bhavcopy...")
+    from backend.data.nse_bhavcopy import download_nse_official, parse_nse
+    
+    # Use the target date we know works to get ISINs
+    try:
+        df = await download_nse_official(datetime(2026, 4, 17))
+        df_parsed = parse_nse(df, datetime(2026, 4, 17))
+        isin_to_nse = pd.Series(df_parsed['symbol'].values, index=df_parsed['isin']).to_dict()
+    except Exception as e:
+        print(f"Warning: Failed to fetch NSE ISIN map: {e}")
+        isin_to_nse = {}
+
     with open(filepath, "r") as f:
         text = f.read()
 
@@ -42,7 +55,9 @@ async def extract_and_load(filepath):
         isin = m.group(2)
         qty = float(m.group(3))
         avg_rate = float(m.group(4))
-        sym = m.group(5)
+        upstox_sym = m.group(5)
+        # Use true NSE symbol via ISIN mapping!
+        sym = isin_to_nse.get(isin, upstox_sym)
         buy_date_str = m.group(6) # DD-MM-YYYY
         
         sig = (sym, qty, avg_rate, buy_date_str)
@@ -78,6 +93,7 @@ async def extract_and_load(filepath):
 
     conn = await aiomysql.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS, db=DB_NAME)
     async with conn.cursor() as cur:
+        await cur.execute("UPDATE stocks_master SET is_active = 0 WHERE type = 'PORTFOLIO'")
         for sym, d in portfolio.items():
             avg_price = d["total_cost"] / d["total_qty"] if d["total_qty"] > 0 else 0
             
@@ -94,14 +110,15 @@ async def extract_and_load(filepath):
             print(f"[{sym}] qty: {d['total_qty']}, avg: {avg_price:.2f}, sector: {sector}, mcap: {mcap_cat}")
             
             query = """
-                INSERT INTO stocks_master (symbol, company_name, isin, sector, market_cap_cat, quantity, avg_buy_price, buy_date, type, added_date)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PORTFOLIO', CURDATE())
+                INSERT INTO stocks_master (symbol, company_name, isin, sector, market_cap_cat, quantity, avg_buy_price, buy_date, type, added_date, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PORTFOLIO', CURDATE(), 1)
                 ON DUPLICATE KEY UPDATE 
                     sector=VALUES(sector), 
                     market_cap_cat=VALUES(market_cap_cat), 
                     quantity=VALUES(quantity), 
                     avg_buy_price=VALUES(avg_buy_price), 
-                    buy_date=VALUES(buy_date)
+                    buy_date=VALUES(buy_date),
+                    is_active=1
             """
             await cur.execute(query, (
                 sym, d["name"], d["isin"], sector, mcap_cat, 
@@ -120,6 +137,15 @@ async def extract_and_load(filepath):
         await conn.commit()
     conn.close()
     print("Portfolio completely synced to Database!")
+
+    print("Running historical price alignment...")
+    try:
+        from scripts.fix_historical_prices import fix_prices
+        # Use existing event loop for the async call
+        await fix_prices(lookback_days=5)
+        print("P&L baseline alignment complete!")
+    except Exception as e:
+        print(f"Warning: Price history alignment failed: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

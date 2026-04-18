@@ -25,7 +25,7 @@ async def fetch_live_prices(symbols: List[str]) -> Dict[str, Dict[str, Any]]:
         try:
             # yfinance doesn't easily support async, so we wrap it or just use it sync
             # download period=1d will fetch the latest daily candle, showing current intraday price
-            df = yf.download(yf_symbols, period='1d', interval='1d', progress=False)
+            df = yf.download(yf_symbols, period='1d', interval='1d', progress=False, auto_adjust=False)
             
             if not df.empty:
                 for idx, yf_sym in enumerate(yf_symbols):
@@ -70,7 +70,7 @@ async def fetch_5min_candles(symbols: List[str]) -> Dict[str, Dict[str, Any]]:
         batch = symbols[i:i+batch_size]
         yf_symbols = [_get_yf_symbol(s) for s in batch]
         try:
-            df = yf.download(yf_symbols, period='1d', interval='5m', progress=False)
+            df = yf.download(yf_symbols, period='1d', interval='5m', progress=False, auto_adjust=False)
             
             if not df.empty:
                 for idx, yf_sym in enumerate(yf_symbols):
@@ -151,7 +151,7 @@ async def fetch_max_history(symbol: str) -> pd.DataFrame:
     """Fetch maximum available daily history for a symbol via yfinance."""
     yf_sym = _get_yf_symbol(symbol)
     try:
-        df = yf.download(yf_sym, period='max', interval='1d', progress=False)
+        df = yf.download(yf_sym, period='max', interval='1d', progress=False, auto_adjust=False)
         return df
     except Exception as e:
         logger.error(f"Error fetching max history for {symbol}: {e}")

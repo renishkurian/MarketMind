@@ -157,9 +157,12 @@ async def _recompute_signals_for(symbol: str):
         )
         history = ph_res.scalars().all()
 
-        if len(history) < 50:
+        if len(history) < 2:
             logger.warning(f"{symbol}: insufficient history ({len(history)} bars) — skipping.")
             return
+
+        # We need at least 2 bars for change_pct, but indicators like SMA(50) need more.
+        # We allow limited indicators if history is short but > 2.
 
         df = pd.DataFrame([
             {
@@ -189,16 +192,16 @@ async def _recompute_signals_for(symbol: str):
                 "sector_pe": float(fund.sector_pe) if fund.sector_pe else 20.0,
             }
 
-        # Compute indicators
-        st_indicators = compute_short_term_indicators(df)
+        # Compute indicators (require at least 50 bars for ST, 200 for LT)
+        st_indicators = compute_short_term_indicators(df) if len(df) >= 50 else {}
         lt_indicators = compute_long_term_indicators(df) if len(df) >= 200 else {}
 
         if not st_indicators:
             logger.warning(f"{symbol}: short-term indicators empty — skipping.")
             return
 
-        # Score
-        st_result = score_short_term(st_indicators, fundamentals)
+        # Score (Default to 50/HOLD if insufficient history for technicals)
+        st_result = score_short_term(st_indicators, fundamentals) if st_indicators else {"signal": "HOLD", "score": 50, "breakdown": {}}
         lt_result = score_long_term(lt_indicators, fundamentals) if lt_indicators else {"signal": "HOLD", "score": 50, "breakdown": {}}
         confidence = calculate_confidence(st_result, lt_result)
 
