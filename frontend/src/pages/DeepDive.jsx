@@ -5,7 +5,7 @@ import {
   ArrowLeft, ArrowUpRight, ArrowDownRight, ArrowRight,
   Activity, Brain, TrendingUp, TrendingDown, Minus,
   RefreshCw, AlertTriangle, CheckCircle, BarChart2,
-  Clock, Shield, Sun, Moon, Layers, BookOpen
+  Clock, Shield, Sun, Moon, Layers, BookOpen, Briefcase
 } from 'lucide-react';
 
 import SignalBadge from '../components/SignalBadge';
@@ -145,6 +145,7 @@ export default function DeepDive() {
   const [selectedSkill, setSelectedSkill] = useState(SKILLS[0].id);
   const [signals, setSignals] = useState(null);
   const [fundamentals, setFundamentals] = useState(null);
+  const [lots, setLots] = useState([]);
 
   const stock = stocks[symbol];
   const sig = stock?.signal || {};
@@ -160,11 +161,12 @@ export default function DeepDive() {
     setInsightError(false);
 
     // Parallel fetches
-    const [histRes, insightRes, signalsRes, fundRes] = await Promise.allSettled([
+    const [histRes, insightRes, signalsRes, fundRes, lotsRes] = await Promise.allSettled([
       fetch(`${API_URL}/api/stock/${symbol}/history`),
       fetch(`${API_URL}/api/stock/${symbol}/insight`),
       fetch(`${API_URL}/api/stock/${symbol}/signals`),
       fetch(`${API_URL}/api/stock/${symbol}/fundamentals`),
+      fetch(`${API_URL}/api/stock/${symbol}/lots`),
     ]);
 
     if (histRes.status === 'fulfilled' && histRes.value.ok) {
@@ -188,6 +190,11 @@ export default function DeepDive() {
     }
     if (fundRes.status === 'fulfilled' && fundRes.value.ok) {
       setFundamentals(await fundRes.value.json());
+    }
+    if (lotsRes.status === 'fulfilled' && lotsRes.value.ok) {
+      setLots(await lotsRes.value.json());
+    } else {
+      setLots([]);
     }
   }, [symbol]);
 
@@ -232,6 +239,7 @@ export default function DeepDive() {
 
   const tabs = [
     { id: 'chart', label: 'Price Chart', Icon: BarChart2 },
+    { id: 'positions', label: 'Tax Lots', Icon: Briefcase },
     { id: 'signals', label: 'Signals', Icon: Layers },
     { id: 'fundamentals', label: 'Fundamentals', Icon: BookOpen },
     { id: 'ai', label: 'AI Insight', Icon: Brain },
@@ -415,6 +423,51 @@ export default function DeepDive() {
                     );
                   })()}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* Positions Tab */}
+          {activeTab === 'positions' && (
+            <div className="space-y-4">
+              {lots.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-dark-muted">
+                  <Briefcase size={36} className="opacity-30" />
+                  <p className="text-sm">No tax lots or positions found.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-dark-border text-dark-muted font-mono uppercase text-xs">
+                        <th className="pb-3 font-medium px-4">Buy Date</th>
+                        <th className="pb-3 font-medium px-4 text-right">Quantity</th>
+                        <th className="pb-3 font-medium px-4 text-right">Buy Price</th>
+                        <th className="pb-3 font-medium px-4 text-right">Current Price</th>
+                        <th className="pb-3 font-medium px-4 text-right">Unrealised P&L</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lots.map((lot, idx) => {
+                        const currentVal = sig.current_price ?? lot.buy_price;
+                        const profit = (currentVal - lot.buy_price) * lot.quantity;
+                        const profitPct = ((currentVal - lot.buy_price) / lot.buy_price) * 100;
+                        const isProfit = profit >= 0;
+                        return (
+                          <tr key={idx} className="border-b border-dark-border/50 hover:bg-dark-border/20 transition-colors">
+                            <td className="py-3 px-4 font-mono">{lot.buy_date}</td>
+                            <td className="py-3 px-4 text-right">{lot.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                            <td className="py-3 px-4 text-right font-mono">₹{lot.buy_price.toFixed(2)}</td>
+                            <td className="py-3 px-4 text-right font-mono">₹{currentVal.toFixed(2)}</td>
+                            <td className={`py-3 px-4 text-right font-mono font-bold ${isProfit ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                              {isProfit ? '+' : ''}₹{profit.toFixed(2)} ({isProfit ? '+' : ''}{profitPct.toFixed(2)}%)
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

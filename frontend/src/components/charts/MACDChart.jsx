@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries, HistogramSeries } from 'lightweight-charts';
 
 const MACDChart = ({ data, theme = 'dark' }) => {
   const chartContainerRef = useRef();
@@ -28,9 +28,9 @@ const MACDChart = ({ data, theme = 'dark' }) => {
       },
     });
 
-    const macdSeries = chart.addLineSeries({ color: '#2563EB', lineWidth: 1, title: 'MACD' });
-    const signalSeries = chart.addLineSeries({ color: '#F59E0B', lineWidth: 1, title: 'Signal' });
-    const histSeries = chart.addHistogramSeries({ title: 'Histogram' });
+    const macdSeries = chart.addSeries(LineSeries, { color: '#2563EB', lineWidth: 1, title: 'MACD' });
+    const signalSeries = chart.addSeries(LineSeries, { color: '#F59E0B', lineWidth: 1, title: 'Signal' });
+    const histSeries = chart.addSeries(HistogramSeries, { title: 'Histogram' });
 
     // Simple EMA calculation
     const calculateEMA = (data, period) => {

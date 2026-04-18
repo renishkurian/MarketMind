@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries } from 'lightweight-charts';
 
 const RSIChart = ({ data, theme = 'dark', length = 14 }) => {
   const chartContainerRef = useRef();
@@ -29,7 +29,7 @@ const RSIChart = ({ data, theme = 'dark', length = 14 }) => {
       },
     });
 
-    const rsiSeries = chart.addLineSeries({
+    const rsiSeries = chart.addSeries(LineSeries, {
       color: '#A855F7',
       lineWidth: 2,
     });

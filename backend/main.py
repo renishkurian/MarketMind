@@ -13,7 +13,7 @@ import asyncio
 
 from backend.data.db import (
     get_db, SessionLocal,
-    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog
+    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_admin, get_password_hash
@@ -543,6 +543,25 @@ async def get_stock_fundamentals(symbol: str, db: AsyncSession = Depends(get_db)
         "market_cap": int(fund.market_cap) if fund.market_cap else None,
         "data_quality": fund.data_quality,
     }
+
+
+@app.get("/api/stock/{symbol}/lots")
+async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(PortfolioTransaction)
+        .where(PortfolioTransaction.symbol == symbol.upper(), PortfolioTransaction.status == 'OPEN')
+        .order_by(PortfolioTransaction.buy_date.asc())
+    )
+    lots = result.scalars().all()
+    return [
+        {
+            "id": lot.id,
+            "quantity": float(lot.quantity),
+            "buy_price": float(lot.buy_price),
+            "buy_date": str(lot.buy_date)
+        }
+        for lot in lots
+    ]
 
 
 @app.get("/api/stock/{symbol}/insight")

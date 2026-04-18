@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, HistogramSeries } from 'lightweight-charts';
 
 const VolumeChart = ({ data, theme = 'dark' }) => {
   const chartContainerRef = useRef();
@@ -29,7 +29,7 @@ const VolumeChart = ({ data, theme = 'dark' }) => {
       },
     });
 
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       color: '#3B82F6',
       priceFormat: {
         type: 'volume',
