@@ -17,6 +17,18 @@ import MACDChart from '../components/charts/MACDChart';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+const SKILLS = [
+  { id: 'goldman_screener', name: 'Goldman Screener', icon: '📊', desc: 'Institutional institutional-grade screening & targets' },
+  { id: 'mckinsey_macro', name: 'McKinsey Macro', icon: '🌍', desc: 'Global & domestic macro impact analysis' },
+  { id: 'renaissance_patterns', name: 'Renaissance Quant', icon: '🧬', desc: 'Statistical trends & seasonal anomalies' },
+  { id: 'bain_strategy', name: 'Bain Strategy', icon: '📉', desc: 'Competitive moat & market share trajectory' },
+  { id: 'harvard_dividends', name: 'Harvard Income', icon: '🎓', desc: 'Sustainable yield & compounding projections' },
+  { id: 'hindenburg_forensic', name: 'Hindenburg Audit', icon: '🔍', desc: 'Accounting red flags & governance risks' },
+  { id: 'ark_disruptive_tech', name: 'ARK Disruptive', icon: '🚀', desc: 'Exponential growth & disruptive tech scout' },
+  { id: 'peter_lynch_simple', name: 'Lynch Main St', icon: '🏠', desc: 'Consumer logic & "Invest in what you know"' },
+  { id: 'policy_lobbyist', name: 'Policy Lobbyist', icon: '🏛️', desc: 'PLI schemes & regulatory catalyst tracking' },
+];
+
 // ── AI Insight Panel ──────────────────────────────────────────────────────
 const AIInsightPanel = ({ insight, loading, error }) => {
   if (loading) return (
@@ -130,6 +142,7 @@ export default function DeepDive() {
   const [insightLoading, setInsightLoading] = useState(true);
   const [insightError, setInsightError] = useState(false);
   const [activeTab, setActiveTab] = useState('chart');
+  const [selectedSkill, setSelectedSkill] = useState(SKILLS[0].id);
   const [signals, setSignals] = useState(null);
   const [fundamentals, setFundamentals] = useState(null);
 
@@ -181,10 +194,22 @@ export default function DeepDive() {
   const handleGenerateInsight = async () => {
     try {
       setInsightLoading(true);
-      const res = await fetch(`${API_URL}/api/stock/${symbol}/insight/generate`, { method: 'POST' });
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/insight/generate`, { 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: json.stringify({ skill_id: selectedSkill })
+      });
       if (res.ok) {
         // Poll for result after a short delay
         setTimeout(fetchData, 5000);
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to generate insight');
+        setInsightLoading(false);
       }
     } catch (e) {
       setInsightLoading(false);
@@ -484,25 +509,47 @@ export default function DeepDive() {
 
           {/* AI Insight Tab */}
           {activeTab === 'ai' && (
-            <div>
-              <AIInsightPanel
-                insight={insight}
-                loading={insightLoading}
-                error={insightError}
-              />
-              {insightError && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    onClick={async () => {
-                      await fetch(`${API_URL}/api/stock/${symbol}/insight/generate`, { method: 'POST' });
-                      setTimeout(fetchData, 3000);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent border border-accent/30 rounded-xl text-sm hover:bg-accent/20 transition"
-                  >
-                    <Brain size={16} /> Generate AI Insight
-                  </button>
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-gray-900/50 border border-dark-border rounded-xl">
+                <div className="flex-1">
+                  <h4 className="text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Analysis Skill / Persona</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {SKILLS.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => setSelectedSkill(s.id)}
+                        className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all border ${
+                          selectedSkill === s.id 
+                          ? 'bg-accent/10 border-accent/40 text-accent' 
+                          : 'bg-dark-bg border-dark-border text-dark-muted hover:border-dark-muted'
+                        }`}
+                      >
+                        <span className="text-base">{s.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold truncate leading-none">{s.name}</p>
+                          <p className="text-[8px] opacity-60 truncate mt-0.5">{s.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
+                <button
+                  onClick={handleGenerateInsight}
+                  disabled={insightLoading}
+                  className="shrink-0 flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent/80 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-accent/20"
+                >
+                  <RefreshCw size={14} className={insightLoading ? 'animate-spin' : ''} />
+                  {insightLoading ? 'Analyzing...' : (insight ? 'Regenerate Analysis' : 'Generate Intelligence')}
+                </button>
+              </div>
+
+              <div className="pt-2">
+                <AIInsightPanel
+                  insight={insight}
+                  loading={insightLoading}
+                  error={insightError && !insightLoading}
+                />
+              </div>
             </div>
           )}
         </div>

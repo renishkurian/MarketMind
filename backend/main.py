@@ -566,7 +566,12 @@ async def get_stock_insight(symbol: str, db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/stock/{symbol}/insight/generate")
-async def trigger_insight_generation(symbol: str, db: AsyncSession = Depends(get_db), admin: str = Depends(get_current_admin)):
+async def trigger_insight_generation(
+    symbol: str, 
+    req: Optional[InsightGenerateRequest] = None,
+    db: AsyncSession = Depends(get_db), 
+    admin: str = Depends(get_current_admin)
+):
     """Manually trigger AI insight generation for a symbol."""
     # Validate symbol exists
     result = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol.upper()))
@@ -574,11 +579,12 @@ async def trigger_insight_generation(symbol: str, db: AsyncSession = Depends(get
     if not stock:
         raise HTTPException(status_code=404, detail="Symbol not found in master")
 
-    asyncio.create_task(_generate_and_save_insight(symbol.upper(), "MANUAL"))
-    return {"message": f"AI insight generation queued for {symbol}"}
+    skill_id = req.skill_id if req else None
+    asyncio.create_task(_generate_and_save_insight(symbol.upper(), "MANUAL", skill_id))
+    return {"message": f"AI insight generation queued for {symbol} (Skill: {skill_id or 'General'})"}
 
 
-async def _generate_and_save_insight(symbol: str, trigger: str):
+async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = None):
     """Background task to generate and persist AI insight."""
     try:
         import pandas as pd
@@ -615,7 +621,7 @@ async def _generate_and_save_insight(symbol: str, trigger: str):
                 "revenue_growth": float(fund.revenue_growth) if fund and fund.revenue_growth else None,
             } if fund else {}
 
-        insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger)
+        insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger, skill_id)
 
         async with SessionLocal() as db:
             new_insight = AIInsights(
@@ -643,6 +649,9 @@ class BhavcopySyncRequest(BaseModel):
     from_date: str
     to_date: Optional[str] = None
     exchange: Optional[str] = 'NSE'
+
+class InsightGenerateRequest(BaseModel):
+    skill_id: Optional[str] = None
 
 @app.post("/api/market/bhavcopy/sync")
 async def manual_bhavcopy_sync(req: BhavcopySyncRequest, admin: str = Depends(get_current_admin)):

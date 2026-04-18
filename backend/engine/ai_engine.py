@@ -3,15 +3,21 @@ import openai
 import json
 import logging
 import pandas as pd
+import os
 from datetime import datetime
 
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
-async def generate_insight(symbol: str, price_history_df: pd.DataFrame, signals: dict, fundamentals: dict, trigger_reason: str) -> dict:
+async def generate_insight(symbol: str, price_history_df: pd.DataFrame, signals: dict, fundamentals: dict, trigger_reason: str, skill_id: str = None) -> dict:
     """Entry point for AI insight generation. Detects provider and routes to appropriate client."""
     provider = settings.AI_PROVIDER.lower()
+    
+    # 0. Load Skill Persona if requested
+    skill_persona = ""
+    if skill_id:
+        skill_persona = _load_skill_prompt(skill_id)
     
     # 1. Check for API keys
     if provider == "anthropic" and not settings.ANTHROPIC_API_KEY:
@@ -34,7 +40,8 @@ async def generate_insight(symbol: str, price_history_df: pd.DataFrame, signals:
         price_summary = f"Over the last 90 days, price moved from {start_p:.2f} to {end_p:.2f} ({pct_change:.2f}%)."
     
     prompt = f"""
-    You are a financial analyst specializing in the Indian Stock Market.
+    {skill_persona if skill_persona else "You are a financial analyst specializing in the Indian Stock Market."}
+    
     Based on the provided data, generate an analytical insight for the stock: {symbol}.
     
     TRIGGER REASON: {trigger_reason}
@@ -126,3 +133,20 @@ def _get_mock_insight(symbol: str, trigger_reason: str) -> dict:
         "key_opportunities": ["Potential for cost realization", "Expansion into new markets", "Strong balance sheet"],
         "sentiment_score": 0.65
     }
+
+def _load_skill_prompt(skill_id: str) -> str:
+    """Loads a skill markdown file from the engine/skills directory."""
+    try:
+        # Base dir for skills
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        skill_path = os.path.join(base_path, "skills", f"{skill_id}.md")
+        
+        if os.path.exists(skill_path):
+            with open(skill_path, "r") as f:
+                return f.read()
+        else:
+            logger.warning(f"Skill file not found: {skill_path}")
+            return ""
+    except Exception as e:
+        logger.error(f"Error loading skill {skill_id}: {e}")
+        return ""
