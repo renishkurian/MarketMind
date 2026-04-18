@@ -5,7 +5,8 @@ import {
   ArrowLeft, ArrowUpRight, ArrowDownRight, ArrowRight,
   Activity, Brain, TrendingUp, TrendingDown, Minus,
   RefreshCw, AlertTriangle, CheckCircle, BarChart2,
-  Clock, Layers, BookOpen, Briefcase
+  Clock, Shield, Sun, Moon, Layers, BookOpen, Briefcase
+  
 } from 'lucide-react';
 
 import SignalBadge from '../components/SignalBadge';

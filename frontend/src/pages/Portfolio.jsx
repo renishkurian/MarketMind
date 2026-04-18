@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useStockStore } from '../store/stockStore';
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
-import StockTable from '../components/StockTable';
+import PortfolioTable from '../components/PortfolioTable';
 import { Briefcase, TrendingUp, BarChart, ArrowDown, Upload } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -119,7 +119,7 @@ export default function Portfolio() {
 
       {/* Main Table */}
       <div className="flex-1">
-        <StockTable stocks={portfolioStocks} />
+        <PortfolioTable stocks={portfolioStocks} />
       </div>
 
       {portfolioStocks.length === 0 && (
