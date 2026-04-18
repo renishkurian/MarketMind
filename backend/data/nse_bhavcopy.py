@@ -51,25 +51,28 @@ def parse_nse(df: pd.DataFrame, target_date: datetime) -> pd.DataFrame:
         # Legacy Format
         df = df.rename(columns={
             'SYMBOL': 'symbol', 'SERIES': 'series', 'OPEN': 'open', 'HIGH': 'high',
-            'LOW': 'low', 'CLOSE': 'close', 'TOTTRDQTY': 'volume', 'TIMESTAMP': 'date'
+            'LOW': 'low', 'CLOSE': 'close', 'TOTTRDQTY': 'volume', 'TIMESTAMP': 'date',
+            'ISIN': 'isin', 'TOTALTRADES': 'no_of_trades'
         })
         if isinstance(df['date'].iloc[0], str):
             df['date'] = pd.to_datetime(df['date'], format='%d-%b-%Y').dt.date
     elif df.columns.dtype == 'int64' or list(df.columns) == list(range(len(df.columns))):
-        # UDiFF Format (No Header)
-        # 0:Date, 7:Symbol, 8:Series, 14:Open, 15:High, 16:Low, 17:Close, 24:Volume
-        df = df[[7, 8, 14, 15, 16, 17, 24]].copy()
-        df.columns = ['symbol', 'series', 'open', 'high', 'low', 'close', 'volume']
+        # 6:ISIN, 7:Symbol, 8:Series, 14:Open, 15:High, 16:Low, 17:Close, 24:Volume, 26:TotalTrades
+        df = df[[6, 7, 8, 14, 15, 16, 17, 24, 26]].copy()
+        df.columns = ['isin', 'symbol', 'series', 'open', 'high', 'low', 'close', 'volume', 'no_of_trades']
         df['date'] = target_date.date()
     else:
         # Samco/Fallback Format
         df = df.rename(columns={
             'SYMBOL': 'symbol', 'SERIES': 'series', 'OPEN': 'open', 'HIGH': 'high',
-            'LOW': 'low', 'CLOSE': 'close', 'TOTTRDQTY': 'volume'
+            'LOW': 'low', 'CLOSE': 'close', 'TOTTRDQTY': 'volume', 'ISIN': 'isin'
         })
         df['date'] = target_date.date()
 
     df['symbol'] = df['symbol'].astype(str).str.strip()
+    df['isin'] = df['isin'].astype(str).str.strip()
     df = df[df['series'].astype(str).str.strip() == 'EQ'].copy()
     df['exchange'] = 'NSE'
-    return df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume', 'exchange']]
+    if 'no_of_trades' not in df.columns:
+        df['no_of_trades'] = None
+    return df[['symbol', 'isin', 'date', 'open', 'high', 'low', 'close', 'volume', 'no_of_trades', 'exchange']]

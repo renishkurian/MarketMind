@@ -137,9 +137,14 @@ export default function PortfolioTable({ stocks }) {
                   {/* Symbol */}
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
-                      <span className="font-mono font-bold text-accent group-hover:underline text-base">
+                      <span className="font-mono font-bold text-accent group-hover:underline text-base leading-tight">
                         {stock.symbol}
                       </span>
+                      {stock.quantity > 0 && (
+                        <span className="text-[10px] font-mono font-bold text-dark-muted mt-0.5">
+                          ₹{(stock.quantity * parseFloat(stock.avg_buy_price)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
                       <DataQualityFlag quality={sig.data_quality} />
                     </div>
                   </td>
@@ -147,7 +152,9 @@ export default function PortfolioTable({ stocks }) {
                   {/* Company / Sector */}
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
-                      <span className="text-dark-text font-medium truncate max-w-[150px]">{stock.company_name}</span>
+                      <span className="text-dark-text font-medium truncate max-w-[200px]">
+                        {stock.scp_name || stock.company_name}
+                      </span>
                       <span className="text-[10px] text-dark-muted font-mono">{stock.sector || 'N/A'}</span>
                     </div>
                   </td>
@@ -219,9 +226,13 @@ export default function PortfolioTable({ stocks }) {
                       {stock.quantity ? (
                         <div className="flex flex-col">
                           <span className="font-mono text-xs font-bold text-dark-text">
-                            {stock.quantity} Qty
+                            ₹{(stock.quantity * parseFloat(stock.avg_buy_price)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                           </span>
-                          <span className="font-mono text-[10px] text-dark-muted">@ ₹{stock.avg_buy_price}</span>
+                          <div className="flex justify-end items-center gap-1.5 mt-0.5">
+                            <span className="font-mono text-[10px] text-dark-muted">{stock.quantity} Qty</span>
+                            <span className="text-[10px] text-dark-border">|</span>
+                            <span className="font-mono text-[10px] text-dark-muted">@ ₹{stock.avg_buy_price}</span>
+                          </div>
                         </div>
                       ) : (
                         <span className="text-dark-muted">—</span>

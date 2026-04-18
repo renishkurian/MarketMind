@@ -54,6 +54,7 @@ def parse_bse(df: pd.DataFrame, target_date: datetime) -> pd.DataFrame:
         'LOW': 'low',
         'CLOSE': 'close',
         'NO_OF_SHRS': 'volume',
+        'NO_TRADES': 'no_of_trades',
         'SC_TYPE': 'series'
     })
     
@@ -65,4 +66,6 @@ def parse_bse(df: pd.DataFrame, target_date: datetime) -> pd.DataFrame:
         df = df[df['series'].astype(str).str.strip() == 'STK'].copy()
         
     df['exchange'] = 'BSE'
-    return df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume', 'exchange']]
+    if 'no_of_trades' not in df.columns:
+        df['no_of_trades'] = None
+    return df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume', 'no_of_trades', 'exchange']]

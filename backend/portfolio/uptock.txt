@@ -4252,205 +4252,6 @@
     "data": {
         "unRealisedPnLBreakdowns": [
             {
-                "scpCode": "543534",
-                "scpName": "Aether Industries Limited",
-                "isin": "INE0BWX01014",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 1180.15,
-                "closingAmount": 7080.900000000001,
-                "openQty": 6.0,
-                "avgRate": 996.25,
-                "openAmt": 5977.5,
-                "unrealizedPnL": 1103.4000000000005,
-                "unrealizedPnLPercent": 18.459222082810548,
-                "symbol": "AETHER",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "08-06-2023"
-            },
-            {
-                "scpCode": "543534",
-                "scpName": "Aether Industries Limited",
-                "isin": "INE0BWX01014",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 1180.15,
-                "closingAmount": 7080.900000000001,
-                "openQty": 6.0,
-                "avgRate": 809.5,
-                "openAmt": 4857.0,
-                "unrealizedPnL": 2223.9000000000005,
-                "unrealizedPnLPercent": 45.787523162445964,
-                "symbol": "AETHER",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "22-03-2024"
-            }{
-    "success": true,
-    "data": {
-        "unRealisedPnLBreakdowns": [
-            {
-                "scpCode": "540879",
-                "scpName": "APOLLO MICRO SYSTEMS LTD",
-                "isin": "INE713T01028",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 282.95,
-                "closingAmount": 39613.0,
-                "openQty": 140.0,
-                "avgRate": 17.164285714285715,
-                "openAmt": 2403.0,
-                "unrealizedPnL": 37210.0,
-                "unrealizedPnLPercent": 1548.481065334998,
-                "symbol": "APOLLO",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "03-01-2022"
-            },
-            {
-                "scpCode": "540879",
-                "scpName": "APOLLO MICRO SYSTEMS LTD",
-                "isin": "INE713T01028",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 282.95,
-                "closingAmount": 33954.0,
-                "openQty": 120.0,
-                "avgRate": 17.28083333333333,
-                "openAmt": 2073.7,
-                "unrealizedPnL": 31880.3,
-                "unrealizedPnLPercent": 1537.3631672855283,
-                "symbol": "APOLLO",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "04-01-2022"
-            },
-            {
-                "scpCode": "540879",
-                "scpName": "APOLLO MICRO SYSTEMS LTD",
-                "isin": "INE713T01028",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 282.95,
-                "closingAmount": 28295.0,
-                "openQty": 100.0,
-                "avgRate": 16.61,
-                "openAmt": 1661.0,
-                "unrealizedPnL": 26634.0,
-                "unrealizedPnLPercent": 1603.4918723660446,
-                "symbol": "APOLLO",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "11-01-2022"
-            },
-            {
-                "scpCode": "540879",
-                "scpName": "APOLLO MICRO SYSTEMS LTD",
-                "isin": "INE713T01028",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 282.95,
-                "closingAmount": 19806.5,
-                "openQty": 70.0,
-                "avgRate": 12.895,
-                "openAmt": 902.65,
-                "unrealizedPnL": 18903.85,
-                "unrealizedPnLPercent": 2094.261341605273,
-                "symbol": "APOLLO",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "04-04-2022"
-            },
-            {
-                "scpCode": "540879",
-                "scpName": "APOLLO MICRO SYSTEMS LTD",
-                "isin": "INE713T01028",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 282.95,
-                "closingAmount": 76396.5,
-                "openQty": 270.0,
-                "avgRate": 14.75537037037037,
-                "openAmt": 3983.95,
-                "unrealizedPnL": 72412.55,
-                "unrealizedPnLPercent": 1817.6068976769286,
-                "symbol": "APOLLO",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "08-04-2022"
-            }
-        ]
-    },
-    "errors": null,
-    "metaData": {
-        "page": {
-            "pageNumber": 0,
-            "pageSize": 5000,
-            "recordCount": 5
-        }
-    }
-}{
-    "success": true,
-    "data": {
-        "unRealisedPnLBreakdowns": [
-            {
-                "scpCode": "544261",
-                "scpName": "ARKADE DEVELOPERS LIMITED",
-                "isin": "INE0QRL01017",
-                "scpOpt": "EQ",
-                "buySell": "BUY",
-                "closingRateExchange": "BSE",
-                "closingRateDate": "17-04-2026",
-                "closingRate": 116.82,
-                "closingAmount": 3504.6,
-                "openQty": 30.0,
-                "avgRate": 177.47333333333333,
-                "openAmt": 5324.2,
-                "unrealizedPnL": -1819.6,
-                "unrealizedPnLPercent": -34.176026445287555,
-                "symbol": "ARKADE",
-                "lotSize": 1.0,
-                "strikeRate": null,
-                "dueDate": null,
-                "buyDate": "24-09-2024"
-            }
-        ]
-    },
-    "errors": null,
-    "metaData": {
-        "page": {
-            "pageNumber": 0,
-            "pageSize": 5000,
-            "recordCount": 1
-        }
-    }
-}{
-    "success": true,
-    "data": {
-        "unRealisedPnLBreakdowns": [
-            {
                 "scpCode": "500477",
                 "scpName": "ASHOK LEYLND",
                 "isin": "INE208A01029",
@@ -5126,6 +4927,99 @@
         }
     }
 }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 2
+        }
+    }
+}
+{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "544261",
+                "scpName": "ARKADE DEVELOPERS LIMITED",
+                "isin": "INE0QRL01017",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 116.82,
+                "closingAmount": 3504.6,
+                "openQty": 30.0,
+                "avgRate": 177.47333333333333,
+                "openAmt": 5324.2,
+                "unrealizedPnL": -1819.6,
+                "unrealizedPnLPercent": -34.176026445287555,
+                "symbol": "ARKADE",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "24-09-2024"
+            }
+        ]
+    },
+    "errors": null,
+    "metaData": {
+        "page": {
+            "pageNumber": 0,
+            "pageSize": 5000,
+            "recordCount": 1
+        }
+    }
+}
+{
+    "success": true,
+    "data": {
+        "unRealisedPnLBreakdowns": [
+            {
+                "scpCode": "534804",
+                "scpName": "CARE RATING",
+                "isin": "INE752H01013",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1621.0,
+                "closingAmount": 3242.0,
+                "openQty": 2.0,
+                "avgRate": 995.1,
+                "openAmt": 1990.2,
+                "unrealizedPnL": 1251.8,
+                "unrealizedPnLPercent": 62.898201185810464,
+                "symbol": "CARERATING",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "25-01-2024"
+            },
+            {
+                "scpCode": "534804",
+                "scpName": "CARE RATING",
+                "isin": "INE752H01013",
+                "scpOpt": "EQ",
+                "buySell": "BUY",
+                "closingRateExchange": "BSE",
+                "closingRateDate": "17-04-2026",
+                "closingRate": 1621.0,
+                "closingAmount": 3242.0,
+                "openQty": 2.0,
+                "avgRate": 1151.45,
+                "openAmt": 2302.9,
+                "unrealizedPnL": 939.0999999999999,
+                "unrealizedPnLPercent": 40.779017760215375,
+                "symbol": "CARERATING",
+                "lotSize": 1.0,
+                "strikeRate": null,
+                "dueDate": null,
+                "buyDate": "08-04-2024"
+            }
         ]
     },
     "errors": null,

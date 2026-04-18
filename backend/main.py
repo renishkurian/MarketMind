@@ -143,6 +143,7 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
             item = {
                 "symbol": stock.symbol,
                 "company_name": stock.company_name,
+                "scp_name": stock.scp_name,
                 "sector": stock.sector,
                 "type": stock.type,
                 "quantity": float(stock.quantity) if stock.quantity else None,

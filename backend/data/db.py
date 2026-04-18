@@ -31,6 +31,7 @@ class StockMaster(Base):
     symbol = Column(String(20), index=True, nullable=False)
     exchange = Column(Enum('NSE', 'BSE'), default='NSE', nullable=False, index=True)
     company_name = Column(String(100), nullable=False)
+    scp_name = Column(String(100))
     isin = Column(String(12), index=True)
     sector = Column(String(50))
     market_cap_cat = Column(Enum('LARGE','MID','SMALL','UNKNOWN'))
@@ -40,7 +41,7 @@ class StockMaster(Base):
     
     # Portfolio specific fields
     quantity = Column(Numeric(14,4))
-    avg_buy_price = Column(Numeric(10,2))
+    avg_buy_price = Column(Numeric(18,6))
     buy_date = Column(Date)
 
 class PortfolioTransaction(Base):
@@ -50,7 +51,7 @@ class PortfolioTransaction(Base):
     symbol = Column(String(20), index=True, nullable=False)
     isin = Column(String(12), index=True)
     quantity = Column(Numeric(14,4), nullable=False)
-    buy_price = Column(Numeric(10,2), nullable=False)
+    buy_price = Column(Numeric(18,6), nullable=False)
     buy_date = Column(Date, nullable=False)
     status = Column(Enum('OPEN', 'CLOSED'), default='OPEN', nullable=False)
 
@@ -60,12 +61,14 @@ class PriceHistory(Base):
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     symbol = Column(String(20), index=True, nullable=False)
     exchange = Column(Enum('NSE', 'BSE'), default='NSE', nullable=False, index=True)
+    isin = Column(String(12), index=True)
     date = Column(Date, index=True, nullable=False)
     open = Column(Numeric(10,2))
     high = Column(Numeric(10,2))
     low = Column(Numeric(10,2))
     close = Column(Numeric(10,2), nullable=False)
     volume = Column(BigInteger)
+    no_of_trades = Column(Integer)
     source = Column(Enum('bhavcopy','yfinance_fallback','eod_computed','historical_import'))
 
 class IntradayTicks(Base):

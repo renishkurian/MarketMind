@@ -57,37 +57,64 @@ async def load_bhavcopy_to_db(target_date: datetime, sync_type: str = 'MANUAL', 
             logger.warning(f"No valid records found for {exchange} on {target_date.date()}")
             status = 'SUCCESS'
         else:
-            # Portfolio Filter Check
-            sync_mode = await get_config("SYNC_MODE", "ALL")
-            if sync_mode == "PORTFOLIO":
-                async with SessionLocal() as session:
-                    res = await session.execute(select(StockMaster.symbol).where(StockMaster.exchange == exchange))
-                    valid_symbols = {row[0] for row in res.all()}
-                    clean_df = clean_df[clean_df['symbol'].isin(valid_symbols)].copy()
+            async with SessionLocal() as session:
+                # Always fetch portfolio mappings (ISIN -> internal_symbol)
+                # to ensure we match correctly regardless of what the CSV calls it.
+                res = await session.execute(
+                    select(StockMaster.isin, StockMaster.symbol)
+                    .where(StockMaster.isin != None)
+                )
+                # Create a map of ISIN -> internal symbol
+                isin_to_symbol = {row[0]: row[1] for row in res.all()}
+                sync_mode = await get_config("SYNC_MODE", "ALL")
+                
+                if sync_mode == "PORTFOLIO":
+                    if 'isin' in clean_df.columns:
+                        clean_df['internal_symbol'] = clean_df['isin'].map(isin_to_symbol)
+                        clean_df = clean_df[clean_df['internal_symbol'].notna()].copy()
+                    else:
+                        res_sym = await session.execute(select(StockMaster.symbol))
+                        valid_symbols = {row[0] for row in res_sym.all()}
+                        clean_df = clean_df[clean_df['symbol'].isin(valid_symbols)].copy()
+                        clean_df['internal_symbol'] = clean_df['symbol']
+                else:
+                    if 'isin' in clean_df.columns:
+                        clean_df['internal_symbol'] = clean_df['isin'].map(isin_to_symbol).fillna(clean_df['symbol'])
+                    else:
+                        clean_df['internal_symbol'] = clean_df['symbol']
 
             records = clean_df.to_dict('records')
             records_count = len(records)
             
             if records_count > 0:
                 async with SessionLocal() as session:
-                    stmt = insert(PriceHistory).values([{
-                        'symbol': r['symbol'],
-                        'exchange': r['exchange'],
-                        'date': r['date'],
-                        'open': r['open'],
-                        'high': r['high'],
-                        'low': r['low'],
-                        'close': r['close'],
-                        'volume': r['volume'],
-                        'source': 'bhavcopy'
-                    } for r in records])
+                    # Map records to PriceHistory schema
+                    price_records = []
+                    for r in records:
+                        price_records.append({
+                            'symbol': r['internal_symbol'],
+                            'isin': r.get('isin'),
+                            'exchange': r['exchange'],
+                            'date': r['date'],
+                            'open': r['open'],
+                            'high': r['high'],
+                            'low': r['low'],
+                            'close': r['close'],
+                            'volume': r['volume'],
+                            'no_of_trades': r.get('no_of_trades'),
+                            'source': 'bhavcopy'
+                        })
+                    
+                    stmt = insert(PriceHistory).values(price_records)
                     
                     update_dict = {
+                        'isin': stmt.inserted.isin,
                         'open': stmt.inserted.open,
                         'high': stmt.inserted.high,
                         'low': stmt.inserted.low,
                         'close': stmt.inserted.close,
                         'volume': stmt.inserted.volume,
+                        'no_of_trades': stmt.inserted.no_of_trades,
                         'source': 'bhavcopy'
                     }
                     
