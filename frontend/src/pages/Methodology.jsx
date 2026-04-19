@@ -18,12 +18,13 @@ const SECTIONS = [
   },
   {
     title: 'Data Confidence Metric',
-    desc: 'The Confidence Score (0.0 to 1.0) measures the reliability and completeness of the incoming data streams.',
+    desc: 'The Confidence Score (displayed as 0–100%) measures the density and reliability of data points used for scoring.',
     icon: Shield,
     items: [
-      { name: 'Full Coverage (1.0)', focus: 'All fundamental, price, and sector data is present and vetted.' },
-      { name: 'Partial Coverage (<0.5)', focus: 'Missing debt levels or growth figures; score is safe but less certain.' },
-      { name: 'Graceful Degradation', focus: 'Missing fields are treated as neutral to avoid unfair penalization.' },
+      { name: 'High (80% - 100%)', focus: 'Official exchange filings. All Fundamental, Technical, and Sector data is present.' },
+      { name: 'Partial (50% - 79%)', focus: 'Safe for Technicals/Momentum, but some Fundamentals (e.g. Debt/ROE) are estimations.' },
+      { name: 'Low (<50%)', focus: 'Engine is operating with gaps; signals are valid but based on limited price history.' },
+      { name: 'Neutral Baseline', focus: 'Missing data defaults to a score of 50 to avoid penalizing stocks with lagging data.' },
     ]
   },
   {
