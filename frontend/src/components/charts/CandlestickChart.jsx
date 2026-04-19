@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries, LineSeries } from 'lightweight-charts';
 
-const CandlestickChart = ({ data, theme = 'dark' }) => {
+const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
   const chartContainerRef = useRef();
 
   useEffect(() => {
@@ -49,6 +49,37 @@ const CandlestickChart = ({ data, theme = 'dark' }) => {
 
     candlestickSeries.setData(formattedData);
 
+    // AI Trend Lines mapping
+    if (trendLines && trendLines.length > 0) {
+      trendLines.forEach(line => {
+         const colorMap = {
+           'green': '#10B981',
+           'red': '#EF4444',
+           'blue': '#3B82F6',
+           'white': '#FFFFFF',
+           'yellow': '#EAB308'
+         };
+         const mappedColor = colorMap[line.color] || colorMap['blue'];
+
+         const lineSeries = chart.addSeries(LineSeries, {
+            color: mappedColor,
+            lineWidth: 2,
+            lineStyle: 1, // Dotted
+            title: line.label || '',
+         });
+         
+         const t1 = Math.floor(new Date(line.start_date).getTime() / 1000);
+         const t2 = Math.floor(new Date(line.end_date).getTime() / 1000);
+         
+         // In lightweight-charts, line data must be chronologically sorted.
+         const p1 = { time: t1, value: line.start_price };
+         const p2 = { time: t2, value: line.end_price };
+         const lineData = t1 > t2 ? [p2, p1] : [p1, p2];
+
+         lineSeries.setData(lineData);
+      });
+    }
+
     const handleResize = () => {
       chart.applyOptions({ width: chartContainerRef.current.clientWidth });
     };
@@ -59,7 +90,7 @@ const CandlestickChart = ({ data, theme = 'dark' }) => {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data, theme]);
+  }, [data, theme, trendLines]);
 
   return <div ref={chartContainerRef} className="w-full h-[400px]" />;
 };

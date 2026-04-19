@@ -21,5 +21,7 @@ build/
 backend/archive/
 backend/data/*.csv
 backend/data/*.zip
+backend/data/bse_bhavcopy.py
 scratch/
+*samco*
 *.log

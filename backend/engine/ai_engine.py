@@ -416,6 +416,210 @@ async def generate_insight(
         error_message=error_message,
     )
 
+    return parsed  # ← was missing: caused insights to never be saved to AIInsights table
+
+
+
+async def generate_chart_chat(symbol: str, user_messages: list, context_data: dict) -> dict:
+    """
+    Given a chat history and OHLC/signal context, generate a response containing 
+    a markdown 'reply' and an optional array of 'trend_lines'.
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai": ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai": ai_cfg["xai_key"],
+    }
+    
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    if not key_map.get(provider):
+        raise ValueError(f"No API key configured for AI features.")
+
+    model = {
+        "openai": ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai": ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    sys_prompt = f"""You are an elite quantitative technical analyst examining internal charts for {symbol}.
+You have access to the following current signals and the last 90 bars of OHLCV data:
+{json.dumps(context_data, indent=2)}
+
+You MUST answer the user's questions based strictly on the provided technical data.
+Focus your analysis on obvious trends, RSI extremes, MACD crossovers, and horizontal support/resistance levels.
+
+CRITICAL INSTRUCTION: You must strictly reply in valid JSON using EXACTLY this schema:
+{{
+  "reply": "Your markdown formatted text here. Explain the graph, RSI/MACD readings, and whether it's a good time to buy. Keep it concise, aggressive, and highly analytical.",
+  "trend_lines": [
+    {{
+      "start_date": "2023-01-01", 
+      "end_date": "2023-02-01", 
+      "start_price": 100.5, 
+      "end_price": 110.2, 
+      "color": "green", 
+      "label": "Support"
+    }}
+  ]
+}}
+* Return an empty array [] for trend_lines if no lines apply to the specific question.
+* Format dates as YYYY-MM-DD exactly matching the provided context dates.
+"""
+
+    messages = [{"role": "system", "content": sys_prompt}] + user_messages
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    try:
+        api_key = key_map[provider]
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, api_key)
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, api_key)
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, api_key)
+            
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"Chart chat generation failed ({provider}): {e}")
+        raise e
+
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol=symbol,
+            provider=provider,
+            model=model,
+            trigger_reason="CHART_CHAT",
+            skill_id=None,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+        )
+
+    return parsed
+
+# ── Portfolio AI Allocation ─────────────────────────────────────────────────────
+
+async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> dict:
+    """
+    AI task to dynamically distribute an amount of capital across the user's active portfolio.
+    Returns a dict with 'allocations' and a 'rationale'.
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai": ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai": ai_cfg["xai_key"],
+    }
+    
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    
+    if not key_map.get(provider):
+        raise ValueError(f"No API key configured for AI Portfolio Allocation.")
+
+    model = {
+        "openai": ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai": ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    portfolio_summary = json.dumps([{
+        "symbol": item["symbol"],
+        "composite_score": float(item["signal"]["composite_score"]) if item["signal"] and item["signal"].get("composite_score") else 50.0,
+        "current_price": float(item["signal"]["current_price"]) if item["signal"] and item["signal"].get("current_price") else 1.0,
+        "sector": item["sector"],
+        "st_signal": item["signal"]["st_signal"] if item["signal"] else "HOLD",
+    } for item in portfolio_data], indent=2)
+
+    prompt = f"""
+You are a quantitative portfolio manager.
+I want to allocate a lump sum of EXACTLY {amount} among my current portfolio holdings.
+Here is the portfolio state with scores:
+{portfolio_summary}
+
+Instructions:
+1. Weight the distribution higher toward stocks with strong fundamentals/composite_scores and solid short-term setups.
+2. The sum of allocated amounts MUST equal exactly {amount}.
+3. Return the result in the following JSON format:
+{{
+  "rationale": "High-level reason for this distribution strategy based on the sectors and scores.",
+  "allocations": [
+    {{
+      "symbol": "TICKER",
+      "allocated_amount": 5000,
+      "estimated_qty": 10,
+      "reason": "Brief reason for this specific allocation weight."
+    }}
+  ]
+}}
+Ensure the response is ONLY valid JSON.
+"""
+    messages = [
+        {"role": "system", "content": "You are a quantitative AI agent returning strictly valid JSON."},
+        {"role": "user", "content": prompt}
+    ]
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    try:
+        api_key = key_map[provider]
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, api_key)
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, api_key)
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, api_key)
+            
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"AI Portfolio Allocation generation failed ({provider}): {e}")
+        raise e
+
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol="PORT_ALLOC",
+            provider=provider,
+            model=model,
+            trigger_reason="MANUAL_ALLOCATION",
+            skill_id=None,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+        )
+
     return parsed
 
 

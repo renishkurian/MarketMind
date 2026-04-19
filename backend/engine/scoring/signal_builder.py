@@ -85,6 +85,7 @@ class SignalBuilder:
             roe_3yr_avg=_to_float(fc.roe_3yr_avg),
             debt_equity=_to_float(fc.debt_equity),
             revenue_growth_3yr=_to_float(fc.revenue_growth_3yr),
+            revenue_growth=_to_float(fc.revenue_growth),
             pat_growth_3yr=_to_float(fc.pat_growth_3yr),
             operating_margin=_to_float(fc.operating_margin),
             promoter_holding=_to_float(fc.promoter_holding),

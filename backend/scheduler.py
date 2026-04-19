@@ -182,7 +182,7 @@ async def recompute_signals_for(symbol: str, sector_vault: Dict[str, SectorData]
                 signal_row.st_score = res.technical_score
                 signal_row.lt_score = res.composite_score
                 signal_row.confidence_pct = confidence
-                signal_row.data_quality = "FULL" if res.fa_coverage > 0.5 else "TECHNICALS_ONLY"
+                signal_row.data_quality = "FULL" if res.fa_coverage >= 0.5 else "TECHNICALS_ONLY"
                 
                 # Group V2.1 metrics into timeframe-based UI buckets
                 short_term = {}

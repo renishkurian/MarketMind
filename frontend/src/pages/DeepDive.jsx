@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback,useMemo } from 'react';
+import React, { useRef,useEffect, useState, useCallback,useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStockStore } from '../store/stockStore';
 import {
@@ -310,7 +310,8 @@ export default function DeepDive() {
       if (res.ok) {
         const data = await res.json();
         toast.success(`Synced! Source data quality: ${data.status}`);
-        fetchData();
+        // Automate signal refresh to pick up new fundamentals
+        await handleRegenerateSignals();
       } else {
         toast.error('Failed to sync from Yahoo');
       }
@@ -422,6 +423,174 @@ export default function DeepDive() {
 
   // Volume max for bar scaling
   const maxVol = Math.max(...filteredHistory.map(d => d.volume || 0), 1);
+
+  // ── Chart Chat (Multi-Session, Persistent) ─────────────────────────────
+  const CHAT_STORAGE_KEY = `mm_chart_chats_${symbol}`;
+
+  const [showChartChat, setShowChartChat] = useState(false);
+  const [showSessionList, setShowSessionList] = useState(false);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [activeChatSessionId, setActiveChatSessionId] = useState(null);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [activeTrendLines, setActiveTrendLines] = useState([]);
+  const chatScrollRef = useRef(null);
+
+  // Derived: active session messages
+  const activeSession = chatSessions.find(s => s.id === activeChatSessionId);
+  const chatMessages = activeSession?.messages || [];
+
+  // Load sessions from localStorage when symbol changes
+  useEffect(() => {
+    const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (stored) {
+      try {
+        const sessions = JSON.parse(stored);
+        setChatSessions(sessions);
+        // Default to latest session
+        if (sessions.length > 0) {
+          setActiveChatSessionId(sessions[sessions.length - 1].id);
+          setActiveTrendLines(sessions[sessions.length - 1].trendLines || []);
+        }
+      } catch { /* ignore corrupt data */ }
+    } else {
+      setChatSessions([]);
+      setActiveChatSessionId(null);
+    }
+  }, [symbol]);
+
+  // Persist sessions to localStorage whenever they change
+  const saveSessions = (sessions) => {
+    setChatSessions(sessions);
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sessions));
+  };
+
+  const createNewSession = (autoStart = false) => {
+    const newSession = {
+      id: Date.now().toString(),
+      title: 'New Analysis',
+      createdAt: new Date().toISOString(),
+      messages: [],
+      trendLines: [],
+    };
+    const updated = [...chatSessions, newSession];
+    saveSessions(updated);
+    setActiveChatSessionId(newSession.id);
+    setActiveTrendLines([]);
+    setShowSessionList(false);
+    return newSession.id;
+  };
+
+  const updateSession = (sessionId, newMessages, newTrendLines = null) => {
+    setChatSessions(prev => {
+      const updated = prev.map(s => {
+        if (s.id !== sessionId) return s;
+        // Use first user message as title
+        const firstUser = newMessages.find(m => m.role === 'user');
+        const title = firstUser
+          ? firstUser.content.slice(0, 40) + (firstUser.content.length > 40 ? '…' : '')
+          : s.title;
+        return { ...s, messages: newMessages, trendLines: newTrendLines ?? s.trendLines, title };
+      });
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteSession = (sessionId) => {
+    const updated = chatSessions.filter(s => s.id !== sessionId);
+    saveSessions(updated);
+    if (activeChatSessionId === sessionId) {
+      const next = updated[updated.length - 1];
+      setActiveChatSessionId(next?.id || null);
+      setActiveTrendLines(next?.trendLines || []);
+    }
+  };
+
+  const switchSession = (sessionId) => {
+    const s = chatSessions.find(s => s.id === sessionId);
+    setActiveChatSessionId(sessionId);
+    setActiveTrendLines(s?.trendLines || []);
+    setShowSessionList(false);
+  };
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const sendChatMessage = async (msgOverride = null, sessionIdOverride = null) => {
+    const text = msgOverride || chatInput;
+    if (!text.trim() && !msgOverride) return;
+
+    const targetSessionId = sessionIdOverride || activeChatSessionId;
+    if (!targetSessionId) return;
+
+    const currentSession = chatSessions.find(s => s.id === targetSessionId);
+    const prevMessages = currentSession?.messages || [];
+
+    const newMsg = { role: 'user', content: text };
+    const updatedMessages = [...prevMessages, newMsg];
+    updateSession(targetSessionId, updatedMessages, currentSession?.trendLines);
+    if (!msgOverride) setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/chart_chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ messages: updatedMessages })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const finalMessages = [...updatedMessages, { role: 'assistant', content: data.reply || '' }];
+        const newTrendLines = data.trend_lines && data.trend_lines.length > 0 ? data.trend_lines : (currentSession?.trendLines || []);
+        updateSession(targetSessionId, finalMessages, newTrendLines);
+        setActiveTrendLines(newTrendLines);
+        if (data.trend_lines?.length > 0) toast.success(`AI plotted ${data.trend_lines.length} trendlines`);
+      } else {
+        toast.error('AI chat failed');
+        updateSession(targetSessionId, prevMessages);
+      }
+    } catch (e) {
+      toast.error('Connection error');
+      updateSession(targetSessionId, prevMessages);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const toggleChat = () => {
+    const willOpen = !showChartChat;
+    setShowChartChat(willOpen);
+    if (willOpen) {
+      const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+      const existingSessions = stored ? JSON.parse(stored) : [];
+      if (existingSessions.length === 0) {
+        // Auto-start the very first session
+        const newSession = {
+          id: Date.now().toString(),
+          title: 'Initial Analysis',
+          createdAt: new Date().toISOString(),
+          messages: [],
+          trendLines: [],
+        };
+        const updated = [newSession];
+        saveSessions(updated);
+        setActiveChatSessionId(newSession.id);
+        sendChatMessage(
+          "Please analyze this chart based on RSI, MACD, and current price trends. State clearly if this is a good buy setup right now. Plot any important support/resistance trend lines.",
+          newSession.id
+        );
+      }
+    }
+  };
 
   const tabs = [
     { id: 'chart', label: 'Price Chart', Icon: BarChart2 },
@@ -617,22 +786,33 @@ export default function DeepDive() {
         <div className="p-6">
           {/* Chart Tab */}
           {activeTab === 'chart' && (
-            <div>
-              {/* Range buttons */}
-              <div className="flex gap-2 mb-5">
-                {Object.keys(rangeMap).map(r => (
-                  <button
-                    key={r}
-                    onClick={() => setRange(r)}
-                    className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors ${
-                      range === r
-                        ? 'bg-accent text-white'
-                        : 'text-dark-muted bg-gray-800 hover:bg-gray-700'
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
+            <div className="relative">
+              {/* Range buttons + Action Button */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex gap-2">
+                  {Object.keys(rangeMap).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setRange(r)}
+                      className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors ${
+                        range === r
+                          ? 'bg-accent text-white'
+                          : 'text-dark-muted bg-gray-800 hover:bg-gray-700'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  onClick={toggleChat}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-colors border ${
+                    showChartChat ? 'bg-signal-buy text-white border-signal-buy' : 'bg-dark-card text-accent border-accent hover:bg-accent/10'
+                  }`}
+                >
+                  <Sparkles size={16} />
+                  Ask AI
+                </button>
               </div>
 
               {historyLoading ? (
@@ -647,29 +827,149 @@ export default function DeepDive() {
                   <p className="text-xs text-dark-muted/70">Run the historical data loader to populate price data.</p>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-4">
-                    <CandlestickChart data={filteredHistory} theme={theme} />
-                    <VolumeChart data={filteredHistory} theme={theme} />
-                    <RSIChart data={filteredHistory} theme={theme} />
-                    <MACDChart data={filteredHistory} theme={theme} />
+                <div className="flex gap-4 items-stretch">
+                  {/* Left Chart Area */}
+                  <div className={`flex-1 overflow-hidden transition-all duration-300 ${showChartChat ? 'w-2/3' : 'w-full'}`}>
+                    <div className="space-y-4">
+                      <CandlestickChart data={filteredHistory} theme={theme} trendLines={activeTrendLines} />
+                      <VolumeChart data={filteredHistory} theme={theme} />
+                      <RSIChart data={filteredHistory} theme={theme} />
+                      <MACDChart data={filteredHistory} theme={theme} />
+                    </div>
+
+                    {/* OHLC last bar summary */}
+                    {filteredHistory.length > 0 && (() => {
+                      const last = filteredHistory[filteredHistory.length - 1];
+                      return (
+                        <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-dark-border text-xs font-mono text-dark-muted">
+                          <span>O: <span className="text-dark-text">₹{last.open?.toFixed(2)}</span></span>
+                          <span>H: <span className="text-signal-buy">₹{last.high?.toFixed(2)}</span></span>
+                          <span>L: <span className="text-signal-sell">₹{last.low?.toFixed(2)}</span></span>
+                          <span>C: <span className="text-dark-text font-bold">₹{last.close?.toFixed(2)}</span></span>
+                          <span>Vol: <span className="text-dark-text">{last.volume?.toLocaleString()}</span></span>
+                          <span className="ml-auto text-dark-muted">{last.date}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  {/* OHLC last bar summary */}
-                  {filteredHistory.length > 0 && (() => {
-                    const last = filteredHistory[filteredHistory.length - 1];
-                    return (
-                      <div className="flex gap-5 mt-4 pt-4 border-t border-dark-border text-xs font-mono text-dark-muted">
-                        <span>O: <span className="text-dark-text">₹{last.open?.toFixed(2)}</span></span>
-                        <span>H: <span className="text-signal-buy">₹{last.high?.toFixed(2)}</span></span>
-                        <span>L: <span className="text-signal-sell">₹{last.low?.toFixed(2)}</span></span>
-                        <span>C: <span className="text-dark-text font-bold">₹{last.close?.toFixed(2)}</span></span>
-                        <span>Vol: <span className="text-dark-text">{last.volume?.toLocaleString()}</span></span>
-                        <span className="ml-auto text-dark-muted">{last.date}</span>
+                  {/* Right Chat Panel */}
+                  {showChartChat && (
+                    <div className="w-1/3 min-w-[300px] border border-dark-border bg-[#0d1117] rounded-xl flex flex-col shadow-2xl" style={{height: '700px'}}>
+                      
+                      {/* Header */}
+                      <div className="p-3 border-b border-dark-border bg-dark-bg flex items-center gap-2 shrink-0">
+                        <Brain size={15} className="text-accent" />
+                        <span className="font-bold text-accent text-sm flex-1 truncate">
+                          {activeSession?.title || 'Chart Intelligence'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {/* New Chat */}
+                          <button
+                            onClick={() => createNewSession()}
+                            title="New Chat"
+                            className="text-dark-muted hover:text-signal-buy transition-colors p-1 rounded"
+                          >
+                            <Edit2 size={14}/>
+                          </button>
+                          {/* Session History */}
+                          <button
+                            onClick={() => setShowSessionList(v => !v)}
+                            title="All chats"
+                            className={`text-dark-muted hover:text-white transition-colors p-1 rounded ${showSessionList ? 'text-white bg-dark-border' : ''}`}
+                          >
+                            <Clock size={14}/>
+                          </button>
+                          <button onClick={() => setShowChartChat(false)} className="text-dark-muted hover:text-white p-1">
+                            <X size={14}/>
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })()}
-                </>
+
+                      {/* Session List Dropdown */}
+                      {showSessionList && (
+                        <div className="border-b border-dark-border bg-gray-950 shrink-0 max-h-48 overflow-y-auto">
+                          {chatSessions.length === 0 ? (
+                            <p className="p-3 text-xs text-dark-muted text-center">No chats yet</p>
+                          ) : (
+                            [...chatSessions].reverse().map(s => (
+                              <div key={s.id} className={`flex items-center gap-2 px-3 py-2 hover:bg-dark-card cursor-pointer border-b border-dark-border/50 last:border-0 ${activeChatSessionId === s.id ? 'bg-accent/10' : ''}`}>
+                                <div className="flex-1 min-w-0" onClick={() => switchSession(s.id)}>
+                                  <p className="text-xs font-medium text-dark-text truncate">
+                                    {s.title || 'Untitled'}
+                                  </p>
+                                  <p className="text-[10px] text-dark-muted">
+                                    {new Date(s.createdAt).toLocaleDateString()} · {s.messages.length} messages
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                                  className="text-dark-muted hover:text-signal-sell shrink-0 p-1"
+                                >
+                                  <X size={12}/>
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+
+                      {/* Messages */}
+                      <div
+                        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+                        ref={chatScrollRef}
+                        style={{scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent'}}
+                      >
+                        {chatMessages.length === 0 && !chatLoading && (
+                          <div className="flex flex-col items-center justify-center h-full gap-3 text-dark-muted">
+                            <Brain size={28} className="opacity-30"/>
+                            <p className="text-sm text-center">Analyzing chart…<br/><span className="text-xs opacity-60">This may take a few seconds</span></p>
+                          </div>
+                        )}
+                        {chatMessages.map((msg, i) => (
+                          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[88%] p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                              msg.role === 'user'
+                                ? 'bg-accent text-white rounded-br-sm'
+                                : 'bg-dark-card border border-dark-border text-dark-text rounded-bl-sm'
+                            }`}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div className="flex justify-start">
+                            <div className="p-3 rounded-2xl bg-dark-card border border-dark-border rounded-bl-sm flex items-center gap-1.5">
+                              <div className="w-2 h-2 bg-accent/70 rounded-full animate-bounce"/>
+                              <div className="w-2 h-2 bg-accent/70 rounded-full animate-bounce" style={{animationDelay: '150ms'}}/>
+                              <div className="w-2 h-2 bg-accent/70 rounded-full animate-bounce" style={{animationDelay: '300ms'}}/>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Input Bar */}
+                      <div className="p-3 border-t border-dark-border bg-dark-bg flex gap-2 shrink-0">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && !chatLoading && sendChatMessage()}
+                          placeholder={activeChatSessionId ? "Ask about this chart…" : "Start a new chat first"}
+                          disabled={chatLoading || !activeChatSessionId}
+                          className="flex-1 bg-dark-card border border-dark-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent text-white disabled:opacity-50 placeholder:text-gray-600"
+                        />
+                        <button
+                          onClick={() => sendChatMessage()}
+                          disabled={chatLoading || !activeChatSessionId}
+                          className="bg-accent text-white p-2 rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors shrink-0"
+                        >
+                          <ArrowUpRight size={18}/>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -807,15 +1107,18 @@ export default function DeepDive() {
                                 pe_vs_5yr: "PE vs 5Y", roe_quality: "ROE", debt_equity: "D/E", revenue_growth_3yr: "Rev Growth", pat_growth_3yr: "PAT Growth", operating_margin: "Margin", pledge_penalty_on_roe: "Pledge Pnlty"
                               };
                               const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
-                              const pct = data.max > 0 ? (data.score / data.max) * 100 : 0;
-                              const barColor = pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell';
+                              const pct = (data.score !== null && data.max > 0) ? (data.score / data.max) * 100 : 0;
+                              const isMissing = data.score === null;
+                              const barColor = isMissing ? 'bg-gray-800' : (pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell');
                               return (
                                 <div key={name} className="flex items-center gap-3">
                                   <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title={displayName}>{displayName}</span>
-                                  <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                                  <div className="flex-1 h-1.5 bg-gray-700/30 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${isMissing ? 0 : pct}%` }} />
                                   </div>
-                                  <span className="font-mono text-xs text-right w-12 text-dark-muted">{Math.round(data.score)}/{Math.round(data.max)}</span>
+                                  <span className="font-mono text-xs text-right w-12 text-dark-muted">
+                                    {isMissing ? 'N/A' : `${Math.round(data.score)}/${Math.round(data.max)}`}
+                                  </span>
                                 </div>
                               );
                             })}

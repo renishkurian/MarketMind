@@ -137,9 +137,16 @@ export default function PortfolioTable({ stocks }) {
                   {/* Symbol */}
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
-                      <span className="font-mono font-bold text-accent group-hover:underline text-base leading-tight">
-                        {stock.symbol}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-accent group-hover:underline text-base leading-tight">
+                          {stock.symbol}
+                        </span>
+                        {stock.is_accumulate_recommended && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-signal-buy/20 text-signal-buy border border-signal-buy/30 whitespace-nowrap hidden md:inline-block">
+                            ACCUMULATE
+                          </span>
+                        )}
+                      </div>
                       {stock.quantity > 0 && (
                         <span className="text-[10px] font-mono font-bold text-dark-muted mt-0.5">
                           ₹{(stock.quantity * parseFloat(stock.avg_buy_price)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}

@@ -215,6 +215,16 @@ class AICallLog(Base):
     called_at         = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
 
+class AllocationLog(Base):
+    __tablename__ = "allocation_logs"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    allocated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    total_amount = Column(Numeric(14,2), nullable=False)
+    allocation_type = Column(Enum('AI_DRIVEN', 'PROPORTIONAL'), nullable=False)
+    allocations = Column(JSON, nullable=False)  # Array of {symbol, amount, units, reason}
+    ai_call_id = Column(Integer, nullable=True)  # FK to ai_call_logs if used
+
 class SystemConfig(Base):
     __tablename__ = "system_config"
     

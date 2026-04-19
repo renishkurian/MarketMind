@@ -3,7 +3,7 @@ import { useStockStore } from '../store/stockStore';
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
 import PortfolioTable from '../components/PortfolioTable';
-import { Briefcase, TrendingUp, BarChart, ArrowDown, Upload, IndianRupee, Activity, PieChart, Search } from 'lucide-react';
+import { Briefcase, TrendingUp, BarChart, ArrowDown, Upload, IndianRupee, Activity, PieChart, Search, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
@@ -17,6 +17,15 @@ export default function Portfolio() {
 
   const fileInputRef = useRef(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  // ── Modal / feature state — must be declared before any early returns ────
+  const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [allocateAmount, setAllocateAmount] = useState(10000);
+  const [allocateLimit, setAllocateLimit] = useState('');
+  const [useAI, setUseAI] = useState(false);
+  const [isAllocating, setIsAllocating] = useState(false);
+  const [allocationResult, setAllocationResult] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const portfolioStocks = useMemo(() =>
     Object.values(stocks).filter(s => s.type === 'PORTFOLIO' || !s.type),
@@ -124,6 +133,54 @@ export default function Portfolio() {
     }
   };
 
+
+  const handleAllocate = async () => {
+    if (allocateAmount <= 0) return toast.error("Amount must be greater than 0");
+    setIsAllocating(true);
+    setAllocationResult(null);
+    try {
+      const payload = {
+        amount: parseFloat(allocateAmount),
+        use_ai: useAI
+      };
+      if (allocateLimit.trim() !== '') {
+         payload.limit = parseInt(allocateLimit, 10);
+      }
+      
+      const res = await axios.post(`${API_URL}/api/portfolio/allocate`, payload, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('mm_token')}` }
+      });
+      setAllocationResult(res.data);
+      toast.success("Allocation calculated successfully!");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Allocation failed');
+    } finally {
+      setIsAllocating(false);
+    }
+  };
+
+  const handleSyncSignals = async () => {
+    setIsSyncing(true);
+    const toastId = toast.loading(`Syncing signals for ${portfolioStocks.length} stocks…`);
+    try {
+      const res = await axios.post(`${API_URL}/api/portfolio/sync-signals`, {}, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('mm_token')}` }
+      });
+      const { success_count, error_count, failed_symbols } = res.data;
+      toast.dismiss(toastId);
+      if (error_count === 0) {
+        toast.success(`✅ All ${success_count} signals synced!`);
+      } else {
+        toast.success(`Synced ${success_count} stocks. ⚠️ ${error_count} failed: ${failed_symbols.join(', ')}`);
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error(err.response?.data?.detail || 'Sync failed');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen p-6 space-y-6">
       <div className="flex justify-between items-end">
@@ -139,6 +196,22 @@ export default function Portfolio() {
             ref={fileInputRef} 
             onChange={handleFileUpload} 
           />
+          <button
+            onClick={handleSyncSignals}
+            disabled={isSyncing}
+            title="Recompute signals for all portfolio stocks"
+            className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-xl text-sm font-semibold hover:border-signal-buy hover:text-signal-buy transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            {isSyncing ? 'Syncing…' : 'Sync Signals'}
+          </button>
+          <button 
+            onClick={() => setShowAllocateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-dark-card border border-dark-border rounded-xl text-sm font-semibold hover:border-accent hover:text-accent transition-all"
+          >
+            <PieChart size={16} />
+            Smart Allocate
+          </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
@@ -243,6 +316,111 @@ export default function Portfolio() {
             <Briefcase size={48} className="text-dark-muted mb-4" />
             <p className="text-lg font-bold text-dark-text">No portfolio stocks loaded</p>
             <p className="text-sm text-dark-muted">Import your holdings via XLSX or add symbols from the Watchlist.</p>
+        </div>
+      )}
+
+      {/* Allocation Modal */}
+      {showAllocateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-dark-bg border border-dark-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-dark-border flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-dark-text tracking-tight flex items-center gap-2">
+                  <PieChart className="text-accent" /> Smart Allocate
+                </h3>
+                <p className="text-sm text-dark-muted mt-1">Distribute capital optimally across your portfolio</p>
+              </div>
+              <button 
+                onClick={() => setShowAllocateModal(false)}
+                className="text-dark-muted hover:text-dark-text transition-colors"
+              >
+                Close
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                <div className="flex-1 w-full flex flex-col items-start text-left">
+                  <label className="block text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Amount to Allocate (₹)</label>
+                  <input 
+                    type="number" 
+                    value={allocateAmount}
+                    onChange={(e) => setAllocateAmount(e.target.value)}
+                    className="w-full bg-dark-card border border-dark-border text-lg font-mono font-bold text-dark-text rounded-xl p-3 focus:outline-none focus:border-accent transition-colors"
+                  />
+                </div>
+                <div className="w-full md:w-32 flex flex-col items-start text-left">
+                  <label className="block text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Max Stocks</label>
+                  <input 
+                    type="number" 
+                    placeholder="All"
+                    value={allocateLimit}
+                    onChange={(e) => setAllocateLimit(e.target.value)}
+                    className="w-full bg-dark-card border border-dark-border text-lg font-mono font-bold text-dark-text rounded-xl p-3 focus:outline-none focus:border-accent transition-colors placeholder:text-gray-600/50"
+                  />
+                </div>
+                <div className="flex flex-col border border-dark-border bg-dark-card rounded-xl p-3 mt-4 md:mt-0 items-center justify-center h-[76px] self-end">
+                  <label className="text-xs font-bold text-dark-muted uppercase mb-2">Use AI</label>
+                  <button 
+                    onClick={() => setUseAI(!useAI)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useAI ? 'bg-signal-buy' : 'bg-gray-600'}`}
+                  >
+                    <span className={`inline-block w-4 h-4 transform rounded-full bg-white transition-transform ${useAI ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                onClick={handleAllocate}
+                disabled={isAllocating}
+                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isAllocating ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : <PieChart size={18} />}
+                Generate Allocation
+              </button>
+
+              {allocationResult && (
+                <div className="space-y-4 pt-4 border-t border-dark-border animate-in slide-in-from-bottom flex flex-col">
+                  {allocationResult.rationale && (
+                    <div className="bg-signal-buy/10 border border-signal-buy/20 rounded-xl p-4 text-sm text-signal-buy leading-relaxed">
+                      <span className="font-bold">Strategy:</span> {allocationResult.rationale}
+                    </div>
+                  )}
+                  <div className="border border-dark-border rounded-xl bg-dark-card overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-900/40 text-dark-muted border-b border-dark-border text-xs uppercase tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3">Symbol</th>
+                          <th className="px-4 py-3 text-right">Allocation (₹)</th>
+                          <th className="px-4 py-3 text-right">Est. Qty</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-dark-border">
+                        {allocationResult.allocations?.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-gray-800/40 transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-mono font-bold text-accent">{item.symbol}</span>
+                              <div className="text-[10px] text-dark-muted font-sans font-normal mt-0.5 line-clamp-2" title={item.reason}>
+                                {item.reason}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-signal-buy whitespace-nowrap">
+                              ₹{parseFloat(item.allocated_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-dark-muted whitespace-nowrap">
+                              {parseFloat(item.estimated_qty).toFixed(1)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

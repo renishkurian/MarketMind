@@ -150,6 +150,7 @@ class FundamentalData:
     roe_3yr_avg: Optional[float] = None
     debt_equity: Optional[float] = None
     revenue_growth_3yr: Optional[float] = None
+    revenue_growth: Optional[float] = None
     pat_growth_3yr: Optional[float] = None
     operating_margin: Optional[float] = None
     promoter_holding: Optional[float] = None
@@ -349,13 +350,11 @@ class CompositeScorer:
         """
 
         # 1. PE vs 5yr avg (20 pts)
-        pe_present = (
-            fa.pe_ratio is not None
-            and fa.pe_5yr_avg is not None
-            and fa.pe_5yr_avg > 0
-        )
+        pe_present = fa.pe_ratio is not None
         if pe_present:
-            discount = (fa.pe_5yr_avg - fa.pe_ratio) / fa.pe_5yr_avg
+            # Fallback benchmark if 5yr avg is missing
+            ref_pe = fa.pe_5yr_avg if (fa.pe_5yr_avg and fa.pe_5yr_avg > 0) else 20.0
+            discount = (ref_pe - fa.pe_ratio) / ref_pe
             pe_score = _clamp(_linear_scale(discount, -0.5, 0.5, 0, 100), 0, 100)
         else:
             pe_score = 50.0
@@ -384,10 +383,11 @@ class CompositeScorer:
             if de_present else 50.0
         )
 
-        # 4. Revenue CAGR 3yr (15 pts)
-        rev_present = fa.revenue_growth_3yr is not None
+        # 4. Revenue CAGR 3yr (15 pts) - Fallback to current YoY
+        rev_val = fa.revenue_growth_3yr if fa.revenue_growth_3yr is not None else fa.revenue_growth
+        rev_present = rev_val is not None
         rev_score = (
-            _clamp(_linear_scale(fa.revenue_growth_3yr, -5.0, 25.0, 0, 100), 0, 100)
+            _clamp(_linear_scale(rev_val, -5.0, 25.0, 0, 100), 0, 100)
             if rev_present else 50.0
         )
 
@@ -416,12 +416,12 @@ class CompositeScorer:
         ) / 100.0
 
         breakdown: dict = {
-            "pe_vs_5yr": round(pe_score, 1),
-            "roe_quality": round(roe_score, 1),
-            "debt_equity": round(de_score, 1),
-            "revenue_growth_3yr": round(rev_score, 1),
-            "pat_growth_3yr": round(pat_score, 1),
-            "operating_margin": round(om_score, 1)
+            "pe_vs_5yr":            round(pe_score, 1)  if pe_present  else None,
+            "roe_quality":          round(roe_score, 1) if roe_present  else None,
+            "debt_equity":          round(de_score, 1)  if de_present  else None,
+            "revenue_growth_3yr":   round(rev_score, 1) if rev_present  else None,
+            "pat_growth_3yr":       round(pat_score, 1) if pat_present  else None,
+            "operating_margin":     round(om_score, 1)  if om_present  else None,
         }
         if fa.promoter_pledge_pct is not None and fa.promoter_pledge_pct > 20.0:
             penalty = min((fa.promoter_pledge_pct - 20.0) * 0.5, 20.0)
@@ -526,13 +526,13 @@ class CompositeScorer:
         ) / 100.0
 
         breakdown: dict = {
-            "rsi": round(rsi_score, 1),
-            "macd": round(macd_score, 1),
-            "price_vs_sma200": round(sma200_score, 1),
-            "price_vs_sma50": round(sma50_score, 1),
-            "adx": round(adx_score, 1),
-            "bb_position": round(bb_score, 1),
-            "trade_activity": round(shock_score, 1)
+            "rsi":              round(rsi_score, 1)    if rsi_present    else None,
+            "macd":             round(macd_score, 1)   if macd_present   else None,
+            "price_vs_sma200":  round(sma200_score, 1) if sma200_present else None,
+            "price_vs_sma50":   round(sma50_score, 1)  if sma50_present  else None,
+            "adx":              round(adx_score, 1)    if adx_present    else None,
+            "bb_position":      round(bb_score, 1)     if bb_present     else None,
+            "trade_activity":   round(shock_score, 1)  if shock_present  else None,
         }
 
         n_present = sum([rsi_present, macd_present, sma200_present, sma50_present,
@@ -604,12 +604,12 @@ class CompositeScorer:
         ) / 100.0
 
         breakdown: dict = {
-            "roc_1yr": round(roc252_score, 1),
-            "roc_60d": round(roc60_score, 1),
-            "roc_20d": round(roc20_score, 1),
-            "volume_trend": round(vol_score, 1),
-            "52w_rank": round(rank_score, 1),
-            "rs_vs_nifty": round(rs_score, 1)
+            "roc_1yr":          round(roc252_score, 1) if roc252_present else None,
+            "roc_60d":          round(roc60_score, 1)  if roc60_present  else None,
+            "roc_20d":          round(roc20_score, 1)  if roc20_present  else None,
+            "volume_trend":     round(vol_score, 1)    if vol_present    else None,
+            "52w_rank":         round(rank_score, 1)   if rank_present   else None,
+            "rs_vs_nifty":      round(rs_score, 1)     if rs_present     else None,
         }
 
         n_present = sum([roc252_present, roc60_present, roc20_present,

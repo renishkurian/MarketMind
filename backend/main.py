@@ -13,12 +13,13 @@ import asyncio
 
 from backend.data.db import (
     get_db, SessionLocal,
-    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction, AICallLog
+    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction, AICallLog, AllocationLog
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_admin, get_password_hash
 from backend.config import settings
 from backend.api import analysis
+from backend.engine.ai_engine import generate_portfolio_allocation, generate_chart_chat
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -280,16 +281,27 @@ async def get_portfolio(db: AsyncSession = Depends(get_db)):
         .order_by(SignalsCache.confidence_pct.desc())
     )
     rows = result.all()
-    return [
-        {
+    portfolio_data = []
+    for stock, signal in rows:
+        # Determine Accumulate/Buy More signal (price-agnostic)
+        # Rule: Strong fundamentals/moat (composite > 60) AND positive short-term momentum (st_signal == 'BUY')
+        is_accumulate_recommended = False
+        if signal and signal.composite_score is not None and signal.st_signal == 'BUY':
+            if signal.composite_score > 60:
+                is_accumulate_recommended = True
+
+        portfolio_data.append({
             "symbol": stock.symbol,
             "company_name": stock.company_name,
             "sector": stock.sector,
             "market_cap_cat": stock.market_cap_cat,
+            "quantity": float(stock.quantity) if stock.quantity else 0.0,
+            "avg_buy_price": float(stock.avg_buy_price) if stock.avg_buy_price else 0.0,
+            "is_accumulate_recommended": is_accumulate_recommended,
             "signal": _serialize_signal(signal)
-        }
-        for stock, signal in rows
-    ]
+        })
+    
+    return portfolio_data
 
 
 @app.post("/api/portfolio/import")
@@ -392,6 +404,99 @@ async def remove_from_portfolio(symbol: str, db: AsyncSession = Depends(get_db),
     stock.is_active = False
     await db.commit()
     return {"message": f"{symbol} removed"}
+
+
+@app.post("/api/portfolio/allocate")
+async def allocate_portfolio(
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    amount = float(payload.get("amount", 10000))
+    use_ai = bool(payload.get("use_ai", False))
+    limit = payload.get("limit")
+
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+
+    result = await db.execute(
+        select(StockMaster, SignalsCache)
+        .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+        .where(StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
+    )
+    rows = result.all()
+    if not rows:
+        raise HTTPException(status_code=400, detail="No active portfolio stocks found")
+
+    portfolio_data = []
+    for stock, signal in rows:
+        portfolio_data.append({
+            "symbol": stock.symbol,
+            "sector": stock.sector,
+            "signal": _serialize_signal(signal) if signal else None
+        })
+
+    # Sort descending by composite score to find the strongest stocks
+    portfolio_data.sort(
+        key=lambda x: float(x["signal"]["composite_score"] or 0) if x["signal"] else 0.0, 
+        reverse=True
+    )
+
+    # Apply top N limit if requested
+    if limit is not None and str(limit).strip():
+        try:
+            limit_int = int(limit)
+            if limit_int > 0:
+                portfolio_data = portfolio_data[:limit_int]
+        except ValueError:
+            pass
+
+    allocation_result = {}
+    allocation_type = "AI_DRIVEN" if use_ai else "PROPORTIONAL"
+
+    if use_ai:
+        try:
+            allocation_result = await generate_portfolio_allocation(amount, portfolio_data)
+        except Exception as e:
+            logger.error(f"AI Allocation failed, falling back to proportional: {e}")
+            use_ai = False
+            allocation_type = "PROPORTIONAL"
+
+    if not use_ai:
+        # Fallback proportional allocation based on composite scores
+        total_score = sum([float(p["signal"]["composite_score"] or 50) for p in portfolio_data if p["signal"]])
+        if total_score == 0:
+            total_score = len(portfolio_data) * 50
+        
+        allocs = []
+        for p in portfolio_data:
+            score = float(p["signal"]["composite_score"] or 50) if p["signal"] else 50.0
+            weight = score / total_score
+            alloc_amt = amount * weight
+            price = p["signal"]["current_price"] if p["signal"] and p["signal"]["current_price"] else 1.0
+            
+            allocs.append({
+                "symbol": p["symbol"],
+                "allocated_amount": round(alloc_amt, 2),
+                "estimated_qty": round(alloc_amt / float(price), 2) if price else 0,
+                "reason": f"Proportional allocation based on composite score of {score:.1f}"
+            })
+            
+        allocs.sort(key=lambda x: x["allocated_amount"], reverse=True)
+        allocation_result = {
+            "rationale": "Mathematical proportional allocation based on AI composite scores.",
+            "allocations": allocs
+        }
+
+    # Save to db
+    log_entry = AllocationLog(
+        total_amount=amount,
+        allocation_type=allocation_type,
+        allocations=allocation_result
+    )
+    db.add(log_entry)
+    await db.commit()
+
+    return allocation_result
 
 
 # ── Watchlist ─────────────────────────────────────────────────────────────────
@@ -599,6 +704,57 @@ async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db)):
         }
         for lot in lots
     ]
+
+
+@app.post("/api/stock/{symbol}/chart_chat")
+async def handle_chart_chat(
+    symbol: str,
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Handles an interactive chat about the chart, utilizing historical OHLC and Signals as context."""
+    chat_history = payload.get("messages", [])
+    symbol = symbol.upper()
+
+    # Get signals context
+    sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
+    sig = sig_result.scalars().first()
+    
+    # Get last 90 bars of history
+    hist_result = await db.execute(
+        select(PriceHistory)
+        .where(PriceHistory.symbol == symbol)
+        .order_by(PriceHistory.date.desc())
+        .limit(90)
+    )
+    history = hist_result.scalars().all()
+    history.reverse() # chronological order
+
+    # Format the context tightly
+    context_data = {
+        "current_st_signal": sig.st_signal if sig else "HOLD",
+        "current_lt_signal": sig.lt_signal if sig else "HOLD",
+        "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
+        "indicators": sig.indicator_breakdown if sig else {},
+        "last_90_bars": [
+            {
+                "date": str(h.date),
+                "open": float(h.open),
+                "high": float(h.high),
+                "low": float(h.low),
+                "close": float(h.close),
+                "volume": int(h.volume)
+            } for h in history
+        ]
+    }
+
+    try:
+        response = await generate_chart_chat(symbol, chat_history, context_data)
+        return response
+    except Exception as e:
+        logger.error(f"Chart Chat Error for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.get("/api/ai-logs")
@@ -851,6 +1007,47 @@ async def recompute_stock_signals(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/portfolio/sync-signals")
+async def sync_portfolio_signals(
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """Recompute signals for every active PORTFOLIO stock in one click."""
+    from backend.scheduler import recompute_signals_for, _fetch_all_sector_data
+
+    result = await db.execute(
+        select(StockMaster)
+        .where(StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
+    )
+    stocks = result.scalars().all()
+    if not stocks:
+        raise HTTPException(status_code=404, detail="No portfolio stocks found")
+
+    symbols = [s.symbol for s in stocks]
+    logger.info(f"Bulk portfolio signal sync started for {len(symbols)} stocks")
+
+    # Fetch sector vault once for all stocks
+    vault = await _fetch_all_sector_data()
+
+    success, errors = 0, []
+    for sym in symbols:
+        try:
+            await recompute_signals_for(sym, sector_vault=vault)
+            success += 1
+            logger.info(f"[BULK SYNC] {sym} — OK")
+        except Exception as e:
+            errors.append(sym)
+            logger.error(f"[BULK SYNC] {sym} — FAILED: {e}")
+
+    return {
+        "message": f"Signal sync complete: {success}/{len(symbols)} succeeded.",
+        "success_count": success,
+        "error_count": len(errors),
+        "failed_symbols": errors,
+    }
+
+
+
 async def _research_and_save_fundamentals(symbol: str):
     """Background task to research fundamentals via AI and recompute signals."""
     try:
@@ -940,6 +1137,10 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
             } if fund else {}
 
         insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger, skill_id, company_name=company_name)
+
+        if not insight_data:
+            logger.error(f"generate_insight returned None for {symbol} — skipping save to AIInsights.")
+            return
 
         async with SessionLocal() as db:
             new_insight = AIInsights(
