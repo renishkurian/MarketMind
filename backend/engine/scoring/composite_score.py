@@ -155,6 +155,23 @@ class FundamentalData:
     operating_margin: Optional[float] = None
     promoter_holding: Optional[float] = None
     promoter_pledge_pct: Optional[float] = None
+    
+    # -- Institutional Upgrade --
+    peg_ratio: Optional[float] = None
+    ps_ratio: Optional[float] = None
+    pb_ratio: Optional[float] = None
+    ev_ebitda: Optional[float] = None
+    book_value: Optional[float] = None
+    ebitda: Optional[float] = None
+    held_percent_institutions: Optional[float] = None
+    shares_outstanding: Optional[float] = None
+    
+    # -- Phase 3: Health & Sentiment --
+    analyst_rating: Optional[float] = None
+    recommendation_key: Optional[str] = None
+    total_cash: Optional[float] = None
+    total_debt: Optional[float] = None
+    current_ratio: Optional[float] = None
 
 
 @dataclass
@@ -193,6 +210,12 @@ class MomentumData:
     volume_ratio_20_90: Optional[float] = None
     price_52w_rank: Optional[float] = None # 0 to 1
     relative_strength_nifty: Optional[float] = None
+    
+    # -- Phase 3: Price Action --
+    fifty_two_week_high: Optional[float] = None
+    fifty_two_week_low: Optional[float] = None
+    fifty_two_week_change: Optional[float] = None
+    beta: Optional[float] = None
 
 
 @dataclass
@@ -370,22 +393,24 @@ class CompositeScorer:
         self, fa: FundamentalData
     ) -> tuple[float, dict, float]:
         """
-        FIX-2: Missing fields → neutral 50 (never excluded from denominator).
-        FIX-5: Pledge penalty applied inside ROE component before blending.
-        Returns (score 0–100, breakdown dict, coverage 0–1).
+        Scoring logic updated for Phase 3: Health & Sentiment.
+        Weights: PE 10 | PEG 10 | ROE 15 | D/E 5 | Rev 10 | PAT 10 | Margin 10 | InstHold 10 | PB/EV 5 | Sentiment 10 | Health 5
         """
 
-        # 1. PE vs 5yr avg (20 pts)
+        # 1. PE vs 5yr avg (10 pts)
         pe_present = fa.pe_ratio is not None
         if pe_present:
-            # Fallback benchmark if 5yr avg is missing
             ref_pe = fa.pe_5yr_avg if (fa.pe_5yr_avg and fa.pe_5yr_avg > 0) else 20.0
             discount = (ref_pe - fa.pe_ratio) / ref_pe
             pe_score = _clamp(_linear_scale(discount, -0.5, 0.5, 0, 100), 0, 100)
         else:
             pe_score = 50.0
 
-        # 2. ROE quality (25 pts) + pledge penalty here (FIX-5)
+        # 2. PEG Ratio (10 pts)
+        peg_present = fa.peg_ratio is not None
+        peg_score = _clamp(_linear_scale(fa.peg_ratio, 3.0, 0.5, 0, 100), 0, 100) if peg_present else 50.0
+
+        # 3. ROE quality (15 pts) - Reduced from 20
         roe_present = fa.roe is not None
         if roe_present:
             roe_raw = _clamp(_linear_scale(fa.roe, 5.0, 30.0, 0, 100), 0, 100)
@@ -395,69 +420,102 @@ class CompositeScorer:
             else:
                 bonus = 0.0
             roe_score = _clamp(roe_raw * 0.85 + bonus, 0, 100)
-            # FIX-5: penalty lives here, not after the final average
             if fa.promoter_pledge_pct is not None and fa.promoter_pledge_pct > 20.0:
                 penalty = min((fa.promoter_pledge_pct - 20.0) * 0.5, 20.0)
                 roe_score = _clamp(roe_score - penalty, 0, 100)
         else:
             roe_score = 50.0
 
-        # 3. Debt/Equity (15 pts)
+        # 4. Debt/Equity (5 pts) - Reduced from 10
         de_present = fa.debt_equity is not None
-        de_score = (
-            _clamp(_linear_scale(fa.debt_equity, 2.0, 0.0, 0, 100), 0, 100)
-            if de_present else 50.0
-        )
+        de_score = _clamp(_linear_scale(fa.debt_equity, 2.0, 0.0, 0, 100), 0, 100) if de_present else 50.0
 
-        # 4. Revenue CAGR 3yr (15 pts) - Fallback to current YoY
+        # 5. Revenue CAGR 3yr (10 pts)
         rev_val = fa.revenue_growth_3yr if fa.revenue_growth_3yr is not None else fa.revenue_growth
         rev_present = rev_val is not None
-        rev_score = (
-            _clamp(_linear_scale(rev_val, -5.0, 25.0, 0, 100), 0, 100)
-            if rev_present else 50.0
-        )
+        rev_score = _clamp(_linear_scale(rev_val, -5.0, 25.0, 0, 100), 0, 100) if rev_present else 50.0
 
-        # 5. PAT CAGR 3yr (15 pts)
+        # 6. PAT CAGR 3yr (10 pts)
         pat_present = fa.pat_growth_3yr is not None
-        pat_score = (
-            _clamp(_linear_scale(fa.pat_growth_3yr, -10.0, 30.0, 0, 100), 0, 100)
-            if pat_present else 50.0
-        )
+        pat_score = _clamp(_linear_scale(fa.pat_growth_3yr, -10.0, 30.0, 0, 100), 0, 100) if pat_present else 50.0
 
-        # 6. Operating margin (10 pts)
+        # 7. Operating margin (10 pts)
         om_present = fa.operating_margin is not None
-        om_score = (
-            _clamp(_linear_scale(fa.operating_margin, 5.0, 30.0, 0, 100), 0, 100)
-            if om_present else 50.0
-        )
+        om_score = _clamp(_linear_scale(fa.operating_margin, 5.0, 30.0, 0, 100), 0, 100) if om_present else 50.0
 
-        # FIX-2: denominator always 100 — missing fields contribute neutral 50
+        # 8. Institutional Confidence (10 pts)
+        inst_present = fa.held_percent_institutions is not None
+        inst_score = _clamp(_linear_scale(fa.held_percent_institutions, 0.0, 15.0, 40, 100), 0, 100) if inst_present else 50.0
+
+        # 9. Multi-Valuer Filter (5 pts)
+        pb_present = fa.pb_ratio is not None
+        ev_present = fa.ev_ebitda is not None
+        val_filter = 50.0
+        if pb_present and ev_present:
+            s_pb = _linear_scale(fa.pb_ratio, 10.0, 3.0, 0, 100)
+            s_ev = _linear_scale(fa.ev_ebitda, 50.0, 15.0, 0, 100)
+            val_filter = _clamp((s_pb + s_ev) / 2, 0, 100)
+
+        # 10. Analyst Sentiment (10 pts) - Strong Buy, Buy, Hold
+        sent_present = fa.recommendation_key is not None
+        sent_map = {
+            "strong_buy": 100,
+            "buy": 80,
+            "hold": 50,
+            "underperform": 20,
+            "sell": 0
+        }
+        sent_score = sent_map.get(fa.recommendation_key, 50.0) if sent_present else 50.0
+
+        # 11. Balance Sheet Health (5 pts) - Cash Cushion & Liquidity
+        health_present = fa.total_cash is not None and fa.total_debt is not None
+        health_score = 50.0
+        if health_present:
+            # Positive if cash > 20% of debt
+            cash_cover = fa.total_cash / (fa.total_debt + 1)
+            health_score = _clamp(_linear_scale(cash_cover, 0.0, 0.5, 20, 100), 0, 100)
+            if fa.current_ratio and fa.current_ratio < 1.0:
+                health_score = _clamp(health_score - 15, 0, 100) # Liquidity penalty
+
+        # Final Weighted Average
         raw = (
-            pe_score  * 20
-            + roe_score * 25
-            + de_score  * 15
-            + rev_score * 15
-            + pat_score * 15
-            + om_score  * 10
+            pe_score    * 10
+            + peg_score   * 10
+            + roe_score   * 15
+            + de_score    * 5
+            + rev_score   * 10
+            + pat_score   * 10
+            + om_score    * 10
+            + inst_score  * 10
+            + val_filter  * 5
+            + sent_score  * 10
+            + health_score * 5
         ) / 100.0
 
         breakdown: dict = {
             "pe_vs_5yr":            round(pe_score, 1)  if pe_present  else None,
+            "peg_ratio":            round(peg_score, 1) if peg_present else None,
             "roe_quality":          round(roe_score, 1) if roe_present  else None,
             "debt_equity":          round(de_score, 1)  if de_present  else None,
             "revenue_growth_3yr":   round(rev_score, 1) if rev_present  else None,
             "pat_growth_3yr":       round(pat_score, 1) if pat_present  else None,
             "operating_margin":     round(om_score, 1)  if om_present  else None,
+            "institutional_hold":   round(inst_score, 1) if inst_present else None,
+            "valuation_filter":     round(val_filter, 1),
+            "analyst_sentiment":    round(sent_score, 1) if sent_present else None,
+            "balance_sheet_health": round(health_score, 1) if health_present else None
         }
         if fa.promoter_pledge_pct is not None and fa.promoter_pledge_pct > 20.0:
             penalty = min((fa.promoter_pledge_pct - 20.0) * 0.5, 20.0)
             breakdown["pledge_penalty_on_roe"] = round(-penalty, 1)
 
-        n_present = sum([pe_present, roe_present, de_present,
-                         rev_present, pat_present, om_present])
-        coverage = round(n_present / 6.0, 3)
+        n_present = sum([pe_present, peg_present, roe_present, de_present,
+                         rev_present, pat_present, om_present, inst_present,
+                         sent_present, health_present])
+        coverage = round(n_present / 10.0, 3)
 
         return round(_clamp(raw, 0, 100), 2), breakdown, coverage
+
 
     # ------------------------------------------------------------------
     # Technical Score (0–100)
@@ -640,6 +698,9 @@ class CompositeScorer:
             "volume_trend":     round(vol_score, 1)    if vol_present    else None,
             "52w_rank":         round(rank_score, 1)   if rank_present   else None,
             "rs_vs_nifty":      round(rs_score, 1)     if rs_present     else None,
+            "beta":             round(m.beta, 2)       if m.beta is not None else None,
+            "52w_high":         round(m.fifty_two_week_high, 2) if m.fifty_two_week_high else None,
+            "52w_low":          round(m.fifty_two_week_low, 2)  if m.fifty_two_week_low  else None
         }
 
         n_present = sum([roc252_present, roc60_present, roc20_present,

@@ -6,8 +6,41 @@ import {
   Activity, Brain, TrendingUp, TrendingDown, Minus,
   RefreshCw, AlertTriangle, CheckCircle, BarChart2,
   Clock, Shield, Sun, Moon, Layers, BookOpen, Briefcase, Sparkles,
-  Edit2, X, ShieldCheck
+  Edit2, X, ShieldCheck,
+  Flame,
+  Zap,
+  Star
 } from 'lucide-react';
+
+const FiftyTwoWeekRange = ({ current, low, high }) => {
+  if (!current || !low || !high) return null;
+  const range = high - low;
+  const progress = ((current - low) / range) * 100;
+  const clampProgress = Math.min(100, Math.max(0, progress));
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between text-[10px] font-bold text-dark-muted uppercase tracking-tighter">
+        <span>52W Low (₹{low.toFixed(1)})</span>
+        <span>52W High (₹{high.toFixed(1)})</span>
+      </div>
+      <div className="h-1.5 w-full bg-dark-bg rounded-full border border-dark-border relative overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-signal-sell via-signal-hold to-signal-buy transition-all duration-1000"
+          style={{ width: `${clampProgress}%` }}
+        />
+        <div 
+          className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10"
+          style={{ left: `calc(${clampProgress}% - 2px)` }}
+        />
+      </div>
+      <p className="text-[10px] text-center text-dark-muted italic">
+        Currently {progress.toFixed(1)}% above 52w low
+      </p>
+    </div>
+  );
+};
+
 import toast from 'react-hot-toast';
 
 import SignalBadge from '../components/SignalBadge';
@@ -1224,18 +1257,38 @@ export default function DeepDive() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {[
                       { label: 'P/E Ratio', value: fundamentals.pe_ratio?.toFixed(2) ?? '—', sub: 'Trailing' },
-                      { label: 'EPS', value: fundamentals.eps != null ? `₹${fundamentals.eps.toFixed(2)}` : '—', sub: 'Trailing 12m' },
+                      { label: 'PEG Ratio', value: fundamentals.peg_ratio?.toFixed(2) ?? '—', sub: 'Price/Earnings-to-Growth', highlight: fundamentals.peg_ratio && fundamentals.peg_ratio < 1.0 },
+                      { label: 'P/B Ratio', value: fundamentals.pb_ratio?.toFixed(2) ?? '—', sub: 'Price to Book' },
+                      { label: 'P/S Ratio', value: fundamentals.ps_ratio?.toFixed(2) ?? '—', sub: 'Price to Sales' },
                       { label: 'ROE', value: fundamentals.roe != null ? `${(fundamentals.roe * 100).toFixed(1)}%` : '—', sub: 'Return on Equity' },
                       { label: 'Debt / Equity', value: fundamentals.debt_equity?.toFixed(2) ?? '—', sub: 'Leverage ratio' },
+                      { label: 'Current Ratio', value: fundamentals.current_ratio?.toFixed(2) ?? '—', sub: 'Liquidity index' },
+                      { label: 'Analyst Rating', value: fundamentals.analyst_rating?.toFixed(2) ?? '—', sub: fundamentals.recommendation_key || 'No Consensus', highlight: fundamentals.recommendation_key === 'strong_buy' },
+                      { label: 'Beta (5Y)', value: fundamentals.beta?.toFixed(2) ?? sig?.beta?.toFixed(2) ?? '—', sub: 'Market Volatility' },
+                      { label: 'EV / EBITDA', value: fundamentals.ev_ebitda?.toFixed(1) ?? '—', sub: 'Value Multiple' },
+                      { label: 'Institutional Hold', value: fundamentals.held_percent_institutions != null ? `${fundamentals.held_percent_institutions.toFixed(1)}%` : '—', sub: 'Held by Big Money' },
+                      { label: 'Total Cash', value: fundamentals.total_cash ? `₹${(fundamentals.total_cash / 1e7).toFixed(1)}Cr` : '—', sub: 'Cash Balance' },
+                      { label: 'Total Debt', value: fundamentals.total_debt ? `₹${(fundamentals.total_debt / 1e7).toFixed(1)}Cr` : '—', sub: 'Liabilities' },
                       { label: 'Revenue Growth', value: fundamentals.revenue_growth != null ? `${(fundamentals.revenue_growth * 100).toFixed(1)}%` : '—', sub: 'YoY' },
-                      { label: 'Market Cap', value: fundamentals.market_cap ? `₹${(fundamentals.market_cap / 1e9).toFixed(1)}B` : '—', sub: 'In billions' },
-                    ].map(({ label, value, sub }) => (
-                      <div key={label} className="bg-gray-900/50 border border-dark-border rounded-xl p-4 group hover:border-accent/30 transition-colors">
+                      { label: 'Market Cap', value: fundamentals.market_cap ? `₹${(fundamentals.market_cap / 1e9).toFixed(1)}B` : '—', sub: 'Valuation' },
+                    ].map(({ label, value, sub, highlight }) => (
+                      <div key={label} className={`bg-gray-900/50 border rounded-xl p-4 group transition-colors ${highlight ? 'border-accent/50 bg-accent/5' : 'border-dark-border hover:border-accent/30'}`}>
                         <p className="text-xs text-dark-muted mb-1">{label}</p>
-                        <p className="text-2xl font-bold font-mono group-hover:text-accent transition-colors">{value}</p>
-                        <p className="text-xs text-dark-muted/70 mt-1">{sub}</p>
+                        <p className={`text-2xl font-bold font-mono transition-colors ${highlight ? 'text-accent' : 'group-hover:text-accent'}`}>{value}</p>
+                        <p className="text-xs text-dark-muted/70 mt-1 uppercase text-[10px] font-bold tracking-tight">{sub}</p>
                       </div>
                     ))}
+                    <div className="col-span-full mt-4 p-5 bg-dark-bg border border-dark-border rounded-2xl">
+                      <h4 className="text-[10px] font-black text-dark-muted uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Zap size={10} className="text-accent" />
+                        Price Action Momentum (52-Week Statistics)
+                      </h4>
+                      <FiftyTwoWeekRange 
+                        current={sig?.current_price} 
+                        low={fundamentals.fifty_two_week_low || sig?.fifty_two_week_low} 
+                        high={fundamentals.fifty_two_week_high || sig?.fifty_two_week_high} 
+                      />
+                    </div>
                     <div className="col-span-full pt-2">
                       <p className="text-xs text-dark-muted/60 text-right">
                         Last fetched: {new Date(fundamentals.fetched_at).toLocaleString()} · Quality: <span className={

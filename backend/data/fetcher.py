@@ -1,8 +1,10 @@
 import yfinance as yf
 import pandas as pd
 import asyncio
+import httpx
 import logging
 from typing import List, Dict, Any, Union
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +119,65 @@ async def fetch_5min_candles(symbols: Union[List[str], Dict[str, str]]) -> Dict[
         
     return results
 
+async def fetch_valuation_timeseries(symbol: str, yahoo_symbol: str) -> Dict[str, Any]:
+    """
+    Fetch trailing ratios from the direct TimeSeries API.
+    Returns: {peg_ratio, ps_ratio, pb_ratio, ev_ebitda}
+    """
+    url = f"https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{yahoo_symbol}"
+    params = {
+        "merge": "false",
+        "padTimeSeries": "true",
+        "period1": int(datetime(2020, 1, 1).timestamp()),
+        "period2": int(datetime.now().timestamp()),
+        "type": "trailingPegRatio,trailingPsRatio,trailingPbRatio,trailingEnterprisesValueEBITDARatio",
+        "lang": "en-US",
+        "region": "US"
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    defaults = {"peg_ratio": None, "ps_ratio": None, "pb_ratio": None, "ev_ebitda": None}
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code != 200:
+                logger.warning(f"Timeseries API error {resp.status_code} for {yahoo_symbol}")
+                return defaults
+            
+            data = resp.json()
+            results = data.get("timeseries", {}).get("result", [])
+            
+            extracted = {}
+            for res in results:
+                meta_type = res.get("meta", {}).get("type", [None])[0]
+                # Look for the latest data point in the array for this type
+                # The metric name in the JSON matches the meta_type
+                points = res.get(meta_type, [])
+                if points:
+                    # Get the most recent one (last in list)
+                    latest = points[-1].get("reportedValue", {}).get("raw")
+                    if meta_type == "trailingPegRatio": extracted["peg_ratio"] = latest
+                    elif meta_type == "trailingPsRatio": extracted["ps_ratio"] = latest
+                    elif meta_type == "trailingPbRatio": extracted["pb_ratio"] = latest
+                    elif meta_type == "trailingEnterprisesValueEBITDARatio": extracted["ev_ebitda"] = latest
+            
+            return {**defaults, **extracted}
+
+    except Exception as e:
+        logger.error(f"Error in fetch_valuation_timeseries for {yahoo_symbol}: {e}")
+        return defaults
+
 async def fetch_fundamentals(symbol: str, yahoo_symbol: str = None) -> Dict[str, Any]:
-    """Fetch fundamentals using yfinance info. yahoo_symbol is preferred."""
+    """Fetch fundamentals using yfinance + direct TimeSeries API."""
     yf_sym = yahoo_symbol or _get_yf_symbol(symbol)
     try:
         ticker = yf.Ticker(yf_sym)
         info = ticker.info
         
+        # 1. Base data from yfinance
         result = {
             "pe_ratio": info.get('trailingPE'),
             "eps": info.get('trailingEps'),
@@ -134,9 +188,33 @@ async def fetch_fundamentals(symbol: str, yahoo_symbol: str = None) -> Dict[str,
             "sector": info.get('sector'),
             "sector_pe": None,
             "promoter_holding": (info.get('heldPercentInsiders', 0) * 100) if info.get('heldPercentInsiders') else None,
-            "promoter_pledge_pct": (info.get('pledgedPercent', 0) * 100) if info.get('pledgedPercent') else None
+            "promoter_pledge_pct": (info.get('pledgedPercent', 0) * 100) if info.get('pledgedPercent') else None,
+            
+            # Key Statistics (Added from User Discovery)
+            "book_value": info.get('bookValue'),
+            "ebitda": info.get('ebitda'),
+            "held_percent_institutions": (info.get('heldPercentInstitutions', 0) * 100) if info.get('heldPercentInstitutions') else None,
+            "shares_outstanding": info.get('sharesOutstanding'),
+            
+            # -- Phase 3: Health & Sentiment --
+            "analyst_rating": info.get('recommendationMean'),
+            "recommendation_key": info.get('recommendationKey'),
+            "total_cash": info.get('totalCash'),
+            "total_debt": info.get('totalDebt'),
+            "current_ratio": info.get('currentRatio'),
+            
+            # -- Phase 3: Price Action Statistics --
+            "fifty_two_week_high": info.get('fiftyTwoWeekHigh'),
+            "fifty_two_week_low": info.get('fiftyTwoWeekLow'),
+            "fifty_two_week_change": info.get('52WeekChange'),
+            "beta": info.get('beta')
         }
         
+        # 2. Advanced Valuation from direct TimeSeries API
+        adv_val = await fetch_valuation_timeseries(symbol, yf_sym)
+        result.update(adv_val)
+        
+        # Determine data quality
         required_keys = ["pe_ratio", "eps", "roe", "debt_equity", "revenue_growth"]
         missing_count = sum(1 for k in required_keys if result[k] is None)
         

@@ -109,6 +109,12 @@ class SignalsCache(Base):
     flags = Column(JSON)
     indicator_breakdown = Column(JSON)
     
+    # -- Price Action V3 --
+    fifty_two_week_high = Column(Numeric(10,2))
+    fifty_two_week_low = Column(Numeric(10,2))
+    fifty_two_week_change = Column(Numeric(10,4))
+    beta = Column(Numeric(6,3))
+    
     # Analysis V2 Columns
     composite_score = Column(Numeric(5,2))
     fundamental_score = Column(Numeric(5,2))
@@ -154,6 +160,24 @@ class FundamentalsCache(Base):
     roe_3yr_avg = Column(Numeric(6,2))
     sector_pe = Column(Numeric(10,2))
     market_cap = Column(BigInteger)
+    
+    # -- Institutional Valuation Upgrade --
+    peg_ratio = Column(Numeric(6,2))
+    ps_ratio = Column(Numeric(10,2))
+    pb_ratio = Column(Numeric(10,2))
+    ev_ebitda = Column(Numeric(10,2))
+    book_value = Column(Numeric(10,2))
+    ebitda = Column(BigInteger)
+    held_percent_institutions = Column(Numeric(6,2))
+    shares_outstanding = Column(BigInteger)
+    
+    # -- Phase 3: Health & Sentiment --
+    analyst_rating = Column(Numeric(4,2))
+    recommendation_key = Column(String(50))
+    total_cash = Column(BigInteger)
+    total_debt = Column(BigInteger)
+    current_ratio = Column(Numeric(10,2))
+    
     promoter_holding = Column(Numeric(6,2))
     promoter_pledge_pct = Column(Numeric(6,2))
     data_quality = Column(Enum('FULL', 'PARTIAL', 'MISSING', 'AI_RESEARCHED', 'VERIFIED'), default='FULL')

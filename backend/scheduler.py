@@ -229,11 +229,36 @@ async def run_bulk_fundamental_sync():
                     revenue_growth_3yr=fund_data.get("revenue_growth_3yr"), # CAGR
                     pat_growth_3yr=fund_data.get("pat_growth_3yr"),
                     market_cap=fund_data.get("market_cap"),
-                    data_quality=fund_data.get("data_quality", "MISSING"),
+                    
+                    # -- Institutional Upgrade --
+                    peg_ratio=fund_data.get("peg_ratio"),
+                    ps_ratio=fund_data.get("ps_ratio"),
+                    pb_ratio=fund_data.get("pb_ratio"),
+                    ev_ebitda=fund_data.get("ev_ebitda"),
+                    book_value=fund_data.get("book_value"),
+                    ebitda=fund_data.get("ebitda"),
+                    held_percent_institutions=fund_data.get("held_percent_institutions"),
+                    shares_outstanding=fund_data.get("shares_outstanding"),
+                    
+                    # -- Phase 3: Health & Sentiment --
+                    analyst_rating=fund_data.get("analyst_rating"),
+                    recommendation_key=fund_data.get("recommendation_key"),
+                    total_cash=fund_data.get("total_cash"),
+                    total_debt=fund_data.get("total_debt"),
+                    current_ratio=fund_data.get("current_ratio"),
+                    
+                    promoter_holding=fund_data.get("promoter_holding"),
+                    promoter_pledge_pct=fund_data.get("promoter_pledge_pct"),
+                    data_quality=fund_data.get("data_quality", "PARTIAL"), # Hybrid engine is always at least partial
                 )
-                FUND_COLS = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
-                             "revenue_growth", "revenue_growth_3yr", "pat_growth_3yr", 
-                             "market_cap", "data_quality"]
+                FUND_COLS = [
+                    "fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
+                    "revenue_growth", "revenue_growth_3yr", "pat_growth_3yr", 
+                    "market_cap", "peg_ratio", "ps_ratio", "pb_ratio", "ev_ebitda",
+                    "book_value", "ebitda", "held_percent_institutions", "shares_outstanding",
+                    "analyst_rating", "recommendation_key", "total_cash", "total_debt", "current_ratio",
+                    "promoter_holding", "promoter_pledge_pct", "data_quality"
+                ]
                 stmt = stmt.on_duplicate_key_update(
                     **{c: stmt.inserted[c] for c in FUND_COLS}
                 )
@@ -245,6 +270,24 @@ async def run_bulk_fundamental_sync():
             async with SessionLocal() as session:
                 service = ScoringService(session)
                 await service.score_symbol(sym, exchange="NSE")
+                
+                # -- Phase 3: Push fresh Price Action V3 stats to SignalsCache --
+                sig_stmt = mysql_insert(SignalsCache).values(
+                    symbol=sym,
+                    computed_at=datetime.now(),
+                    market_session='EOD',
+                    fifty_two_week_high=fund_data.get("fifty_two_week_high"),
+                    fifty_two_week_low=fund_data.get("fifty_two_week_low"),
+                    fifty_two_week_change=fund_data.get("fifty_two_week_change"),
+                    beta=fund_data.get("beta")
+                ).on_duplicate_key_update(
+                    fifty_two_week_high=fund_data.get("fifty_two_week_high"),
+                    fifty_two_week_low=fund_data.get("fifty_two_week_low"),
+                    fifty_two_week_change=fund_data.get("fifty_two_week_change"),
+                    beta=fund_data.get("beta")
+                )
+                await session.execute(sig_stmt)
+                await session.commit()
 
             # Generate weekly AI insight (optional but kept as per original weekly flow)
             await _generate_and_store_insight(sym, "WEEKLY")

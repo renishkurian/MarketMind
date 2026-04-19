@@ -684,6 +684,24 @@ async def get_stock_fundamentals(symbol: str, db: AsyncSession = Depends(get_db)
         "debt_equity": float(fund.debt_equity) if fund.debt_equity else None,
         "revenue_growth": float(fund.revenue_growth) if fund.revenue_growth else None,
         "market_cap": int(fund.market_cap) if fund.market_cap else None,
+        
+        # -- Institutional Upgrade --
+        "peg_ratio": float(fund.peg_ratio) if fund.peg_ratio else None,
+        "ps_ratio": float(fund.ps_ratio) if fund.ps_ratio else None,
+        "pb_ratio": float(fund.pb_ratio) if fund.pb_ratio else None,
+        "ev_ebitda": float(fund.ev_ebitda) if fund.ev_ebitda else None,
+        "book_value": float(fund.book_value) if fund.book_value else None,
+        "ebitda": fund.ebitda,
+        "held_percent_institutions": float(fund.held_percent_institutions) if fund.held_percent_institutions else None,
+        "shares_outstanding": fund.shares_outstanding,
+        
+        # -- Phase 3: Health & Sentiment --
+        "analyst_rating": float(fund.analyst_rating) if fund.analyst_rating else None,
+        "recommendation_key": fund.recommendation_key,
+        "total_cash": fund.total_cash,
+        "total_debt": fund.total_debt,
+        "current_ratio": float(fund.current_ratio) if fund.current_ratio else None,
+        
         "data_quality": fund.data_quality,
         "yahoo_symbol": stock_row,
     }
@@ -1151,6 +1169,11 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
                 "roe": float(fund.roe) if fund and fund.roe else None,
                 "debt_equity": float(fund.debt_equity) if fund and fund.debt_equity else None,
                 "revenue_growth": float(fund.revenue_growth) if fund and fund.revenue_growth else None,
+                "peg_ratio": float(fund.peg_ratio) if fund and fund.peg_ratio else None,
+                "ps_ratio": float(fund.ps_ratio) if fund and fund.ps_ratio else None,
+                "pb_ratio": float(fund.pb_ratio) if fund and fund.pb_ratio else None,
+                "ev_ebitda": float(fund.ev_ebitda) if fund and fund.ev_ebitda else None,
+                "held_percent_institutions": float(fund.held_percent_institutions) if fund and fund.held_percent_institutions else None,
             } if fund else {}
 
         insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger, skill_id, company_name=company_name)
@@ -1308,8 +1331,15 @@ def _serialize_signal(signal) -> dict:
         # V2.1 Institutional & Audit Data
         "score_version": signal.score_version,
         "scored_at": signal.scored_at.isoformat() if signal.scored_at else None,
-        "fa_coverage": float(signal.fa_coverage) if signal.fa_coverage is not None else 0,
-        "ta_coverage": float(signal.ta_coverage) if signal.ta_coverage is not None else 0,
+        "fa_coverage": float(signal.fa_coverage) if signal.fa_coverage else 0,
+        "indicator_breakdown": signal.indicator_breakdown,
+        "fa_breakdown": signal.fa_breakdown,
+        
+        # -- Phase 3: Price Action --
+        "fifty_two_week_high": float(signal.fifty_two_week_high) if signal.fifty_two_week_high else None,
+        "fifty_two_week_low": float(signal.fifty_two_week_low) if signal.fifty_two_week_low else None,
+        "fifty_two_week_change": float(signal.fifty_two_week_change) if signal.fifty_two_week_change else None,
+        "beta": float(signal.beta) if signal.beta else None,
         "momentum_coverage": float(signal.momentum_coverage) if signal.momentum_coverage is not None else 0,
         "sector_peer_count": int(signal.sector_peer_count) if signal.sector_peer_count is not None else 0,
         "backtest_cagr": float(signal.backtest_cagr) if signal.backtest_cagr is not None else None,

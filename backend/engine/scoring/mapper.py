@@ -21,7 +21,24 @@ def build_fa_from_db(fund: Optional[FundamentalsCache]) -> FundamentalData:
         pat_growth_3yr=float(fund.pat_growth_3yr) if fund.pat_growth_3yr else None,
         operating_margin=float(fund.operating_margin) if fund.operating_margin else None,
         promoter_holding=float(fund.promoter_holding) if fund.promoter_holding else None,
-        promoter_pledge_pct=float(fund.promoter_pledge_pct) if fund.promoter_pledge_pct else None
+        promoter_pledge_pct=float(fund.promoter_pledge_pct) if fund.promoter_pledge_pct else None,
+        
+        # -- Institutional Upgrade --
+        peg_ratio=float(fund.peg_ratio) if fund.peg_ratio else None,
+        ps_ratio=float(fund.ps_ratio) if fund.ps_ratio else None,
+        pb_ratio=float(fund.pb_ratio) if fund.pb_ratio else None,
+        ev_ebitda=float(fund.ev_ebitda) if fund.ev_ebitda else None,
+        book_value=float(fund.book_value) if fund.book_value else None,
+        ebitda=float(fund.ebitda) if fund.ebitda else None,
+        held_percent_institutions=float(fund.held_percent_institutions) if fund.held_percent_institutions else None,
+        shares_outstanding=float(fund.shares_outstanding) if fund.shares_outstanding else None,
+        
+        # -- Phase 3: Health & Sentiment --
+        analyst_rating=float(fund.analyst_rating) if fund.analyst_rating else None,
+        recommendation_key=fund.recommendation_key,
+        total_cash=float(fund.total_cash) if fund.total_cash else None,
+        total_debt=float(fund.total_debt) if fund.total_debt else None,
+        current_ratio=float(fund.current_ratio) if fund.current_ratio else None
     )
 
 def build_ta_from_indicators(st: Dict[str, Any], lt: Dict[str, Any]) -> TechnicalData:
@@ -109,10 +126,14 @@ def build_ta_from_cache(sig: Optional[SignalsCache]) -> TechnicalData:
         macd_signal=parse_value(st.get("MACD"), "value"),
     )
 
-def build_momentum_from_df(df: pd.DataFrame, nifty_df: pd.DataFrame | None = None) -> MomentumData:
+def build_momentum_from_df(
+    df: pd.DataFrame, 
+    nifty_df: pd.DataFrame | None = None,
+    static_stats: Dict[str, Any] | None = None
+) -> MomentumData:
     """
-    Compute V2 Momentum metrics from price history DataFrame.
-    Pass nifty_df (same date range) to enable relative_strength_nifty.
+    Compute V2 Momentum metrics. 
+    static_stats can include {fifty_two_week_high, fifty_two_week_low, beta} from SignalsCache.
     """
     if df.empty or len(df) < 20: 
         return MomentumData()
@@ -123,8 +144,8 @@ def build_momentum_from_df(df: pd.DataFrame, nifty_df: pd.DataFrame | None = Non
     roc_252 = ((close.iloc[-1] - close.iloc[-252]) / close.iloc[-252] * 100) if len(df) >= 252 else None
     
     # 52-week range rank
-    high_52w = close.tail(252).max()
-    low_52w  = close.tail(252).min()
+    high_52w = static_stats.get("fifty_two_week_high") if static_stats and static_stats.get("fifty_two_week_high") else close.tail(252).max()
+    low_52w  = static_stats.get("fifty_two_week_low") if static_stats and static_stats.get("fifty_two_week_low") else close.tail(252).min()
     rank = (close.iloc[-1] - low_52w) / (high_52w - low_52w) if high_52w > low_52w else 0.5
     
     # Volume Trend
@@ -143,10 +164,15 @@ def build_momentum_from_df(df: pd.DataFrame, nifty_df: pd.DataFrame | None = Non
             rs_nifty = stock_ret / nifty_ret
 
     return MomentumData(
-        roc_20=roc_20,
-        roc_60=roc_60,
-        roc_252=roc_252,
-        price_52w_rank=rank,
-        volume_ratio_20_90=vol_ratio,
-        relative_strength_nifty=rs_nifty,
+        roc_20=float(roc_20) if roc_20 is not None else None,
+        roc_60=float(roc_60) if roc_60 is not None else None,
+        roc_252=float(roc_252) if roc_252 is not None else None,
+        volume_ratio_20_90=float(vol_ratio),
+        price_52w_rank=float(rank),
+        relative_strength_nifty=float(rs_nifty) if rs_nifty is not None else None,
+        
+        # -- Phase 3: Price Action --
+        fifty_two_week_high=float(high_52w) if high_52w else None,
+        fifty_two_week_low=float(low_52w) if low_52w else None,
+        beta=float(static_stats.get("beta")) if static_stats and static_stats.get("beta") else None
     )
