@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, Body, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, Body, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -13,11 +13,12 @@ import asyncio
 
 from backend.data.db import (
     get_db, SessionLocal,
-    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction
+    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction, AICallLog
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_admin, get_password_hash
 from backend.config import settings
+from backend.api import analysis
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -100,6 +101,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(analysis.router)
 
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 @app.websocket("/ws/market")
@@ -202,54 +205,61 @@ async def verify(admin: str = Depends(get_current_admin)):
 
 # ── Settings ───────────────────────────────────────────────────────────────
 @app.get("/api/settings")
-async def get_app_settings(admin: str = Depends(get_current_admin)):
+async def get_app_settings(admin: str = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
+    # Load AI settings from DB (system_config), fallback to in-memory settings
+    from backend.data.db import SystemConfig
+    result = await db.execute(select(SystemConfig))
+    db_config = {row.key: row.value for row in result.scalars().all()}
+
     return {
-        "anthropic_api_key": settings.ANTHROPIC_API_KEY,
-        "anthropic_model": settings.ANTHROPIC_MODEL,
-        "openai_api_key": settings.OPENAI_API_KEY,
-        "openai_model": settings.OPENAI_MODEL,
-        "xai_api_key": settings.XAI_API_KEY,
-        "xai_model": settings.XAI_MODEL,
-        "ai_provider": settings.AI_PROVIDER,
+        "anthropic_api_key": db_config.get("ANTHROPIC_API_KEY", settings.ANTHROPIC_API_KEY),
+        "anthropic_model": db_config.get("ANTHROPIC_MODEL", settings.ANTHROPIC_MODEL),
+        "openai_api_key": db_config.get("OPENAI_API_KEY", settings.OPENAI_API_KEY),
+        "openai_model": db_config.get("OPENAI_MODEL", settings.OPENAI_MODEL),
+        "xai_api_key": db_config.get("XAI_API_KEY", settings.XAI_API_KEY),
+        "xai_model": db_config.get("XAI_MODEL", settings.XAI_MODEL),
+        "ai_provider": db_config.get("AI_PROVIDER", settings.AI_PROVIDER),
         "env": settings.APP_ENV,
         "version": "1.1.0"
     }
 
 @app.post("/api/settings")
-async def update_app_settings(data: dict = Body(...), admin: str = Depends(get_current_admin)):
-    # Fields to persist
-    fields = [
-        "anthropic_api_key", "anthropic_model",
-        "openai_api_key", "openai_model",
-        "xai_api_key", "xai_model",
-        "ai_provider"
-    ]
-    updated = {}
-    
-    import dotenv
-    # Robustly find .env in current file's directory
-    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-    
-    # If not found there, try the parent directory (project root)
-    if not os.path.exists(env_path):
-        root_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-        if os.path.exists(root_env):
-            env_path = root_env
+async def update_app_settings(data: dict = Body(...), admin: str = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
+    """Save AI settings to system_config DB table + update in-memory."""
+    from backend.data.db import SystemConfig
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
 
-    for f in fields:
-        val = data.get(f)
+    AI_FIELDS = {
+        "anthropic_api_key": "ANTHROPIC_API_KEY",
+        "anthropic_model": "ANTHROPIC_MODEL",
+        "openai_api_key": "OPENAI_API_KEY",
+        "openai_model": "OPENAI_MODEL",
+        "xai_api_key": "XAI_API_KEY",
+        "xai_model": "XAI_MODEL",
+        "ai_provider": "AI_PROVIDER",
+    }
+    updated = []
+
+    for field, db_key in AI_FIELDS.items():
+        val = data.get(field)
         if val is not None:
-            # Update in-memory (use upper case for settings object)
-            attr_name = f.upper()
-            if hasattr(settings, attr_name):
-                setattr(settings, attr_name, str(val))
-                # Update .env
-                if os.path.exists(env_path):
-                    dotenv.set_key(env_path, attr_name, str(val))
-                updated[f] = val
+            # 1. Upsert into system_config
+            stmt = mysql_insert(SystemConfig).values(
+                key=db_key, value=str(val), description=f"AI setting: {field}"
+            )
+            stmt = stmt.on_duplicate_key_update(value=str(val), updated_at=datetime.now())
+            await db.execute(stmt)
 
-    logger.info(f"Updated settings: {list(updated.keys())}")
-    return {"message": "Settings updated", "count": len(updated)}
+            # 2. Update in-memory settings for the running process
+            if hasattr(settings, db_key):
+                setattr(settings, db_key, str(val))
+
+            updated.append(field)
+
+    await db.commit()
+    logger.info(f"AI settings saved to DB: {updated}")
+    return {"message": "Settings saved to database", "count": len(updated)}
+
 
 
 # ── Market Status ─────────────────────────────────────────────────────────────
@@ -584,9 +594,77 @@ async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db)):
             "id": lot.id,
             "quantity": float(lot.quantity),
             "buy_price": float(lot.buy_price),
-            "buy_date": str(lot.buy_date)
+            "buy_date": str(lot.buy_date),
+            "status": lot.status
         }
         for lot in lots
+    ]
+
+
+@app.get("/api/ai-logs")
+async def get_ai_logs(
+    limit: int = 100,
+    symbol: Optional[str] = None,
+    trigger: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Return all AI insight logs for the AI Logs page, newest first."""
+    query = select(AIInsights).order_by(AIInsights.generated_at.desc()).limit(limit)
+    if symbol:
+        query = query.where(AIInsights.symbol == symbol.upper())
+    if trigger:
+        query = query.where(AIInsights.trigger_reason == trigger)
+    result = await db.execute(query)
+    insights = result.scalars().all()
+    return [
+        {
+            "id": ins.id,
+            "symbol": ins.symbol,
+            "generated_at": str(ins.generated_at),
+            "trigger_reason": ins.trigger_reason,
+            "skill_id": ins.skill_id,
+            "verdict": ins.verdict,
+            "short_summary": ins.short_summary,
+            "long_summary": ins.long_summary,
+            "key_risks": ins.key_risks or [],
+            "key_opportunities": ins.key_opportunities or [],
+            "sentiment_score": float(ins.sentiment_score) if ins.sentiment_score else None,
+        }
+        for ins in insights
+    ]
+
+@app.get("/api/ai-logs/calls")
+async def get_ai_call_logs(
+    limit: int = 100,
+    symbol: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Return raw AI API call logs with token usage, payloads, and timing."""
+    query = select(AICallLog).order_by(AICallLog.called_at.desc()).limit(limit)
+    if symbol:
+        query = query.where(AICallLog.symbol == symbol.upper())
+    result = await db.execute(query)
+    logs = result.scalars().all()
+    return [
+        {
+            "id": log.id,
+            "insight_id": log.insight_id,
+            "symbol": log.symbol,
+            "skill_id": log.skill_id,
+            "provider": log.provider,
+            "model": log.model,
+            "trigger_reason": log.trigger_reason,
+            "prompt_tokens": log.prompt_tokens,
+            "completion_tokens": log.completion_tokens,
+            "total_tokens": log.total_tokens,
+            "duration_ms": log.duration_ms,
+            "status": log.status,
+            "error_message": log.error_message,
+            "request_payload": log.request_payload,
+            "response_raw": log.response_raw,
+            "called_at": str(log.called_at),
+        }
+        for log in logs
     ]
 
 
@@ -620,7 +698,15 @@ class BhavcopySyncRequest(BaseModel):
     exchange: Optional[str] = 'NSE'
 
 class InsightGenerateRequest(BaseModel):
-    skill_id: Optional[str] = None
+    skill_id: str
+
+class FundamentalUpdateRequest(BaseModel):
+    pe_ratio: Optional[float] = None
+    eps: Optional[float] = None
+    roe: Optional[float] = None
+    debt_equity: Optional[float] = None
+    revenue_growth: Optional[float] = None
+    market_cap: Optional[float] = None
 
 @app.post("/api/stock/{symbol}/insight/generate")
 async def trigger_insight_generation(
@@ -639,6 +725,148 @@ async def trigger_insight_generation(
     skill_id = req.skill_id if req else None
     asyncio.create_task(_generate_and_save_insight(symbol.upper(), "MANUAL", skill_id))
     return {"message": f"AI insight generation queued for {symbol} (Skill: {skill_id or 'General'})"}
+
+
+@app.post("/api/stock/{symbol}/fundamentals/research")
+async def trigger_fundamental_research(
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    admin: str = Depends(get_current_admin),
+    background_tasks: BackgroundTasks = None
+):
+    """Trigger AI to research and fill in missing fundamental data."""
+    symbol = symbol.upper()
+    result = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol))
+    if not result.scalars().first():
+         raise HTTPException(status_code=404, detail="Symbol not found")
+
+    background_tasks.add_task(_research_and_save_fundamentals, symbol)
+    return {"message": f"Historical research task started for {symbol}."}
+
+
+@app.patch("/api/stock/{symbol}/fundamentals")
+async def update_fundamentals(
+    symbol: str, 
+    update: FundamentalUpdateRequest, 
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """Manually override fundamental data for a stock."""
+    from backend.scheduler import recompute_signals_for
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
+    symbol = symbol.upper()
+    
+    # 1. Update/Insert fundamentally verified data
+    stmt = mysql_insert(FundamentalsCache).values(
+        symbol=symbol,
+        fetched_at=datetime.now(),
+        pe_ratio=update.pe_ratio,
+        eps=update.eps,
+        roe=update.roe,
+        debt_equity=update.debt_equity,
+        revenue_growth=update.revenue_growth,
+        market_cap=update.market_cap,
+        data_quality="VERIFIED"
+    )
+    
+    cols_to_update = {
+        "fetched_at": stmt.inserted.fetched_at,
+        "data_quality": stmt.inserted.data_quality
+    }
+    if update.pe_ratio is not None: cols_to_update["pe_ratio"] = stmt.inserted.pe_ratio
+    if update.eps is not None: cols_to_update["eps"] = stmt.inserted.eps
+    if update.roe is not None: cols_to_update["roe"] = stmt.inserted.roe
+    if update.debt_equity is not None: cols_to_update["debt_equity"] = stmt.inserted.debt_equity
+    if update.revenue_growth is not None: cols_to_update["revenue_growth"] = stmt.inserted.revenue_growth
+    if update.market_cap is not None: cols_to_update["market_cap"] = stmt.inserted.market_cap
+    
+    stmt = stmt.on_duplicate_key_update(**cols_to_update)
+    
+    await db.execute(stmt)
+    await db.commit()
+    
+    # 2. Trigger signal recompute
+    await recompute_signals_for(symbol)
+    
+    return {"message": f"Fundamentals updated and signals recomputed for {symbol}."}
+
+
+@app.post("/api/stock/{symbol}/fundamentals/sync")
+async def sync_fundamental_data(
+    symbol: str, 
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """Trigger a fresh fetch of fundamentals from Yahoo Finance."""
+    from backend.data.fetcher import fetch_fundamentals
+    from backend.scheduler import recompute_signals_for
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
+    symbol = symbol.upper()
+    
+    # 1. Fetch from Yahoo
+    data = await fetch_fundamentals(symbol)
+    
+    # 2. Persist
+    stmt = mysql_insert(FundamentalsCache).values(
+        symbol=symbol,
+        fetched_at=datetime.now(),
+        pe_ratio=data.get("pe_ratio"),
+        eps=data.get("eps"),
+        roe=data.get("roe"),
+        debt_equity=data.get("debt_equity"),
+        revenue_growth=data.get("revenue_growth"),
+        market_cap=data.get("market_cap"),
+        data_quality=data.get("data_quality", "FULL")
+    )
+    
+    cols = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity", "revenue_growth", "market_cap", "data_quality"]
+    stmt = stmt.on_duplicate_key_update(**{c: stmt.inserted[c] for c in cols})
+    
+    await db.execute(stmt)
+    await db.commit()
+    
+    # 3. Always recompute signals when data changes
+    await recompute_signals_for(symbol)
+    
+    return {"message": f"Fundamentals synced from Yahoo Finance for {symbol}.", "status": data.get("data_quality")}
+
+
+async def _research_and_save_fundamentals(symbol: str):
+    """Background task to research fundamentals via AI and recompute signals."""
+    try:
+        from backend.engine.ai_engine import generate_fundamentals
+        from backend.scheduler import recompute_signals_for
+        
+        # 1. Generate via AI
+        ai_data = await generate_fundamentals(symbol)
+        
+        # 2. Persist to DB
+        async with SessionLocal() as session:
+            stmt = mysql_insert(FundamentalsCache).values(
+                symbol=symbol,
+                fetched_at=datetime.now(),
+                pe_ratio=ai_data.get("pe_ratio"),
+                eps=ai_data.get("eps"),
+                roe=ai_data.get("roe"),
+                debt_equity=ai_data.get("debt_equity"),
+                revenue_growth=ai_data.get("revenue_growth"),
+                market_cap=ai_data.get("market_cap"),
+                data_quality="AI_RESEARCHED"
+            )
+            FUND_COLS = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
+                         "revenue_growth", "market_cap", "data_quality"]
+            stmt = stmt.on_duplicate_key_update(
+                **{c: stmt.inserted[c] for c in FUND_COLS}
+            )
+            await session.execute(stmt)
+            await session.commit()
+            
+            # 3. Recompute signals (FA data has changed)
+            await recompute_signals_for(symbol)
+            logger.info(f"AI Fundamental research + Signal recompute complete for {symbol}.")
+
+    except Exception as e:
+        logger.error(f"AI Fund research background task failed for {symbol}: {e}")
 
 
 async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = None):
@@ -685,6 +913,8 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
                 symbol=symbol,
                 generated_at=datetime.now(),
                 trigger_reason=trigger,
+                skill_id=skill_id,
+                verdict=insight_data.get("verdict"),
                 short_summary=insight_data.get("short_summary"),
                 long_summary=insight_data.get("long_summary"),
                 key_risks=insight_data.get("key_risks", []),
@@ -693,7 +923,7 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
             )
             db.add(new_insight)
             await db.commit()
-            logger.info(f"AI insight saved for {symbol}")
+            logger.info(f"AI insight saved for {symbol} (skill: {skill_id}, verdict: {insight_data.get('verdict')})")
 
     except Exception as e:
         logger.error(f"AI insight generation failed for {symbol}: {e}")

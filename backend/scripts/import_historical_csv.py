@@ -1,26 +1,32 @@
 import os
 import sys
 import asyncio
-import pandas as pd
-from datetime import datetime
 import logging
-from sqlalchemy import select
-from sqlalchemy.dialects.mysql import insert
+from datetime import datetime
+
+# Dependency check
+try:
+    import pandas as pd
+except ImportError:
+    print("Error: 'pandas' not found. Please run this script using the project's virtual environment:")
+    print("  ./.venv/bin/python3 -m backend.scripts.import_historical_csv")
+    sys.exit(1)
 
 # Add project root to python path so we can import from backend
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.data.db import SessionLocal, PriceHistory, StockMaster
+try:
+    from backend.data.db import SessionLocal, PriceHistory
+    from sqlalchemy.dialects.mysql import insert
+except ImportError:
+    print("Error: Could not import backend modules. Ensure you are running from the project root.")
+    sys.exit(1)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Root directory for extracted archives
 ARCHIVE_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "archive", "2015-2026-April17-bhavacopy")
-
-# MySQL limit is 65535 parameters. A row has 9 parameters now (added exchange). 
-# 65535 / 9 = 7281 max rows per execute. 
-# We use 1000 for safety against max_allowed_packet size.
 CHUNK_SIZE = 1000
 
 async def process_chunk(chunk_df, exchange, session):
@@ -30,84 +36,121 @@ async def process_chunk(chunk_df, exchange, session):
         
     records = chunk_df.to_dict('records')
     
-    # Batch UPSERT
-    stmt = insert(PriceHistory).values([{
-        'symbol': r['symbol'],
-        'exchange': exchange,
-        'date': r['date'],
-        'open': r['open'],
-        'high': r['high'],
-        'low': r['low'],
-        'close': r['close'],
-        'volume': r['volume'],
-        'source': 'historical_import'
-    } for r in records])
-    
-    update_dict = {
-        'open': stmt.inserted.open,
-        'high': stmt.inserted.high,
-        'low': stmt.inserted.low,
-        'close': stmt.inserted.close,
-        'volume': stmt.inserted.volume,
-        'source': stmt.inserted.source
-    }
-    
-    stmt = stmt.on_duplicate_key_update(**update_dict)
-    await session.execute(stmt)
-    await session.commit()
-    
-    return len(records)
+    try:
+        # Batch UPSERT attempt
+        stmt = insert(PriceHistory).values([{
+            'symbol': str(r['symbol']),
+            'exchange': exchange,
+            'date': r['date'],
+            'open': r['open'],
+            'high': r['high'],
+            'low': r['low'],
+            'close': r['close'],
+            'volume': int(r['volume']) if pd.notnull(r['volume']) else 0,
+            'source': 'historical_import'
+        } for r in records])
+        
+        update_dict = {
+            'open': stmt.inserted.open,
+            'high': stmt.inserted.high,
+            'low': stmt.inserted.low,
+            'close': stmt.inserted.close,
+            'volume': stmt.inserted.volume,
+            'source': stmt.inserted.source
+        }
+        
+        stmt = stmt.on_duplicate_key_update(**update_dict)
+        await session.execute(stmt)
+        await session.commit()
+        return len(records)
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Bulk insert failed for {exchange} chunk: {e}")
+        return 0
 
 async def import_csv_file(filepath, exchange, session):
-    """Processes a single CSV file in chunks."""
+    """Processes a single CSV file in chunks and handles data cleaning."""
     try:
         # Determine file date from name (Format: YYYYMMDD_EXCH.csv)
         filename = os.path.basename(filepath)
         date_str = filename.split('_')[0]
         file_date = datetime.strptime(date_str, '%Y%m%d').date()
         
-        logger.info(f"Processing {exchange} data for {file_date} ...")
-        
-        # Load and rename columns based on exchange
+        # Load data
         df = pd.read_csv(filepath)
         if df.empty:
             return 0
 
+        # Normalize column names to uppercase for easier mapping
+        df.columns = [c.strip().upper() for c in df.columns]
+
         if exchange == 'NSE':
-            # Headers: SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,TIMESTAMP,TOTALTRADES,ISIN
-            if 'SYMBOL' not in df.columns and 'Symbol' in df.columns:
-                df = df.rename(columns={'Symbol': 'SYMBOL', 'Series': 'SERIES', 'Open': 'OPEN', 'High': 'HIGH', 'Low': 'LOW', 'Close': 'CLOSE', 'Qty': 'TOTTRDQTY'})
+            # Support common variations in Bhavcopy headers
+            mapping = {
+                'SYMBOL': 'symbol', 'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close', 
+                'TOTTRDQTY': 'volume', 'QTY': 'volume'
+            }
+            df = df.rename(columns=mapping)
             
-            # Filter for Equity
+            # Filter for Equity (EQ) series - very important for NSE
             if 'SERIES' in df.columns:
-                df = df[df['SERIES'].astype(str).str.strip() == 'EQ'].copy()
-            
-            df = df.rename(columns={
-                'SYMBOL': 'symbol', 'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close', 'TOTTRDQTY': 'volume'
-            })
+                df = df[df['SERIES'].astype(str).str.strip().isin(['EQ', 'BE'])].copy()
         else:
-            # BSE Headers: SC_CODE,SC_NAME,SC_GROUP,SC_TYPE,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,NO_TRADES,NO_OF_SHRS,NET_TURNOV,TDCLOINDI
-            df = df.rename(columns={
-                'SC_CODE': 'symbol', 'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close', 'NO_OF_SHRS': 'volume', 'SC_TYPE': 'series'
-            })
+            # BSE Mapping
+            mapping = {
+                'SC_CODE': 'symbol', 'OPEN': 'open', 'HIGH': 'high', 'LOW': 'low', 'CLOSE': 'close', 
+                'NO_OF_SHRS': 'volume', 'SC_TYPE': 'series'
+            }
+            df = df.rename(columns=mapping)
             if 'series' in df.columns:
                 df = df[df['series'].astype(str).str.strip() == 'STK'].copy()
 
-        # Common cleaning
-        df['symbol'] = df['symbol'].astype(str).str.strip()
+        # --- ROBUST DATA CLEANING ---
+        if 'symbol' not in df.columns or 'close' not in df.columns:
+            logger.warning(f"File {filename} missing critical columns. Skipping.")
+            return 0
+
+        # 1. Clean Symbol
+        df['symbol'] = df['symbol'].astype(str).str.strip().str.upper()
+        df = df[df['symbol'] != '']
+
+        # 2. Add Date
         df['date'] = file_date
+
+        # 3. Clean Numeric Columns (Handle commas and non-numeric garbage)
+        numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+        for col in numeric_cols:
+            if col in df.columns:
+                # Remove commas from strings like "1,234.50"
+                if df[col].dtype == object:
+                    df[col] = df[col].astype(str).str.replace(',', '', regex=False)
+                # Coerce to numeric, setting errors to NaN
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            else:
+                df[col] = pd.NA
+
+        # 4. Handle NaNs in Price Data
+        # We MUST have a close price.
+        df = df.dropna(subset=['symbol', 'close'])
         
-        # Select target columns
+        # If open/high/low are missing, default them to close
+        for col in ['open', 'high', 'low']:
+            df[col] = df[col].fillna(df['close'])
+        
+        # volume defaults to 0
+        df['volume'] = df['volume'].fillna(0)
+
+        # 5. Final selection (Ensure fixed column order)
         df = df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']]
         
         # Process in batches
-        total = 0
+        total_inserted = 0
         for i in range(0, len(df), CHUNK_SIZE):
             chunk = df.iloc[i : i + CHUNK_SIZE]
             inserted = await process_chunk(chunk, exchange, session)
-            total += inserted
+            total_inserted += inserted
             
-        return total
+        return total_inserted
     except Exception as e:
         logger.error(f"Error importing {filepath}: {e}")
         return 0
@@ -117,12 +160,11 @@ async def main():
         logger.error(f"Archive directory not found: {ARCHIVE_ROOT}")
         return
 
-    logger.info(f"Starting historical import from {ARCHIVE_ROOT}")
+    logger.info(f"Starting robust historical import from {ARCHIVE_ROOT}")
     total_nse = 0
     total_bse = 0
     
     async with SessionLocal() as session:
-        # Walk through all directories
         for root, dirs, files in os.walk(ARCHIVE_ROOT):
             for file in sorted(files):
                 if not file.endswith('.csv'):
@@ -145,12 +187,10 @@ async def main():
                 else:
                     total_bse += count
                 
-                # Optional: Log every file or every X records
                 if count > 0:
-                    logger.info(f"Imported {count} records from {file}. Total NSE: {total_nse}, BSE: {total_bse}")
+                    logger.info(f"Processed {file}: {count} records. [Total NSE: {total_nse}, BSE: {total_bse}]")
 
-    logger.info("Historical data import process complete!")
-    logger.info(f"Summary: NSE Records: {total_nse}, BSE Records: {total_bse}")
+    logger.info("Import process complete!")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -11,6 +11,7 @@ import Opportunities from './pages/Opportunities';
 import DeepDive from './pages/DeepDive';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import AILogs from './pages/AILogs';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
@@ -81,6 +82,10 @@ function AppInner() {
 
         <Route path="/stock/:symbol" element={
           <ProtectedRoute><Layout><DeepDive /></Layout></ProtectedRoute>
+        } />
+
+        <Route path="/ai-logs" element={
+          <ProtectedRoute><Layout><AILogs /></Layout></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />

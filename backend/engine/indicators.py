@@ -38,8 +38,11 @@ def compute_short_term_indicators(df: pd.DataFrame) -> dict:
     else:
         bbl_col, bbu_col = None, None
         
-    # Volume SMA
+    # Volume & Trades
     df['vol_sma20'] = ta.sma(df['volume'], length=20)
+    
+    # Trade Count Analysis (Institutional Footprint)
+    df['trades_sma20'] = ta.sma(df['no_of_trades'], length=20) if 'no_of_trades' in df.columns else None
     
     latest = df.iloc[-1]
     
@@ -53,8 +56,11 @@ def compute_short_term_indicators(df: pd.DataFrame) -> dict:
         'bb_lower': float(latest[bbl_col]) if bbl_col and pd.notna(latest.get(bbl_col, pd.NA)) else None,
         'bb_upper': float(latest[bbu_col]) if bbu_col and pd.notna(latest.get(bbu_col, pd.NA)) else None,
         'vol_sma20': float(latest['vol_sma20']) if pd.notna(latest.get('vol_sma20', pd.NA)) else None,
+        'avg_trades_20': float(latest['trades_sma20']) if 'trades_sma20' in latest and pd.notna(latest.get('trades_sma20', pd.NA)) else None,
+        'trades_shock': (float(latest['no_of_trades']) / float(latest['trades_sma20'])) if 'trades_sma20' in latest and float(latest.get('trades_sma20', 0)) > 0 else 1.0,
         'close': float(latest['close']),
-        'volume': float(latest['volume'])
+        'volume': float(latest['volume']),
+        'no_of_trades': int(latest['no_of_trades']) if 'no_of_trades' in latest and pd.notna(latest.get('no_of_trades', pd.NA)) else None
     }
 
 def compute_long_term_indicators(df: pd.DataFrame) -> dict:

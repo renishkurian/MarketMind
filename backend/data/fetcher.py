@@ -121,7 +121,9 @@ async def fetch_fundamentals(symbol: str) -> Dict[str, Any]:
             "revenue_growth": info.get('revenueGrowth'),
             "market_cap": info.get('marketCap'),
             "sector": info.get('sector'),
-            "sector_pe": None # yfinance info doesn't typically provide sector PE directly
+            "sector_pe": None, # yfinance info doesn't typically provide sector PE directly
+            "promoter_holding": (info.get('heldPercentInsiders', 0) * 100) if info.get('heldPercentInsiders') else None,
+            "promoter_pledge_pct": (info.get('pledgedPercent', 0) * 100) if info.get('pledgedPercent') else None
         }
         
         # Determine data quality

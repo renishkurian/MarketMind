@@ -3,7 +3,7 @@ import sys
 import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import settings
@@ -70,6 +70,10 @@ class PriceHistory(Base):
     volume = Column(BigInteger)
     no_of_trades = Column(Integer)
     source = Column(Enum('bhavcopy','yfinance_fallback','eod_computed','historical_import'))
+    
+    __table_args__ = (
+        UniqueConstraint('symbol', 'date', 'exchange', name='uix_symbol_date_exchange'),
+    )
 
 class IntradayTicks(Base):
     __tablename__ = "intraday_ticks"
@@ -103,6 +107,18 @@ class SignalsCache(Base):
     data_quality = Column(Enum('FULL','TECHNICALS_ONLY'), default='FULL')
     flags = Column(JSON)
     indicator_breakdown = Column(JSON)
+    
+    # Analysis V2 Columns
+    composite_score = Column(Numeric(5,2))
+    momentum_score = Column(Numeric(5,2))
+    sector_rank_score = Column(Numeric(5,2))
+    sector_percentile = Column(Numeric(5,2))
+    data_confidence = Column(Numeric(4,3))
+    promoter_pledge_warning = Column(Boolean, default=False)
+    score_profile = Column(String(50))
+    fa_breakdown = Column(JSON)
+    ta_breakdown = Column(JSON)
+    momentum_breakdown = Column(JSON)
 
 class FundamentalsCache(Base):
     __tablename__ = "fundamentals_cache"
@@ -117,7 +133,9 @@ class FundamentalsCache(Base):
     revenue_growth = Column(Numeric(6,2))
     sector_pe = Column(Numeric(10,2))
     market_cap = Column(BigInteger)
-    data_quality = Column(Enum('FULL','PARTIAL','MISSING'), default='FULL')
+    promoter_holding = Column(Numeric(6,2))
+    promoter_pledge_pct = Column(Numeric(6,2))
+    data_quality = Column(Enum('FULL', 'PARTIAL', 'MISSING', 'AI_RESEARCHED', 'VERIFIED'), default='FULL')
 
 class SyncLog(Base):
     __tablename__ = "sync_logs"
@@ -143,6 +161,29 @@ class AIInsights(Base):
     key_risks = Column(JSON)
     key_opportunities = Column(JSON)
     sentiment_score = Column(Numeric(4,2))
+    skill_id = Column(String(50))
+    verdict = Column(String(20))
+
+class AICallLog(Base):
+    __tablename__ = "ai_call_logs"
+
+    id                = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    insight_id        = Column(Integer, nullable=True)           # FK to ai_insights (nullable)
+    symbol            = Column(String(20), index=True, nullable=False)
+    skill_id          = Column(String(50))
+    provider          = Column(String(20), nullable=False)
+    model             = Column(String(60), nullable=False)
+    trigger_reason    = Column(String(30))
+    prompt_tokens     = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens      = Column(Integer, default=0)
+    duration_ms       = Column(Integer)
+    status            = Column(Enum('SUCCESS', 'ERROR'), default='SUCCESS')
+    error_message     = Column(String(500))
+    request_payload   = Column(JSON)  # The full prompt/messages sent
+    response_raw      = Column(JSON)  # The raw structured response
+    called_at         = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
 
 class SystemConfig(Base):
     __tablename__ = "system_config"

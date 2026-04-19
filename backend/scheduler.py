@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, date, timedelta
 from sqlalchemy import select, delete
 from sqlalchemy.dialects.mysql import insert as mysql_insert
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Dict, List
 
 from backend.data.db import (
     SessionLocal, StockMaster, IntradayTicks, SignalsCache,
@@ -17,6 +17,12 @@ from backend.data.bhavcopy import load_bhavcopy_to_db
 from backend.engine.ai_engine import generate_insight
 from backend.engine.indicators import compute_short_term_indicators, compute_long_term_indicators
 from backend.engine.scorer import score_short_term, score_long_term, calculate_confidence
+from backend.engine.scoring.composite_score import (
+    CompositeScorer, ScoreConfig, SectorData, result_to_cache_dict
+)
+from backend.engine.scoring.mapper import (
+    build_fa_from_db, build_ta_from_indicators, build_momentum_from_df
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +138,13 @@ async def eod_consolidation():
             symbols = [row[0] for row in result.all()]
 
         logger.info(f"Recomputing signals for {len(symbols)} symbols…")
+        
+        # Step 3.5: Pre-fetch all peer data for sector ranking
+        sector_vault = await _fetch_all_sector_data()
+        
         for sym in symbols:
             try:
-                await _recompute_signals_for(sym)
+                await recompute_signals_for(sym, sector_vault)
             except Exception as e:
                 logger.error(f"Signal recompute failed for {sym}: {e}")
 
@@ -146,8 +156,8 @@ async def eod_consolidation():
         logger.error(f"EOD consolidation failed: {e}")
 
 
-async def _recompute_signals_for(symbol: str):
-    """Fetch price history from DB, recompute all indicators, update SignalsCache."""
+async def recompute_signals_for(symbol: str, sector_vault: Dict[str, SectorData] = None):
+    """Fetch price history from DB, recompute all indicators, update SignalsCache using V2 Engine."""
     async with SessionLocal() as session:
         # Fetch full price history
         ph_res = await session.execute(
@@ -161,38 +171,26 @@ async def _recompute_signals_for(symbol: str):
             logger.warning(f"{symbol}: insufficient history ({len(history)} bars) — skipping.")
             return
 
-        # We need at least 2 bars for change_pct, but indicators like SMA(50) need more.
-        # We allow limited indicators if history is short but > 2.
-
         df = pd.DataFrame([
             {
-                "date": str(h.date),
+                "date": h.date,
                 "open": float(h.open or 0),
                 "high": float(h.high or 0),
                 "low": float(h.low or 0),
                 "close": float(h.close),
                 "volume": int(h.volume or 0),
+                "no_of_trades": int(h.no_of_trades or 0),
             }
             for h in history
         ])
 
-        # Fetch fundamentals from cache
+        # Fetch fundamentals
         fund_res = await session.execute(
             select(FundamentalsCache).where(FundamentalsCache.symbol == symbol)
         )
-        fund = fund_res.scalars().first()
-        fundamentals = {}
-        if fund:
-            fundamentals = {
-                "pe_ratio": float(fund.pe_ratio) if fund.pe_ratio else None,
-                "eps": float(fund.eps) if fund.eps else None,
-                "roe": float(fund.roe) if fund.roe else None,
-                "debt_equity": float(fund.debt_equity) if fund.debt_equity else None,
-                "revenue_growth": float(fund.revenue_growth) if fund.revenue_growth else None,
-                "sector_pe": float(fund.sector_pe) if fund.sector_pe else 20.0,
-            }
+        fund_obj = fund_res.scalars().first()
 
-        # Compute indicators (require at least 50 bars for ST, 200 for LT)
+        # Compute raw indicators
         st_indicators = compute_short_term_indicators(df) if len(df) >= 50 else {}
         lt_indicators = compute_long_term_indicators(df) if len(df) >= 200 else {}
 
@@ -200,10 +198,34 @@ async def _recompute_signals_for(symbol: str):
             logger.warning(f"{symbol}: short-term indicators empty — skipping.")
             return
 
-        # Score (Default to 50/HOLD if insufficient history for technicals)
-        st_result = score_short_term(st_indicators, fundamentals) if st_indicators else {"signal": "HOLD", "score": 50, "breakdown": {}}
-        lt_result = score_long_term(lt_indicators, fundamentals) if lt_indicators else {"signal": "HOLD", "score": 50, "breakdown": {}}
-        confidence = calculate_confidence(st_result, lt_result)
+        # ── V2 SCORING ENGINE INTEGRATION ──────────────────────────────────────
+        
+        # 1. Map Data
+        fa_data = build_fa_from_db(fund_obj)
+        ta_data = build_ta_from_indicators(st_indicators, lt_indicators)
+        mom_data = build_momentum_from_df(df)
+        
+        # 2. Add Sector Data from vault
+        stock_sector = None
+        if fund_obj: # Try fundamentals cache first
+            # We need to know the sector to pull from vault. 
+            # If not in fund_obj, we might need to check stock_master.
+             pass
+        
+        # Fallback to stock master for sector
+        m_res = await session.execute(select(StockMaster.sector).where(StockMaster.symbol == symbol))
+        stock_sector = m_res.scalar()
+        
+        sec_data = sector_vault.get(stock_sector, SectorData(sector=stock_sector or "")) if sector_vault else SectorData()
+        
+        # 3. Run V2 Scorer
+        scorer = CompositeScorer(ScoreConfig(profile="long_term_compounding"))
+        res = scorer.score(symbol, "", fa_data, ta_data, mom_data, sec_data)
+        
+        # Legacy V1 fields for backward compatibility with existing components
+        confidence = res.data_confidence * 100
+        st_signal = "BUY" if res.technical_score > 60 else "SELL" if res.technical_score < 40 else "HOLD"
+        lt_signal = "BUY" if res.composite_score > 65 else "SELL" if res.composite_score < 45 else "HOLD"
 
         # Previous close for change_pct
         prev_close = float(df.iloc[-2]["close"]) if len(df) >= 2 else None
@@ -212,6 +234,9 @@ async def _recompute_signals_for(symbol: str):
 
         data_quality = "FULL" if lt_indicators else "TECHNICALS_ONLY"
 
+        # 4. Update Database
+        v2_fields = result_to_cache_dict(res)
+        
         stmt = mysql_insert(SignalsCache).values(
             symbol=symbol,
             computed_at=datetime.now(),
@@ -219,38 +244,37 @@ async def _recompute_signals_for(symbol: str):
             current_price=current_close,
             prev_close=prev_close,
             change_pct=change_pct,
-            st_signal=st_result["signal"],
-            st_score=st_result["score"],
-            lt_signal=lt_result["signal"],
-            lt_score=lt_result["score"],
+            st_signal=st_signal,
+            st_score=res.technical_score,
+            lt_signal=lt_signal,
+            lt_score=res.composite_score,
             confidence_pct=confidence,
             data_quality=data_quality,
             indicator_breakdown={
-                "short_term": st_result["breakdown"],
-                "long_term": lt_result["breakdown"],
-            }
+                "short_term": st_indicators,
+                "long_term": lt_indicators,
+            },
+            **v2_fields
         )
+        
+        # Update everything on duplicate
+        update_cols = [
+            "computed_at", "market_session", "current_price", "prev_close", 
+            "change_pct", "st_signal", "st_score", "lt_signal", "lt_score",
+            "confidence_pct", "data_quality", "indicator_breakdown"
+        ] + list(v2_fields.keys())
+        
         stmt = stmt.on_duplicate_key_update(
-            computed_at=stmt.inserted.computed_at,
-            market_session=stmt.inserted.market_session,
-            current_price=stmt.inserted.current_price,
-            prev_close=stmt.inserted.prev_close,
-            change_pct=stmt.inserted.change_pct,
-            st_signal=stmt.inserted.st_signal,
-            st_score=stmt.inserted.st_score,
-            lt_signal=stmt.inserted.lt_signal,
-            lt_score=stmt.inserted.lt_score,
-            confidence_pct=stmt.inserted.confidence_pct,
-            data_quality=stmt.inserted.data_quality,
-            indicator_breakdown=stmt.inserted.indicator_breakdown,
+            **{c: getattr(stmt.inserted, c) for c in update_cols}
         )
+        
         await session.execute(stmt)
         await session.commit()
 
         logger.info(
-            f"{symbol}: ST={st_result['signal']}({st_result['score']}) "
-            f"LT={lt_result['signal']}({lt_result['score']}) "
-            f"Conf={confidence:.1f}%"
+            f"{symbol}: [V2 institutional] Score={res.composite_score:.1f} "
+            f"FA={res.fundamental_score:.1f} TA={res.technical_score:.1f} "
+            f"SectorPct={res.sector_percentile:.1f}%"
         )
 
 
@@ -309,7 +333,7 @@ async def weekly_refresh():
                 await session.commit()
 
             # Recompute full signals with updated fundamentals
-            await _recompute_signals_for(sym)
+            await recompute_signals_for(sym)
 
             # Generate weekly AI insight
             await _generate_and_store_insight(sym, "WEEKLY")
@@ -367,6 +391,8 @@ async def _generate_and_store_insight(symbol: str, trigger: str):
                 symbol=symbol,
                 generated_at=datetime.now(),
                 trigger_reason=trigger,
+                skill_id=None, # Default for background triggers unless specified
+                verdict=insight_data.get("verdict"),
                 short_summary=insight_data.get("short_summary"),
                 long_summary=insight_data.get("long_summary"),
                 key_risks=insight_data.get("key_risks", []),
@@ -375,10 +401,51 @@ async def _generate_and_store_insight(symbol: str, trigger: str):
             )
             session.add(new_insight)
             await session.commit()
-            logger.info(f"AI insight ({trigger}) stored for {symbol}.")
+            logger.info(f"AI insight ({trigger}, verdict: {insight_data.get('verdict')}) stored for {symbol}.")
 
     except Exception as e:
         logger.error(f"generate_and_store_insight failed for {symbol}: {e}")
+
+async def _fetch_all_sector_data() -> Dict[str, SectorData]:
+    """Pre-fetch and group sector peers for efficient ranking."""
+    logger.info("Batch fetching sector data for institutional ranking...")
+    vault = {}
+    async with SessionLocal() as session:
+        # Fetch all fundamentals and recent signals
+        res = await session.execute(
+            select(
+                StockMaster.sector, 
+                FundamentalsCache.pe_ratio, 
+                FundamentalsCache.roe, 
+                FundamentalsCache.revenue_growth,
+                SignalsCache.change_pct
+            )
+            .join(FundamentalsCache, StockMaster.symbol == FundamentalsCache.symbol)
+            .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+            .where(StockMaster.is_active == True)
+        )
+        rows = res.all()
+        
+        # Group by sector
+        grouped: Dict[str, Dict[str, List[float]]] = {}
+        for sector, pe, roe, rev, mom in rows:
+            if not sector: continue
+            if sector not in grouped:
+                grouped[sector] = {"pe": [], "roe": [], "rev": [], "mom": []}
+            if pe: grouped[sector]["pe"].append(float(pe))
+            if roe: grouped[sector]["roe"].append(float(roe))
+            if rev: grouped[sector]["rev"].append(float(rev))
+            if mom: grouped[sector]["mom"].append(float(mom))
+            
+        for sector, data in grouped.items():
+            vault[sector] = SectorData(
+                sector=sector,
+                sector_pe_list=data["pe"],
+                sector_roe_list=data["roe"],
+                sector_revenue_growth_list=data["rev"],
+                sector_momentum_list=data["mom"]
+            )
+    return vault
 
 
 # ── Scheduler setup ───────────────────────────────────────────────────────────

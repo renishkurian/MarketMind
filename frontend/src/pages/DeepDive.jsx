@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback,useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStockStore } from '../store/stockStore';
 import {
   ArrowLeft, ArrowUpRight, ArrowDownRight, ArrowRight,
   Activity, Brain, TrendingUp, TrendingDown, Minus,
   RefreshCw, AlertTriangle, CheckCircle, BarChart2,
-  Clock, Shield, Sun, Moon, Layers, BookOpen, Briefcase
-  
+  Clock, Shield, Sun, Moon, Layers, BookOpen, Briefcase, Sparkles,
+  Edit2, X, ShieldCheck
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 import SignalBadge from '../components/SignalBadge';
 import MetricCard from '../components/MetricCard';
@@ -142,11 +143,19 @@ export default function DeepDive() {
   const [insight, setInsight] = useState(null);
   const [insightLoading, setInsightLoading] = useState(true);
   const [insightError, setInsightError] = useState(false);
+  const [fundResearchLoading, setFundResearchLoading] = useState(false);
+  const [insightHistory, setInsightHistory] = useState([]);
+  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [fundSyncLoading, setFundSyncLoading] = useState(false);
+  const [editData, setEditData] = useState({});
   const [activeTab, setActiveTab] = useState('chart');
   const [selectedSkill, setSelectedSkill] = useState(SKILLS[0].id);
   const [signals, setSignals] = useState(null);
   const [fundamentals, setFundamentals] = useState(null);
   const [lots, setLots] = useState([]);
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   const stock = stocks[symbol];
   const sig = stock?.signal || {};
@@ -156,18 +165,36 @@ export default function DeepDive() {
   const priceColor = priceChange > 0 ? 'text-signal-buy' : priceChange < 0 ? 'text-signal-sell' : 'text-dark-muted';
   const PriceIcon = priceChange > 0 ? TrendingUp : priceChange < 0 ? TrendingDown : Minus;
 
+  const portfolioSummary = useMemo(() => {
+    if (!lots || lots.length === 0) return null;
+    // The backend already filters for OPEN lots, but we double-check just in case
+    const openLots = lots.filter(l => !l.status || l.status === 'OPEN');
+    if (openLots.length === 0) return null;
+
+    const quantity = openLots.reduce((sum, l) => sum + parseFloat(l.quantity), 0);
+    const invested = openLots.reduce((sum, l) => sum + (parseFloat(l.quantity) * parseFloat(l.buy_price)), 0);
+    const avgPrice = invested / quantity;
+    const currentPrice = sig.current_price || 0;
+    const currentValue = quantity * currentPrice;
+    const pnl = currentValue - invested;
+    const pnlPct = (pnl / invested) * 100;
+
+    return { quantity, invested, avgPrice, currentValue, pnl, pnlPct };
+  }, [lots, sig.current_price]);
+
   const fetchData = useCallback(async () => {
     setHistoryLoading(true);
     setInsightLoading(true);
     setInsightError(false);
 
     // Parallel fetches
-    const [histRes, insightRes, signalsRes, fundRes, lotsRes] = await Promise.allSettled([
+    const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes] = await Promise.allSettled([
       fetch(`${API_URL}/api/stock/${symbol}/history`),
       fetch(`${API_URL}/api/stock/${symbol}/insight`),
       fetch(`${API_URL}/api/stock/${symbol}/signals`),
       fetch(`${API_URL}/api/stock/${symbol}/fundamentals`),
       fetch(`${API_URL}/api/stock/${symbol}/lots`),
+      fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`),
     ]);
 
     if (histRes.status === 'fulfilled' && histRes.value.ok) {
@@ -197,7 +224,27 @@ export default function DeepDive() {
     } else {
       setLots([]);
     }
-  }, [symbol]);
+
+    if (historyRes.status === 'fulfilled' && historyRes.value.ok) {
+      setInsightHistory(await historyRes.value.json());
+    } else {
+      setInsightHistory([]);
+    }
+
+    // Fetch Full Consensus Analysis if ISIN exists
+    if (stock?.isin) {
+      setAnalysisLoading(true);
+      try {
+        const aRes = await fetch(`${API_URL}/api/analysis/${stock.isin}/full`);
+        if (aRes.ok) {
+          setAnalysis(await aRes.json());
+        }
+      } catch (e) {
+        console.error("Analysis fetch failed:", e);
+      }
+      setAnalysisLoading(false);
+    }
+  }, [symbol, stock?.isin]);
 
   const handleGenerateInsight = async () => {
     try {
@@ -209,18 +256,133 @@ export default function DeepDive() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: json.stringify({ skill_id: selectedSkill })
+        body: JSON.stringify({ skill_id: selectedSkill })
       });
       if (res.ok) {
-        // Poll for result after a short delay
-        setTimeout(fetchData, 5000);
+        toast.success('AI generation started. Refreshing in 15s...');
+        // Poll for result after a longer delay (Pi can be slow)
+        setTimeout(fetchData, 15000);
       } else {
         const err = await res.json();
-        alert(err.detail || 'Failed to generate insight');
+        toast.error(err.detail || 'Failed to generate insight');
         setInsightLoading(false);
       }
     } catch (e) {
       setInsightLoading(false);
+    }
+  };
+
+  const handleManualUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(editData)
+      });
+      if (res.ok) {
+        toast.success('Fundamentals updated! Signals recomputing...');
+        setIsEditModalOpen(false);
+        fetchData(); // Refresh UI
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Failed to update');
+      }
+    } catch (e) {
+      toast.error('Network error updating fundamentals');
+    }
+  };
+
+  const handleFundSync = async () => {
+    try {
+      setFundSyncLoading(true);
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Synced! Source data quality: ${data.status}`);
+        fetchData();
+      } else {
+        toast.error('Failed to sync from Yahoo');
+      }
+    } catch (e) {
+      toast.error('Sync error');
+    } finally {
+      setFundSyncLoading(false);
+    }
+  };
+
+  const handleSyncAndResearch = async () => {
+    try {
+      setFundSyncLoading(true);
+      const token = localStorage.getItem('mm_token');
+      // 1. Sync from Yahoo
+      const syncRes = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!syncRes.ok) {
+        toast.error('Sync failed, using existing data for research');
+      } else {
+        toast.success('Yahoo sync complete!');
+      }
+
+      // 2. Generate Insight
+      setInsightLoading(true);
+      const insRes = await fetch(`${API_URL}/api/stock/${symbol}/insight/generate`, { 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ skill_id: selectedSkill })
+      });
+      
+      if (insRes.ok) {
+        toast.success('Sync-Research started. Refreshing in 15s...');
+        setTimeout(fetchData, 15000);
+      } else {
+        const err = await insRes.json();
+        toast.error(err.detail || 'Research failed');
+        setInsightLoading(false);
+      }
+    } catch (e) {
+      toast.error('Sync-Research error');
+      setInsightLoading(false);
+    } finally {
+      setFundSyncLoading(false);
+    }
+  };
+
+  const handleAIResearch = async () => {
+    try {
+      setFundResearchLoading(true);
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/research`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        toast.success('AI research started. Check logs or refresh in 15s.');
+        setTimeout(fetchData, 15000);
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Failed to start AI research');
+      }
+    } catch (e) {
+      toast.error('Connection error during AI research');
+    } finally {
+      setFundResearchLoading(false);
     }
   };
 
@@ -248,6 +410,50 @@ export default function DeepDive() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Portfolio Status Bar (if held) */}
+      {portfolioSummary && (
+        <div className="mb-0 p-1 bg-gradient-to-r from-accent/20 to-transparent rounded-2xl border border-accent/20">
+          <div className="bg-dark-bg/80 backdrop-blur-xl p-4 rounded-xl flex flex-wrap items-center gap-8 shadow-2xl">
+             <div className="flex items-center gap-3 pr-8 border-r border-dark-border">
+                <div className="p-2 bg-accent/10 rounded-lg text-accent">
+                   <Shield size={18} />
+                </div>
+                <div>
+                   <p className="text-[10px] text-dark-muted font-bold uppercase tracking-widest leading-none mb-1">Your Holding</p>
+                   <p className="text-sm font-black text-dark-text leading-none">{portfolioSummary.quantity.toLocaleString()} Shares</p>
+                </div>
+             </div>
+
+             <div className="flex-1 flex flex-wrap gap-8">
+                <div>
+                   <p className="text-[10px] text-dark-muted font-bold uppercase tracking-tight leading-none mb-2">Total Invested</p>
+                   <p className="text-base font-mono font-bold text-dark-text leading-none">₹{portfolioSummary.invested.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+                <div>
+                   <p className="text-[10px] text-dark-muted font-bold uppercase tracking-tight leading-none mb-2">Avg. Cost</p>
+                   <p className="text-base font-mono font-bold text-dark-text leading-none">₹{portfolioSummary.avgPrice.toFixed(2)}</p>
+                </div>
+                <div>
+                   <p className="text-[10px] text-dark-muted font-bold uppercase tracking-tight leading-none mb-2">Market Value</p>
+                   <p className="text-base font-mono font-bold text-dark-text leading-none">₹{portfolioSummary.currentValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+                <div className="ml-auto flex items-center gap-6">
+                   <div className="text-right">
+                      <p className="text-[10px] text-dark-muted font-bold uppercase tracking-tight leading-none mb-2">Total Return</p>
+                      <div className={`flex items-center gap-2 justify-end ${portfolioSummary.pnl >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                         <span className="text-lg font-black font-mono">
+                            {portfolioSummary.pnl >= 0 ? '+' : ''}₹{portfolioSummary.pnl.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                         </span>
+                         <div className={`px-2 py-0.5 rounded text-[10px] font-black ${portfolioSummary.pnl >= 0 ? 'bg-signal-buy/20' : 'bg-signal-sell/20'}`}>
+                            {portfolioSummary.pnlPct.toFixed(2)}%
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
       {/* Page Title & Back */}
       <div className="flex items-center gap-4">
         <button
@@ -300,22 +506,31 @@ export default function DeepDive() {
               <SignalBadge signal={sig.lt_signal} score={sig.lt_score} size="lg" />
             </div>
             <div className="text-center min-w-[100px]">
-              <p className="text-xs text-dark-muted mb-2 uppercase tracking-wide font-medium">Confidence</p>
-              <div className="flex items-center gap-2">
-                <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      (sig.confidence_pct ?? 0) >= 70 ? 'bg-signal-buy' :
-                      (sig.confidence_pct ?? 0) >= 45 ? 'bg-signal-hold' : 'bg-signal-sell'
-                    }`}
-                    style={{ width: `${sig.confidence_pct ?? 0}%` }}
-                  />
+              <p className="text-xs text-dark-muted mb-2 uppercase tracking-wide font-medium">Composite Score</p>
+              <div className="flex items-center gap-3">
+                <div className="text-3xl font-bold font-mono text-accent">
+                  {analysis?.score?.composite_score ?? sig.lt_score?.toFixed(1) ?? '—'}
                 </div>
-                <span className="font-mono font-bold text-sm">{sig.confidence_pct?.toFixed(0) ?? 0}%</span>
+                <div className="text-[10px] text-dark-muted leading-tight">
+                  / 100<br/>V2 ENGINE
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Forensic/Governance Warning Strip */}
+        {analysis?.score?.promoter_pledge_warning && (
+          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3">
+            <AlertTriangle size={16} className="text-red-500" />
+            <span className="text-xs font-bold text-red-500 uppercase tracking-wide">
+              Critical Warning: High Promoter Pledge Detected (&gt;20%)
+            </span>
+            <span className="text-[10px] text-red-400/70 ml-auto">
+              Scoring engine has applied a -15pt governance penalty.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Metrics Row */}
@@ -525,36 +740,102 @@ export default function DeepDive() {
           {/* Fundamentals Tab */}
           {activeTab === 'fundamentals' && (
             <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-black text-dark-muted uppercase tracking-widest">Financial Profile</h3>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={handleFundSync}
+                    disabled={fundSyncLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-[10px] font-bold text-dark-muted hover:border-dark-text hover:text-dark-text transition-all disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={fundSyncLoading ? 'animate-spin' : ''} />
+                    Sync Yahoo
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setEditData({
+                        pe_ratio: fundamentals?.pe_ratio,
+                        eps: fundamentals?.eps,
+                        roe: fundamentals?.roe,
+                        debt_equity: fundamentals?.debt_equity,
+                        revenue_growth: fundamentals?.revenue_growth,
+                        market_cap: fundamentals?.market_cap
+                      });
+                      setIsEditModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-[10px] font-bold text-dark-muted hover:border-dark-text hover:text-dark-text transition-all"
+                  >
+                    <Edit2 size={12} />
+                    Edit Data
+                  </button>
+                </div>
+              </div>
+
               {!fundamentals ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4 text-dark-muted border-2 border-dashed border-dark-border rounded-2xl">
                   <div className="p-3 bg-dark-bg rounded-xl border border-dark-border">
                     <BookOpen size={24} className="opacity-40" />
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-dark-text">No Fundamental Profile</p>
-                    <p className="text-xs text-dark-muted mt-1">Data for this symbol has not been cached yet.</p>
+                  <div className="text-center p-6">
+                    <p className="text-sm font-bold text-dark-text">No Fundamental Profile</p>
+                    <p className="text-xs text-dark-muted mt-1 mb-4">Official data for this symbol has not been cached yet.</p>
+                    <button
+                      onClick={handleAIResearch}
+                      disabled={fundResearchLoading}
+                      className="flex items-center gap-2 px-4 py-2 bg-accent/20 border border-accent/40 text-accent rounded-xl text-xs font-bold hover:bg-accent/30 transition-all disabled:opacity-50 mx-auto"
+                    >
+                      {fundResearchLoading ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      {fundResearchLoading ? 'Reseach in progress...' : 'Research via AI'}
+                    </button>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {[
-                    { label: 'P/E Ratio', value: fundamentals.pe_ratio?.toFixed(2) ?? '—', sub: 'Trailing' },
-                    { label: 'EPS', value: fundamentals.eps != null ? `₹${fundamentals.eps.toFixed(2)}` : '—', sub: 'Trailing 12m' },
-                    { label: 'ROE', value: fundamentals.roe != null ? `${(fundamentals.roe * 100).toFixed(1)}%` : '—', sub: 'Return on Equity' },
-                    { label: 'Debt / Equity', value: fundamentals.debt_equity?.toFixed(2) ?? '—', sub: 'Leverage ratio' },
-                    { label: 'Revenue Growth', value: fundamentals.revenue_growth != null ? `${(fundamentals.revenue_growth * 100).toFixed(1)}%` : '—', sub: 'YoY' },
-                    { label: 'Market Cap', value: fundamentals.market_cap ? `₹${(fundamentals.market_cap / 1e9).toFixed(1)}B` : '—', sub: 'In billions' },
-                  ].map(({ label, value, sub }) => (
-                    <div key={label} className="bg-gray-900/50 border border-dark-border rounded-xl p-4">
-                      <p className="text-xs text-dark-muted mb-1">{label}</p>
-                      <p className="text-2xl font-bold font-mono">{value}</p>
-                      <p className="text-xs text-dark-muted/70 mt-1">{sub}</p>
+                <div className="space-y-4">
+                  {fundamentals.data_quality === 'AI_RESEARCHED' && (
+                    <div className="flex items-center gap-2 p-3 bg-yellow-400/10 border border-yellow-400/20 rounded-xl mb-2">
+                       <AlertTriangle size={14} className="text-yellow-400" />
+                       <p className="text-[10px] font-bold text-yellow-500/80 uppercase tracking-wider">Note: Displaying AI-estimated fundamentals (Unverified)</p>
+                       <button 
+                        onClick={handleAIResearch}
+                        disabled={fundResearchLoading}
+                        className="ml-auto flex items-center gap-1.5 px-2 py-0.5 bg-yellow-400/20 rounded text-[9px] font-black text-yellow-400 hover:bg-yellow-400/30 transition-all"
+                       >
+                         {fundResearchLoading ? <RefreshCw size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                         Re-Research
+                       </button>
                     </div>
-                  ))}
-                  <div className="col-span-full">
-                    <p className="text-xs text-dark-muted/60 text-right">
-                      Last fetched: {new Date(fundamentals.fetched_at).toLocaleString()} · Quality: <span className={fundamentals.data_quality === 'FULL' ? 'text-signal-buy' : 'text-signal-hold'}>{fundamentals.data_quality}</span>
-                    </p>
+                  )}
+                  {fundamentals.data_quality === 'VERIFIED' && (
+                    <div className="flex items-center gap-2 p-3 bg-signal-buy/10 border border-signal-buy/20 rounded-xl mb-2">
+                       <ShieldCheck size={14} className="text-signal-buy" />
+                       <p className="text-[10px] font-bold text-signal-buy/80 uppercase tracking-wider">GROUND TRUTH: This data was manually verified and is used for signal scoring.</p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {[
+                      { label: 'P/E Ratio', value: fundamentals.pe_ratio?.toFixed(2) ?? '—', sub: 'Trailing' },
+                      { label: 'EPS', value: fundamentals.eps != null ? `₹${fundamentals.eps.toFixed(2)}` : '—', sub: 'Trailing 12m' },
+                      { label: 'ROE', value: fundamentals.roe != null ? `${(fundamentals.roe * 100).toFixed(1)}%` : '—', sub: 'Return on Equity' },
+                      { label: 'Debt / Equity', value: fundamentals.debt_equity?.toFixed(2) ?? '—', sub: 'Leverage ratio' },
+                      { label: 'Revenue Growth', value: fundamentals.revenue_growth != null ? `${(fundamentals.revenue_growth * 100).toFixed(1)}%` : '—', sub: 'YoY' },
+                      { label: 'Market Cap', value: fundamentals.market_cap ? `₹${(fundamentals.market_cap / 1e9).toFixed(1)}B` : '—', sub: 'In billions' },
+                    ].map(({ label, value, sub }) => (
+                      <div key={label} className="bg-gray-900/50 border border-dark-border rounded-xl p-4 group hover:border-accent/30 transition-colors">
+                        <p className="text-xs text-dark-muted mb-1">{label}</p>
+                        <p className="text-2xl font-bold font-mono group-hover:text-accent transition-colors">{value}</p>
+                        <p className="text-xs text-dark-muted/70 mt-1">{sub}</p>
+                      </div>
+                    ))}
+                    <div className="col-span-full pt-2">
+                      <p className="text-xs text-dark-muted/60 text-right">
+                        Last fetched: {new Date(fundamentals.fetched_at).toLocaleString()} · Quality: <span className={
+                          fundamentals.data_quality === 'FULL' ? 'text-signal-buy' : 
+                          fundamentals.data_quality === 'AI_RESEARCHED' ? 'text-yellow-400 font-bold' :
+                          fundamentals.data_quality === 'VERIFIED' ? 'text-accent font-black' :
+                          'text-signal-hold'
+                        }>{fundamentals.data_quality}</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -587,27 +868,230 @@ export default function DeepDive() {
                     ))}
                   </div>
                 </div>
-                <button
-                  onClick={handleGenerateInsight}
-                  disabled={insightLoading}
-                  className="shrink-0 flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent/80 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-accent/20"
-                >
-                  <RefreshCw size={14} className={insightLoading ? 'animate-spin' : ''} />
-                  {insightLoading ? 'Analyzing...' : (insight ? 'Regenerate Analysis' : 'Generate Intelligence')}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleGenerateInsight}
+                    disabled={insightLoading}
+                    className="shrink-0 flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent/80 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-accent/20"
+                  >
+                    <RefreshCw size={14} className={insightLoading ? 'animate-spin' : ''} />
+                    {insightLoading ? 'Analyzing...' : (insight ? 'Regenerate Insight' : 'Generate Insight')}
+                  </button>
+                  <button
+                    onClick={handleSyncAndResearch}
+                    disabled={insightLoading || fundSyncLoading}
+                    className="shrink-0 flex items-center gap-2 px-6 py-2 bg-dark-bg border border-dark-border hover:border-accent hover:text-accent disabled:opacity-50 text-dark-muted rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all"
+                  >
+                    <RefreshCw size={12} className={fundSyncLoading ? 'animate-spin' : ''} />
+                    {fundSyncLoading ? 'Syncing...' : 'Sync Yahoo & Research'}
+                  </button>
+                </div>
               </div>
 
-              <div className="pt-2">
-                <AIInsightPanel
-                  insight={insight}
-                  loading={insightLoading}
-                  error={insightError && !insightLoading}
-                />
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* History Sidebar */}
+                {insightHistory.length > 0 && (
+                  <div className="w-full lg:w-64 shrink-0 space-y-3">
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                      <Clock size={14} className="text-dark-muted" />
+                      <h4 className="text-[10px] font-black text-dark-muted uppercase tracking-widest">Analysis History</h4>
+                    </div>
+                    <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scroll-hide">
+                      <button
+                        onClick={() => setSelectedHistoryId(null)}
+                        className={`flex-1 shrink-0 p-3 rounded-xl border text-left transition-all ${
+                          selectedHistoryId === null 
+                          ? 'bg-accent/10 border-accent/40 ring-1 ring-accent/20' 
+                          : 'bg-dark-card border-dark-border hover:border-dark-muted'
+                        }`}
+                      >
+                        <p className="text-[10px] font-black text-dark-text flex items-center justify-between">
+                          <span>LATEST REPORT</span>
+                          {selectedHistoryId === null && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
+                        </p>
+                        <p className="text-[9px] text-dark-muted mt-1">Current Active Insight</p>
+                      </button>
+                      
+                      {insightHistory.slice(selectedHistoryId === null ? 1 : 0).map(h => {
+                        // Skip if it is the current active one already shown at top
+                        if (selectedHistoryId === null && h.id === insight?.id) return null;
+                        
+                        return (
+                          <button
+                            key={h.id}
+                            onClick={() => setSelectedHistoryId(h.id)}
+                            className={`flex-1 shrink-0 p-3 rounded-xl border text-left transition-all ${
+                              selectedHistoryId === h.id 
+                              ? 'bg-accent/10 border-accent/40 ring-1 ring-accent/20' 
+                              : 'bg-dark-card border-dark-border hover:border-dark-muted'
+                            }`}
+                          >
+                            <p className="text-[10px] font-bold text-dark-text truncate">
+                              {h.skill_id ? h.skill_id.replace(/_/g, ' ').toUpperCase() : 'GENERAL'}
+                            </p>
+                            <p className="text-[9px] text-dark-muted mt-0.5">
+                              {new Date(h.generated_at).toLocaleDateString()} at {new Date(h.generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Display Panel */}
+                <div className="flex-1 min-w-0">
+                  {selectedHistoryId !== null && (
+                    <div className="mb-4 flex items-center justify-between p-3 bg-accent/5 border border-accent/20 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <Clock size={14} className="text-accent" />
+                        <span className="text-xs font-bold text-accent">Viewing Historical Report</span>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedHistoryId(null)}
+                        className="text-[10px] font-black text-dark-text hover:text-accent transition-colors"
+                      >
+                        RETURN TO LATEST
+                      </button>
+                    </div>
+                  )}
+
+                  <AIInsightPanel 
+                    insight={selectedHistoryId ? insightHistory.find(h => h.id === selectedHistoryId) : insight} 
+                    loading={insightLoading} 
+                    error={insightError} 
+                  />
+                  
+                  {/* Consensus section moved inside display panel */}
+                  <div className="mt-8">
+                    {analysis?.consensus && (
+                      <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <Brain size={20} className="text-accent" />
+                          <h3 className="text-sm font-bold uppercase tracking-widest text-dark-text">AI Multi-Skill Consensus</h3>
+                        </div>
+                        <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-tighter shadow-lg shadow-accent/20 ${
+                          analysis.consensus.consensus_verdict.includes('BUY') ? 'bg-signal-buy text-white' : 
+                          analysis.consensus.consensus_verdict.includes('AVOID') ? 'bg-signal-sell text-white' : 'bg-signal-hold text-white'
+                        }`}>
+                          {analysis.consensus.consensus_verdict}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="md:col-span-2">
+                          <p className="text-sm leading-relaxed text-dark-text opacity-90 italic">
+                            "{analysis.consensus.executive_summary}"
+                          </p>
+                          <div className="flex gap-4 mt-4">
+                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-signal-buy bg-signal-buy/10 px-2 py-1 rounded">
+                                <ArrowUpRight size={12} /> {analysis.consensus.bull_count} BULLS
+                             </div>
+                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-signal-sell bg-signal-sell/10 px-2 py-1 rounded">
+                                <ArrowDownRight size={12} /> {analysis.consensus.bear_count} BEARS
+                             </div>
+                          </div>
+                        </div>
+
+                        {analysis.backtest && (
+                          <div className="bg-dark-bg/50 p-4 rounded-xl border border-dark-border">
+                            <p className="text-[10px] font-bold text-dark-muted uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                              <Shield size={10} /> Backtest Context
+                            </p>
+                            <div className="space-y-3">
+                               <div>
+                                  <p className="text-[10px] text-dark-muted leading-none mb-1">9-YR CAGR</p>
+                                  <p className="text-lg font-black font-mono text-signal-buy">+{analysis.backtest.cagr}%</p>
+                               </div>
+                               <div className="flex gap-4">
+                                  <div>
+                                     <p className="text-[8px] text-dark-muted leading-none mb-1 uppercase">Win Rate</p>
+                                     <p className="text-xs font-bold font-mono">{analysis.backtest.win_rate}%</p>
+                                  </div>
+                                  <div>
+                                     <p className="text-[8px] text-dark-muted leading-none mb-1 uppercase">Avg Rtn</p>
+                                     <p className="text-xs font-bold font-mono">{analysis.backtest.avg_return}%</p>
+                                  </div>
+                               </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Manual Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-dark-card border border-dark-border w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-dark-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-dark-text">Edit Fundamentals</h3>
+                <p className="text-xs text-dark-muted mt-1">Provide ground truth for {symbol} to improve scoring accuracy.</p>
+              </div>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-2 text-dark-muted hover:text-dark-text transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleManualUpdate} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { id: 'pe_ratio', label: 'P/E Ratio', placeholder: 'e.g. 25.5' },
+                  { id: 'eps', label: 'EPS', placeholder: 'e.g. 12.0' },
+                  { id: 'roe', label: 'ROE (%)', placeholder: 'e.g. 15.0', transform: (v) => v / 100 },
+                  { id: 'debt_equity', label: 'Debt to Equity', placeholder: 'e.g. 0.5' },
+                  { id: 'revenue_growth', label: 'Rev Growth (%)', placeholder: 'e.g. 20.0', transform: (v) => v / 100 },
+                  { id: 'market_cap', label: 'Market Cap (Amt)', placeholder: 'Full amount in ₹' },
+                ].map(field => (
+                  <div key={field.id}>
+                    <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">{field.label}</label>
+                    <input 
+                      type="number"
+                      step="any"
+                      placeholder={field.placeholder}
+                      defaultValue={field.id === 'roe' || field.id === 'revenue_growth' ? (editData[field.id] * 100).toFixed(2) : editData[field.id]}
+                      onChange={(e) => {
+                        let val = parseFloat(e.target.value);
+                        if (field.transform) val = field.transform(val);
+                        setEditData({ ...editData, [field.id]: val });
+                      }}
+                      className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm font-mono focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all placeholder:text-dark-muted/30"
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 px-4 py-3 bg-dark-bg border border-dark-border text-dark-text rounded-xl text-xs font-bold hover:bg-gray-800 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-3 px-8 py-3 bg-accent text-white rounded-xl text-xs font-bold hover:bg-accent/80 transition-all shadow-lg shadow-accent/20"
+                >
+                  Update & Recompute Signals
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer disclaimer */}
       <p className="text-center text-xs text-dark-muted/50 mt-6 flex items-center justify-center gap-2">

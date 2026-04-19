@@ -23,7 +23,7 @@ const Th = ({ label, field, sortField, sortDir, onSort, align = 'left' }) => (
 
 export default function PortfolioTable({ stocks }) {
   const navigate = useNavigate();
-  const [sortField, setSortField] = useState('buy_date');
+  const [sortField, setSortField] = useState('symbol');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
