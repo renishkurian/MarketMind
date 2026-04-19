@@ -144,6 +144,7 @@ export default function DeepDive() {
   const [insightLoading, setInsightLoading] = useState(true);
   const [insightError, setInsightError] = useState(false);
   const [fundResearchLoading, setFundResearchLoading] = useState(false);
+  const [signalRegening, setSignalRegening] = useState(false);
   const [insightHistory, setInsightHistory] = useState([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -297,6 +298,7 @@ export default function DeepDive() {
     }
   };
 
+
   const handleFundSync = async () => {
     try {
       setFundSyncLoading(true);
@@ -316,6 +318,27 @@ export default function DeepDive() {
       toast.error('Sync error');
     } finally {
       setFundSyncLoading(false);
+    }
+  };
+
+  const handleRegenerateSignals = async () => {
+    try {
+      setSignalRegening(true);
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/signals/recompute`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Signals recomputed successfully!');
+        fetchData();
+      } else {
+        toast.error('Failed to recompute signals');
+      }
+    } catch (e) {
+      toast.error('Recompute error');
+    } finally {
+      setSignalRegening(false);
     }
   };
 
@@ -505,7 +528,7 @@ export default function DeepDive() {
               <p className="text-xs text-dark-muted mb-2 uppercase tracking-wide font-medium">Long Term</p>
               <SignalBadge signal={sig.lt_signal} score={sig.lt_score} size="lg" />
             </div>
-            <div className="text-center min-w-[100px]">
+            <div className="text-center min-w-[100px] relative group/score">
               <p className="text-xs text-dark-muted mb-2 uppercase tracking-wide font-medium">Composite Score</p>
               <div className="flex items-center gap-3">
                 <div className="text-3xl font-bold font-mono text-accent">
@@ -514,6 +537,14 @@ export default function DeepDive() {
                 <div className="text-[10px] text-dark-muted leading-tight">
                   / 100<br/>V2 ENGINE
                 </div>
+                <button
+                  onClick={handleRegenerateSignals}
+                  disabled={signalRegening}
+                  className="p-1.5 rounded-lg hover:bg-accent/10 text-dark-muted hover:text-accent transition-all opacity-0 group-hover/score:opacity-100 disabled:opacity-50"
+                  title="Force recompute signals"
+                >
+                  <RefreshCw size={14} className={signalRegening ? 'animate-spin' : ''} />
+                </button>
               </div>
             </div>
           </div>
@@ -691,6 +722,17 @@ export default function DeepDive() {
           {/* Signals Breakdown Tab */}
           {activeTab === 'signals' && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-black text-dark-muted uppercase tracking-widest">Signal Logic & Indicators</h3>
+                <button
+                  onClick={handleRegenerateSignals}
+                  disabled={signalRegening}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-[10px] font-bold text-dark-muted hover:border-dark-text hover:text-dark-text transition-all disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={signalRegening ? 'animate-spin' : ''} />
+                  Regenerate Signals
+                </button>
+              </div>
               {!signals ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3 text-dark-muted">
                   <Layers size={36} className="opacity-30" />
@@ -706,24 +748,74 @@ export default function DeepDive() {
                       </div>
                     ))}
                   </div>
+
+                  {/* V2 Institutional Pillars */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    {[
+                      { label: 'Fundamental', val: signals.fundamental_score, icon: '🏛️' },
+                      { label: 'Technical', val: signals.technical_score, icon: '📈' },
+                      { label: 'Momentum', val: signals.momentum_score, icon: '🚀' },
+                      { label: 'Sector Rank', val: signals.sector_rank_score, icon: '📊' },
+                    ].map(p => (
+                      <div key={p.label} className="bg-gradient-to-b from-dark-card to-dark-bg border border-dark-border rounded-xl p-4 flex flex-col items-center text-center">
+                        <span className="text-xl mb-2">{p.icon}</span>
+                        <p className="text-[10px] font-bold text-dark-muted uppercase tracking-widest mb-1">{p.label}</p>
+                        <p className={`text-2xl font-black font-mono ${
+                          (p.val ?? 0) >= 70 ? 'text-signal-buy' : 
+                          (p.val ?? 0) <= 40 ? 'text-signal-sell' : 'text-signal-hold'
+                        }`}>
+                          {p.val?.toFixed(1) ?? '—'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 flex items-center justify-between">
+                       <div>
+                          <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Sector Percentile</p>
+                          <p className="text-sm text-dark-text">Top {100 - (signals.sector_percentile ?? 0).toFixed(1)}% of peers in {stock?.sector}</p>
+                       </div>
+                       <div className="text-2xl font-black text-accent font-mono">
+                          {signals.sector_percentile?.toFixed(1)}%
+                       </div>
+                    </div>
+                    <div className="bg-dark-border/20 border border-dark-border rounded-xl p-4 flex items-center justify-between">
+                       <div>
+                          <p className="text-[10px] font-black text-dark-muted uppercase tracking-widest mb-1">Data Confidence</p>
+                          <p className="text-sm text-dark-text">{signals.data_quality} / {((signals.data_confidence ?? 0) * 100).toFixed(0)}% completeness</p>
+                       </div>
+                       <div className={`text-2xl font-black font-mono ${
+                          (signals.data_confidence ?? 0) >= 0.8 ? 'text-signal-buy' : 'text-signal-hold'
+                       }`}>
+                          {((signals.data_confidence ?? 0) * 100).toFixed(0)}%
+                       </div>
+                    </div>
+                  </div>
                   {signals.indicator_breakdown && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {Object.entries(signals.indicator_breakdown).map(([group, breakdown]) => (
                         <div key={group} className="bg-gray-900/40 border border-dark-border rounded-xl p-4">
                           <p className="text-xs text-dark-muted font-semibold uppercase tracking-wide mb-3">
-                            {group === 'short_term' ? '📈 Short-Term Indicators' : '📊 Long-Term Indicators'}
+                            {group.replace('_', ' ')}
                           </p>
                           <div className="space-y-2">
                             {Object.entries(breakdown).map(([name, data]) => {
+                              const LABEL_MAP = {
+                                rsi: "RSI", macd: "MACD", price_vs_sma200: "SMA 200", price_vs_sma50: "SMA 50", adx: "ADX Trend", bb_position: "Bollinger", trade_activity: "Vol Shock",
+                                roc_1yr: "1Y ROC", roc_60d: "60d ROC", roc_20d: "20d ROC", volume_trend: "Vol Trend", "52w_rank": "52W Rank", rs_vs_nifty: "RS vs Nifty",
+                                pe_vs_5yr: "PE vs 5Y", roe_quality: "ROE", debt_equity: "D/E", revenue_growth_3yr: "Rev Growth", pat_growth_3yr: "PAT Growth", operating_margin: "Margin", pledge_penalty_on_roe: "Pledge Pnlty"
+                              };
+                              const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
                               const pct = data.max > 0 ? (data.score / data.max) * 100 : 0;
                               const barColor = pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell';
                               return (
                                 <div key={name} className="flex items-center gap-3">
-                                  <span className="text-xs font-mono text-dark-muted w-20 shrink-0">{name}</span>
+                                  <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title={displayName}>{displayName}</span>
                                   <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
                                     <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                                   </div>
-                                  <span className="font-mono text-xs text-right w-12">{data.score}/{data.max}</span>
+                                  <span className="font-mono text-xs text-right w-12 text-dark-muted">{Math.round(data.score)}/{Math.round(data.max)}</span>
                                 </div>
                               );
                             })}

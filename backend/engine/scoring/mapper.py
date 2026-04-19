@@ -13,9 +13,13 @@ def build_fa_from_db(fund: Optional[FundamentalsCache]) -> FundamentalData:
         return FundamentalData()
     return FundamentalData(
         pe_ratio=float(fund.pe_ratio) if fund.pe_ratio else None,
+        pe_5yr_avg=float(fund.pe_5yr_avg) if fund.pe_5yr_avg else None,
         roe=float(fund.roe) if fund.roe else None,
+        roe_3yr_avg=float(fund.roe_3yr_avg) if fund.roe_3yr_avg else None,
         debt_equity=float(fund.debt_equity) if fund.debt_equity else None,
-        revenue_growth_3yr=float(fund.revenue_growth) if fund.revenue_growth else None,
+        revenue_growth_3yr=float(fund.revenue_growth_3yr) if fund.revenue_growth_3yr else None,
+        pat_growth_3yr=float(fund.pat_growth_3yr) if fund.pat_growth_3yr else None,
+        operating_margin=float(fund.operating_margin) if fund.operating_margin else None,
         promoter_holding=float(fund.promoter_holding) if fund.promoter_holding else None,
         promoter_pledge_pct=float(fund.promoter_pledge_pct) if fund.promoter_pledge_pct else None
     )
@@ -29,6 +33,13 @@ def build_ta_from_indicators(st: Dict[str, Any], lt: Dict[str, Any]) -> Technica
     s20 = st.get("sma20")
     s50 = st.get("sma50")
     s200 = lt.get("sma200")
+    low = st.get("bb_lower")
+    high = st.get("bb_upper")
+    
+    # Calculate Bollinger Position (0 = lower, 1 = upper)
+    bb_pos = None
+    if price and low and high and (high - low) > 0:
+        bb_pos = (price - low) / (high - low)
 
     return TechnicalData(
         rsi_14=st.get("rsi"),
@@ -36,7 +47,7 @@ def build_ta_from_indicators(st: Dict[str, Any], lt: Dict[str, Any]) -> Technica
         price_vs_sma20=((price - s20) / s20 * 100) if price and s20 else None,
         price_vs_sma50=((price - s50) / s50 * 100) if price and s50 else None,
         price_vs_sma200=((price - s200) / s200 * 100) if price and s200 else None,
-        bb_position=None, # To be added in future indicator update
+        bb_position=bb_pos,
         adx=lt.get("adx"),
         avg_trades_20=st.get("avg_trades_20"),
         trades_shock=st.get("trades_shock")

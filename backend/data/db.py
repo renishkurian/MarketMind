@@ -3,7 +3,7 @@ import sys
 import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import settings
@@ -110,6 +110,8 @@ class SignalsCache(Base):
     
     # Analysis V2 Columns
     composite_score = Column(Numeric(5,2))
+    fundamental_score = Column(Numeric(5,2))
+    technical_score = Column(Numeric(5,2))
     momentum_score = Column(Numeric(5,2))
     sector_rank_score = Column(Numeric(5,2))
     sector_percentile = Column(Numeric(5,2))
@@ -119,6 +121,19 @@ class SignalsCache(Base):
     fa_breakdown = Column(JSON)
     ta_breakdown = Column(JSON)
     momentum_breakdown = Column(JSON)
+    
+    # ── Scoring engine v2.1 columns ──────────────
+    score_version = Column(String(10), nullable=True)
+    scored_at = Column(DateTime, nullable=True)
+    fa_coverage = Column(Numeric(4, 3), nullable=True)
+    ta_coverage = Column(Numeric(4, 3), nullable=True)
+    momentum_coverage = Column(Numeric(4, 3), nullable=True)
+    sector_peer_count = Column(SmallInteger, nullable=True)
+    backtest_cagr = Column(Numeric(6, 2), nullable=True)
+    backtest_win_rate = Column(Numeric(5, 2), nullable=True)
+    backtest_sharpe = Column(Numeric(5, 2), nullable=True)
+    backtest_max_drawdown = Column(Numeric(6, 2), nullable=True)
+    backtest_trades = Column(SmallInteger, nullable=True)
 
 class FundamentalsCache(Base):
     __tablename__ = "fundamentals_cache"
@@ -130,7 +145,12 @@ class FundamentalsCache(Base):
     eps = Column(Numeric(10,2))
     roe = Column(Numeric(6,2))
     debt_equity = Column(Numeric(6,2))
-    revenue_growth = Column(Numeric(6,2))
+    revenue_growth = Column(Numeric(6,2)) # Current YoY
+    revenue_growth_3yr = Column(Numeric(6,2)) # 3-year CAGR
+    pat_growth_3yr = Column(Numeric(6,2)) # 3-year CAGR
+    operating_margin = Column(Numeric(6,2))
+    pe_5yr_avg = Column(Numeric(10,2))
+    roe_3yr_avg = Column(Numeric(6,2))
     sector_pe = Column(Numeric(10,2))
     market_cap = Column(BigInteger)
     promoter_holding = Column(Numeric(6,2))
@@ -163,6 +183,16 @@ class AIInsights(Base):
     sentiment_score = Column(Numeric(4,2))
     skill_id = Column(String(50))
     verdict = Column(String(20))
+    
+    # ── v2.1 consensus fields ─────────────
+    consensus_score = Column(Numeric(4, 1), nullable=True)
+    bull_count = Column(Integer, default=0, nullable=True)
+    bear_count = Column(Integer, default=0, nullable=True)
+    neutral_count = Column(Integer, default=0, nullable=True)
+    forensic_veto = Column(Boolean, default=False, nullable=True)
+    all_verdicts = Column(JSON, nullable=True)
+    composite_score_snapshot = Column(Numeric(5, 2), nullable=True)
+    score_version_snapshot = Column(String(10), nullable=True)
 
 class AICallLog(Base):
     __tablename__ = "ai_call_logs"

@@ -107,6 +107,7 @@ def _build_messages(prompt: str) -> list:
 
 def _build_prompt(
     symbol: str,
+    company_name: str,
     trigger_reason: str,
     price_history_df: pd.DataFrame,
     signals: dict,
@@ -127,9 +128,9 @@ def _build_prompt(
     persona = skill_persona or "You are a senior financial analyst specialising in the Indian equity market."
 
     return f"""
-{persona}
+{skill_persona}
 
-Generate an analytical insight for {symbol}.
+Analyze {company_name} ({symbol}).
 
 TRIGGER: {trigger_reason}
 
@@ -205,7 +206,7 @@ async def _call_xai(messages: list, model: str, api_key: str) -> tuple[dict, int
     return parsed, resp.usage.prompt_tokens, resp.usage.completion_tokens
 
 
-async def generate_fundamentals(symbol: str) -> dict:
+async def generate_fundamentals(symbol: str, company_name: str = None) -> dict:
     """
     Specialized AI task to research and extract fundamental data for a symbol.
     Returns a dict matching FundamentalsCache columns.
@@ -234,17 +235,23 @@ async def generate_fundamentals(symbol: str) -> dict:
         "xai": ai_cfg["xai_model"],
     }.get(provider, "gpt-4o")
 
+    company_id = f"{company_name} ({symbol})" if company_name else symbol
     prompt = f"""
 You are a top-tier equity research analyst. 
-Find the MOST RECENT available fundamental data for the company with ticker: {symbol} (NSE/BSE India).
+Find the MOST RECENT available fundamental data for the company: {company_id} (NSE/BSE India).
 
 Research these specific metrics:
 1. P/E Ratio (Trailing)
 2. EPS (Trailing 12 Months)
 3. ROE (Return on Equity %)
 4. Debt to Equity Ratio
-5. Revenue Growth (YoY %)
+5. Revenue Growth (Current YoY %)
 6. Market Capitalization (in INR)
+7. 3-Year Revenue CAGR (%)
+8. 3-Year PAT (Net Profit) CAGR (%)
+9. Operating Profit Margin (%)
+10. 5-Year Average P/E Ratio
+11. 3-Year Average ROE (%)
 
 Return ONLY a valid JSON object with these keys (use null if data is absolutely unavailable):
 {{
@@ -252,8 +259,13 @@ Return ONLY a valid JSON object with these keys (use null if data is absolutely 
     "eps": float,
     "roe": float (decimal, e.g. 0.15 for 15%),
     "debt_equity": float,
-    "revenue_growth": float (decimal, e.g. 0.10 for 10%),
-    "market_cap": long
+    "revenue_growth": float (decimal),
+    "market_cap": long,
+    "revenue_growth_3yr": float (decimal, e.g. 0.12),
+    "pat_growth_3yr": float (decimal, e.g. 0.15),
+    "operating_margin": float (decimal, e.g. 0.20),
+    "pe_5yr_avg": float,
+    "roe_3yr_avg": float (decimal)
 }}
 """
     messages = _build_messages(prompt)
@@ -301,6 +313,7 @@ async def generate_insight(
     fundamentals: dict,
     trigger_reason: str,
     skill_id: Optional[str] = None,
+    company_name: Optional[str] = None,
 ) -> dict:
     """
     Generates an AI insight, logs every call to ai_call_logs, and returns
@@ -338,11 +351,20 @@ async def generate_insight(
         "xai": ai_cfg["xai_model"],
     }.get(provider, "gpt-4o")
 
-    # Load skill
-    skill_persona = _load_skill_prompt(skill_id) if skill_id else ""
+    # Load skill and substitute variables
+    context = {
+        "SYMBOL": symbol,
+        "COMPANY_NAME": company_name or symbol,
+        "SECTOR": signals.get("sector") or fundamentals.get("sector") or "N/A",
+        "EXCHANGE": signals.get("exchange", "NSE"),
+        "ISIN": signals.get("isin", "N/A"),
+        "CURRENT_PRICE": signals.get("current_price", "N/A"),
+        "MARKET_CAP": fundamentals.get("market_cap", "N/A"),
+    }
+    skill_persona = _load_skill_prompt(skill_id, context) if skill_id else ""
 
     # Build prompt
-    prompt = _build_prompt(symbol, trigger_reason, price_history_df, signals, fundamentals, skill_persona)
+    prompt = _build_prompt(symbol, company_name or symbol, trigger_reason, price_history_df, signals, fundamentals, skill_persona)
     messages = _build_messages(prompt)
 
     # Call provider
@@ -417,13 +439,21 @@ def _get_mock_insight(symbol: str, trigger_reason: str, error_msg: str = None) -
     }
 
 
-def _load_skill_prompt(skill_id: str) -> str:
+def _load_skill_prompt(skill_id: str, context: dict = None) -> str:
     try:
         base_path = os.path.dirname(os.path.abspath(__file__))
         skill_path = os.path.join(base_path, "skills", f"{skill_id}.md")
         if os.path.exists(skill_path):
             with open(skill_path, "r") as f:
-                return f.read()
+                content = f.read()
+                
+            # Basic variable substitution: {{VARIABLE}} -> context["VARIABLE"]
+            if context:
+                for key, val in context.items():
+                    placeholder = "{{" + key + "}}"
+                    content = content.replace(placeholder, str(val))
+            return content
+            
         logger.warning(f"Skill file not found: {skill_path}")
         return ""
     except Exception as e:

@@ -2,7 +2,8 @@
 **Persona**: Forensic Auditor and Short-Seller specializing in cross-border fraud and accounting irregularities.
 
 ## Instruction
-Conduct a ruthless "Red Flag" audit of a specific company to find accounting inconsistencies, governance issues, and hidden risks.
+## Instruction
+Conduct a ruthless "Red Flag" audit of {{COMPANY_NAME}} ({{SYMBOL}}) to find accounting inconsistencies, governance issues, and hidden risks.
 
 ## Required Analysis Points:
 - **Revenue Quality**: Identify any evidence of "round-tripping" revenue or aggressive revenue recognition.

@@ -415,14 +415,13 @@ class CompositeScorer:
             + om_score  * 10
         ) / 100.0
 
-        breakdown: dict = {
-            "pe_vs_5yr": round(pe_score, 1),
-            "roe_quality": round(roe_score, 1),
-            "debt_equity": round(de_score, 1),
-            "revenue_growth_3yr": round(rev_score, 1),
-            "pat_growth_3yr": round(pat_score, 1),
-            "operating_margin": round(om_score, 1)
-        }
+        breakdown: dict = {}
+        if pe_present:   breakdown["pe_vs_5yr"]          = round(pe_score, 1)
+        if roe_present:  breakdown["roe_quality"]         = round(roe_score, 1)
+        if de_present:   breakdown["debt_equity"]         = round(de_score, 1)
+        if rev_present:  breakdown["revenue_growth_3yr"]  = round(rev_score, 1)
+        if pat_present:  breakdown["pat_growth_3yr"]      = round(pat_score, 1)
+        if om_present:   breakdown["operating_margin"]    = round(om_score, 1)
         if fa.promoter_pledge_pct is not None and fa.promoter_pledge_pct > 20.0:
             penalty = min((fa.promoter_pledge_pct - 20.0) * 0.5, 20.0)
             breakdown["pledge_penalty_on_roe"] = round(-penalty, 1)
@@ -525,15 +524,14 @@ class CompositeScorer:
             + shock_score  *  5
         ) / 100.0
 
-        breakdown: dict = {
-            "rsi": round(rsi_score, 1),
-            "macd": round(macd_score, 1),
-            "price_vs_sma200": round(sma200_score, 1),
-            "price_vs_sma50": round(sma50_score, 1),
-            "adx": round(adx_score, 1),
-            "bb_position": round(bb_score, 1),
-            "trade_activity": round(shock_score, 1)
-        }
+        breakdown: dict = {}
+        if rsi_present:    breakdown["rsi"]              = round(rsi_score, 1)
+        if macd_present:   breakdown["macd"]             = round(macd_score, 1)
+        if sma200_present: breakdown["price_vs_sma200"]  = round(sma200_score, 1)
+        if sma50_present:  breakdown["price_vs_sma50"]   = round(sma50_score, 1)
+        if adx_present:    breakdown["adx"]              = round(adx_score, 1)
+        if bb_present:     breakdown["bb_position"]      = round(bb_score, 1)
+        if shock_present:  breakdown["trade_activity"]   = round(shock_score, 1)
 
         n_present = sum([rsi_present, macd_present, sma200_present, sma50_present,
                          adx_present, bb_present, shock_present])
@@ -603,14 +601,13 @@ class CompositeScorer:
             + rs_score     * 10
         ) / 100.0
 
-        breakdown: dict = {
-            "roc_1yr": round(roc252_score, 1),
-            "roc_60d": round(roc60_score, 1),
-            "roc_20d": round(roc20_score, 1),
-            "volume_trend": round(vol_score, 1),
-            "52w_rank": round(rank_score, 1),
-            "rs_vs_nifty": round(rs_score, 1)
-        }
+        breakdown: dict = {}
+        if roc252_present: breakdown["roc_1yr"]      = round(roc252_score, 1)
+        if roc60_present:  breakdown["roc_60d"]      = round(roc60_score, 1)
+        if roc20_present:  breakdown["roc_20d"]      = round(roc20_score, 1)
+        if vol_present:    breakdown["volume_trend"] = round(vol_score, 1)
+        if rank_present:   breakdown["52w_rank"]     = round(rank_score, 1)
+        if rs_present:     breakdown["rs_vs_nifty"]  = round(rs_score, 1)
 
         n_present = sum([roc252_present, roc60_present, roc20_present,
                          vol_present, rank_present, rs_present])

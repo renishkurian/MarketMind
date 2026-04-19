@@ -831,14 +831,42 @@ async def sync_fundamental_data(
     return {"message": f"Fundamentals synced from Yahoo Finance for {symbol}.", "status": data.get("data_quality")}
 
 
+@app.post("/api/stock/{symbol}/signals/recompute")
+async def recompute_stock_signals(
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """Manually trigger a re-computation of all signals for a symbol."""
+    from backend.scheduler import recompute_signals_for, _fetch_all_sector_data
+    symbol = symbol.upper()
+    
+    try:
+        # Fetch sector peers for accurate V2 ranking
+        vault = await _fetch_all_sector_data()
+        await recompute_signals_for(symbol, sector_vault=vault)
+        return {"message": f"Signals recomputed for {symbol}."}
+    except Exception as e:
+        logger.error(f"Manual recompute failed for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 async def _research_and_save_fundamentals(symbol: str):
     """Background task to research fundamentals via AI and recompute signals."""
     try:
         from backend.engine.ai_engine import generate_fundamentals
         from backend.scheduler import recompute_signals_for
         
+        # 0. Fetch company name
+        company_name = symbol
+        async with SessionLocal() as session:
+            stock_res = await session.execute(select(StockMaster).where(StockMaster.symbol == symbol))
+            stock = stock_res.scalars().first()
+            if stock:
+                company_name = stock.company_name
+
         # 1. Generate via AI
-        ai_data = await generate_fundamentals(symbol)
+        ai_data = await generate_fundamentals(symbol, company_name)
         
         # 2. Persist to DB
         async with SessionLocal() as session:
@@ -877,6 +905,11 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
         from backend.data.db import AIInsights
 
         async with SessionLocal() as db:
+            # Fetch company details
+            stock_result = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol))
+            stock = stock_result.scalars().first()
+            company_name = stock.company_name if stock else symbol
+
             # Fetch price history
             ph_result = await db.execute(
                 select(PriceHistory)
@@ -906,7 +939,7 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
                 "revenue_growth": float(fund.revenue_growth) if fund and fund.revenue_growth else None,
             } if fund else {}
 
-        insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger, skill_id)
+        insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger, skill_id, company_name=company_name)
 
         async with SessionLocal() as db:
             new_insight = AIInsights(
@@ -1015,14 +1048,43 @@ def _serialize_signal(signal) -> dict:
     if not signal:
         return None
     return {
-        "current_price": float(signal.current_price) if signal.current_price else None,
-        "change_pct": float(signal.change_pct) if signal.change_pct else None,
+        "current_price": float(signal.current_price) if signal.current_price is not None else None,
+        "change_pct": float(signal.change_pct) if signal.change_pct is not None else None,
         "st_signal": signal.st_signal,
         "lt_signal": signal.lt_signal,
-        "st_score": float(signal.st_score) if signal.st_score else None,
-        "lt_score": float(signal.lt_score) if signal.lt_score else None,
-        "confidence_pct": float(signal.confidence_pct) if signal.confidence_pct else None,
+        "st_score": float(signal.st_score) if signal.st_score is not None else None,
+        "lt_score": float(signal.lt_score) if signal.lt_score is not None else None,
+        "confidence_pct": float(signal.confidence_pct) if signal.confidence_pct is not None else None,
         "data_quality": signal.data_quality,
+        "indicator_breakdown": signal.indicator_breakdown or {},
+        
+        # V2 Pillar Scores
+        "composite_score": float(signal.composite_score) if signal.composite_score is not None else None,
+        "fundamental_score": float(signal.fundamental_score) if signal.fundamental_score is not None else None,
+        "technical_score": float(signal.technical_score) if signal.technical_score is not None else None,
+        "momentum_score": float(signal.momentum_score) if signal.momentum_score is not None else None,
+        "sector_rank_score": float(signal.sector_rank_score) if signal.sector_rank_score is not None else None,
+        
+        # Metadata & Percentiles
+        "sector_percentile": float(signal.sector_percentile) if signal.sector_percentile is not None else None,
+        "data_confidence": float(signal.data_confidence) if signal.data_confidence is not None else None,
+        "score_profile": signal.score_profile,
+        "promoter_pledge_warning": bool(signal.promoter_pledge_warning) if signal.promoter_pledge_warning is not None else False,
+        
+        # JSON Detailed Breakdowns
+        "fa_breakdown": signal.fa_breakdown or {},
+        "ta_breakdown": signal.ta_breakdown or {},
+        "momentum_breakdown": signal.momentum_breakdown or {},
+
+        # V2.1 Institutional & Audit Data
+        "score_version": signal.score_version,
+        "scored_at": signal.scored_at.isoformat() if signal.scored_at else None,
+        "fa_coverage": float(signal.fa_coverage) if signal.fa_coverage is not None else 0,
+        "ta_coverage": float(signal.ta_coverage) if signal.ta_coverage is not None else 0,
+        "momentum_coverage": float(signal.momentum_coverage) if signal.momentum_coverage is not None else 0,
+        "sector_peer_count": int(signal.sector_peer_count) if signal.sector_peer_count is not None else 0,
+        "backtest_cagr": float(signal.backtest_cagr) if signal.backtest_cagr is not None else None,
+        "backtest_win_rate": float(signal.backtest_win_rate) if signal.backtest_win_rate is not None else None,
     }
 
 if __name__ == "__main__":

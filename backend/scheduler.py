@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, date, timedelta
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, and_
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from typing import Callable, Awaitable, Dict, List
 
@@ -15,14 +15,10 @@ from backend.utils.market_hours import is_market_open, get_current_ist_time
 from backend.data.fetcher import fetch_live_prices, fetch_fundamentals
 from backend.data.bhavcopy import load_bhavcopy_to_db
 from backend.engine.ai_engine import generate_insight
-from backend.engine.indicators import compute_short_term_indicators, compute_long_term_indicators
-from backend.engine.scorer import score_short_term, score_long_term, calculate_confidence
 from backend.engine.scoring.composite_score import (
     CompositeScorer, ScoreConfig, SectorData, result_to_cache_dict
 )
-from backend.engine.scoring.mapper import (
-    build_fa_from_db, build_ta_from_indicators, build_momentum_from_df
-)
+from backend.services.scoring_service import ScoringService
 
 logger = logging.getLogger(__name__)
 
@@ -159,123 +155,68 @@ async def eod_consolidation():
 async def recompute_signals_for(symbol: str, sector_vault: Dict[str, SectorData] = None):
     """Fetch price history from DB, recompute all indicators, update SignalsCache using V2 Engine."""
     async with SessionLocal() as session:
-        # Fetch full price history
-        ph_res = await session.execute(
-            select(PriceHistory)
-            .where(PriceHistory.symbol == symbol)
-            .order_by(PriceHistory.date.asc())
-        )
-        history = ph_res.scalars().all()
+        try:
+            # ── V2.1 SCORING SERVICE INTEGRATION ────────────────────────────────────
+            from backend.services.scoring_service import ScoringService
+            
+            service = ScoringService(session, profile="long_term_compounding")
+            res = await service.score_symbol(symbol, exchange="NSE")
+            
+            # Legacy fields for backward compatibility with existing UI components
+            st_signal = "BUY" if res.technical_score > 60 else "SELL" if res.technical_score < 40 else "HOLD"
+            lt_signal = "BUY" if res.composite_score > 65 else "SELL" if res.composite_score < 45 else "HOLD"
+            confidence = res.data_confidence * 100
+            
+            # The service already persisted the core v2.1 columns. 
+            # We just need to update legacy UI fields: signals, st/lt_score, and indicators.
+            stmt = select(SignalsCache).where(
+                and_(SignalsCache.symbol == symbol, SignalsCache.exchange == "NSE")
+            ).order_by(SignalsCache.computed_at.desc()).limit(1)
+            
+            sig_res = await session.execute(stmt)
+            signal_row = sig_res.scalar_one_or_none()
+            
+            if signal_row:
+                signal_row.st_signal = st_signal
+                signal_row.lt_signal = lt_signal
+                signal_row.st_score = res.technical_score
+                signal_row.lt_score = res.composite_score
+                signal_row.confidence_pct = confidence
+                signal_row.data_quality = "FULL" if res.fa_coverage > 0.5 else "TECHNICALS_ONLY"
+                
+                # Group V2.1 metrics into timeframe-based UI buckets
+                short_term = {}
+                long_term = {}
+                
+                # Map Technical Setup -> Short Term
+                short_term.update({k: {"score": v, "max": 100} for k, v in res.ta_breakdown.items()})
+                
+                # Map Momentum -> Split by Timeframe
+                for k, v in res.momentum_breakdown.items():
+                    if k in ["roc_20d", "roc_60d", "volume_trend", "trade_activity"]:
+                        short_term[k] = {"score": v, "max": 100}
+                    else:
+                        long_term[k] = {"score": v, "max": 100}
 
-        if len(history) < 2:
-            logger.warning(f"{symbol}: insufficient history ({len(history)} bars) — skipping.")
-            return
+                # Map Fundamentals -> Long Term
+                long_term.update({k: {"score": v, "max": 100} for k, v in res.fa_breakdown.items() if k != "pledge_penalty_on_roe"})
 
-        df = pd.DataFrame([
-            {
-                "date": h.date,
-                "open": float(h.open or 0),
-                "high": float(h.high or 0),
-                "low": float(h.low or 0),
-                "close": float(h.close),
-                "volume": int(h.volume or 0),
-                "no_of_trades": int(h.no_of_trades or 0),
-            }
-            for h in history
-        ])
-
-        # Fetch fundamentals
-        fund_res = await session.execute(
-            select(FundamentalsCache).where(FundamentalsCache.symbol == symbol)
-        )
-        fund_obj = fund_res.scalars().first()
-
-        # Compute raw indicators
-        st_indicators = compute_short_term_indicators(df) if len(df) >= 50 else {}
-        lt_indicators = compute_long_term_indicators(df) if len(df) >= 200 else {}
-
-        if not st_indicators:
-            logger.warning(f"{symbol}: short-term indicators empty — skipping.")
-            return
-
-        # ── V2 SCORING ENGINE INTEGRATION ──────────────────────────────────────
-        
-        # 1. Map Data
-        fa_data = build_fa_from_db(fund_obj)
-        ta_data = build_ta_from_indicators(st_indicators, lt_indicators)
-        mom_data = build_momentum_from_df(df)
-        
-        # 2. Add Sector Data from vault
-        stock_sector = None
-        if fund_obj: # Try fundamentals cache first
-            # We need to know the sector to pull from vault. 
-            # If not in fund_obj, we might need to check stock_master.
-             pass
-        
-        # Fallback to stock master for sector
-        m_res = await session.execute(select(StockMaster.sector).where(StockMaster.symbol == symbol))
-        stock_sector = m_res.scalar()
-        
-        sec_data = sector_vault.get(stock_sector, SectorData(sector=stock_sector or "")) if sector_vault else SectorData()
-        
-        # 3. Run V2 Scorer
-        scorer = CompositeScorer(ScoreConfig(profile="long_term_compounding"))
-        res = scorer.score(symbol, "", fa_data, ta_data, mom_data, sec_data)
-        
-        # Legacy V1 fields for backward compatibility with existing components
-        confidence = res.data_confidence * 100
-        st_signal = "BUY" if res.technical_score > 60 else "SELL" if res.technical_score < 40 else "HOLD"
-        lt_signal = "BUY" if res.composite_score > 65 else "SELL" if res.composite_score < 45 else "HOLD"
-
-        # Previous close for change_pct
-        prev_close = float(df.iloc[-2]["close"]) if len(df) >= 2 else None
-        current_close = float(df.iloc[-1]["close"])
-        change_pct = ((current_close - prev_close) / prev_close) * 100 if prev_close else None
-
-        data_quality = "FULL" if lt_indicators else "TECHNICALS_ONLY"
-
-        # 4. Update Database
-        v2_fields = result_to_cache_dict(res)
-        
-        stmt = mysql_insert(SignalsCache).values(
-            symbol=symbol,
-            computed_at=datetime.now(),
-            market_session="EOD",
-            current_price=current_close,
-            prev_close=prev_close,
-            change_pct=change_pct,
-            st_signal=st_signal,
-            st_score=res.technical_score,
-            lt_signal=lt_signal,
-            lt_score=res.composite_score,
-            confidence_pct=confidence,
-            data_quality=data_quality,
-            indicator_breakdown={
-                "short_term": st_indicators,
-                "long_term": lt_indicators,
-            },
-            **v2_fields
-        )
-        
-        # Update everything on duplicate
-        update_cols = [
-            "computed_at", "market_session", "current_price", "prev_close", 
-            "change_pct", "st_signal", "st_score", "lt_signal", "lt_score",
-            "confidence_pct", "data_quality", "indicator_breakdown"
-        ] + list(v2_fields.keys())
-        
-        stmt = stmt.on_duplicate_key_update(
-            **{c: getattr(stmt.inserted, c) for c in update_cols}
-        )
-        
-        await session.execute(stmt)
-        await session.commit()
-
-        logger.info(
-            f"{symbol}: [V2 institutional] Score={res.composite_score:.1f} "
-            f"FA={res.fundamental_score:.1f} TA={res.technical_score:.1f} "
-            f"SectorPct={res.sector_percentile:.1f}%"
-        )
+                signal_row.indicator_breakdown = {
+                    "SHORT_TERM": short_term,
+                    "LONG_TERM": long_term
+                }
+                await session.commit()
+                
+                # Broadcast update if price metadata is available
+                if signal_row.current_price and signal_row.change_pct:
+                    await _safe_broadcast_price(symbol, float(signal_row.current_price), float(signal_row.change_pct))
+            
+            logger.info(f"{symbol}: [V2.1 Institutional] Score={res.composite_score:.1f} Signals={lt_signal}")
+            
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"{symbol}: Failed to recompute signals via service: {e}", exc_info=True)
+            raise e
 
 
 async def _check_price_spikes_and_notify():
