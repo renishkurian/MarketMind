@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Activity, BarChart2, Eye, Zap, Brain,
+  Activity, BarChart2, Eye, Zap, Brain, Info,
   Sun, Moon, Wifi, WifiOff, Settings, LogOut,
   Menu, X, ChevronLeft
 } from 'lucide-react';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { path: '/watchlist',     label: 'Watchlist',     Icon: Eye        },
   { path: '/opportunities', label: 'Opportunities', Icon: Zap        },
   { path: '/ai-logs',       label: 'AI Logs',       Icon: Brain      },
+  { path: '/methodology',   label: 'Methodology',   Icon: Info       },
   { path: '/settings',      label: 'Settings',      Icon: Settings   },
 ];
 

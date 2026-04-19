@@ -173,6 +173,10 @@ class TechnicalData:
     adx: Optional[float] = None
     avg_trades_20: Optional[float] = None
     trades_shock: Optional[float] = None   # current trades / avg_trades_20
+    ema_crossover: Optional[int] = None   # +1, -1, 0
+    macd_crossover: Optional[int] = None  # +1, -1, 0
+    overall_trend: Optional[str] = None   # 'Buy Signal', 'Sell Signal', 'Hold'
+    lt_recommendation: Optional[str] = None # 'Buy', 'Sell', 'Hold'
 
 
 @dataclass
@@ -187,7 +191,7 @@ class MomentumData:
     roc_60: Optional[float] = None
     roc_252: Optional[float] = None
     volume_ratio_20_90: Optional[float] = None
-    price_52w_rank: Optional[float] = None
+    price_52w_rank: Optional[float] = None # 0 to 1
     relative_strength_nifty: Optional[float] = None
 
 
@@ -533,6 +537,10 @@ class CompositeScorer:
             "adx":              round(adx_score, 1)    if adx_present    else None,
             "bb_position":      round(bb_score, 1)     if bb_present     else None,
             "trade_activity":   round(shock_score, 1)  if shock_present  else None,
+            "ema_cross":        ta.ema_crossover,
+            "macd_cross":       ta.macd_crossover,
+            "overall_trend":    ta.overall_trend,
+            "lt_recommendation": ta.lt_recommendation,
         }
 
         n_present = sum([rsi_present, macd_present, sma200_present, sma50_present,
@@ -733,4 +741,37 @@ def result_to_cache_dict(r: CompositeScoreResult) -> dict:
         "fa_breakdown":            r.fa_breakdown,
         "ta_breakdown":            r.ta_breakdown,
         "momentum_breakdown":      r.momentum_breakdown,
+        "indicator_breakdown":     _build_ui_breakdown(r)
     }
+
+def _build_ui_breakdown(r: CompositeScoreResult) -> dict:
+    """Legacy UI expects SHORT_TERM/LONG_TERM buckets with {score, max} or {label}."""
+    def wrap(items):
+        wrapped = {}
+        for k, v in items.items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                if k.endswith('_cross') or k.endswith('_crossover'):
+                    wrapped[k] = {"label": v}
+                else:
+                    wrapped[k] = {"score": v, "max": 100}
+            else:
+                wrapped[k] = {"label": v}
+        return wrapped
+
+    st = wrap(r.ta_breakdown)
+    lt = wrap({k: v for k, v in r.fa_breakdown.items() if k != "pledge_penalty_on_roe"})
+    
+    # Mix momentum
+    for k, v in r.momentum_breakdown.items():
+        if k in ["roc_20d", "roc_60d", "volume_trend", "trade_activity"]:
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                st[k] = {"score": v, "max": 100}
+            else:
+                st[k] = {"label": v}
+        else:
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                lt[k] = {"score": v, "max": 100}
+            else:
+                lt[k] = {"label": v}
+
+    return {"SHORT_TERM": st, "LONG_TERM": lt}

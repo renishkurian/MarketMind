@@ -34,6 +34,8 @@ from backend.data.db import PriceHistory, FundamentalsCache, StockMaster, Signal
 from backend.engine.scoring.composite_score import (
     FundamentalData, TechnicalData, MomentumData
 )
+from backend.engine.indicators import compute_short_term_indicators, compute_long_term_indicators
+import pandas as pd
 
 
 # ---------------------------------------------------------------------------
@@ -124,48 +126,40 @@ class SignalBuilder:
 
         ta = TechnicalData()
 
-        # --- RSI 14 ---
-        if len(closes) >= 15:
-            ta.rsi_14 = _rsi(closes, period=14)
+        # --- Core Expert Indicators ---
+        df = pd.DataFrame({
+            "date": [b.date for b in bars],
+            "close": closes,
+            "open": [float(b.open or 0) for b in bars],
+            "high": highs,
+            "low": lows,
+            "volume": volumes,
+            "no_of_trades": trades
+        })
+        
+        st_inds = compute_short_term_indicators(df)
+        lt_inds = compute_long_term_indicators(df)
+        
+        ta.rsi_14 = st_inds.get("rsi")
+        ta.macd_signal = st_inds.get("macd_signal")
+        ta.adx = lt_inds.get("adx")
+        ta.ema_crossover = st_inds.get("ema_crossover")
+        ta.macd_crossover = st_inds.get("macd_crossover")
+        ta.overall_trend = st_inds.get("overall_trend")
+        ta.lt_recommendation = lt_inds.get("lt_recommendation")
+        ta.avg_trades_20 = st_inds.get("avg_trades_20")
+        ta.trades_shock = st_inds.get("trades_shock")
+        
+        # SMAs from indicators (if available) or manual for distances
+        ta.price_vs_sma20 = ((current - st_inds.get("sma20", 0)) / st_inds.get("sma20", 1) * 100) if st_inds.get("sma20") else None
+        ta.price_vs_sma50 = ((current - st_inds.get("sma50", 0)) / st_inds.get("sma50", 1) * 100) if st_inds.get("sma50") else None
+        ta.price_vs_sma200 = ((current - lt_inds.get("sma200", 0)) / lt_inds.get("sma200", 1) * 100) if lt_inds.get("sma200") else None
 
-        # --- MACD (12, 26, 9) ---
-        if len(closes) >= 35:
-            macd_line, signal_line = _macd(closes)
-            ta.macd_signal = macd_line - signal_line  # positive = bullish crossover
-
-        # --- Price vs SMAs ---
-        if len(closes) >= 20:
-            sma20 = _sma(closes, 20)
-            ta.price_vs_sma20 = ((current - sma20) / sma20) * 100
-
-        if len(closes) >= 50:
-            sma50 = _sma(closes, 50)
-            ta.price_vs_sma50 = ((current - sma50) / sma50) * 100
-
-        if len(closes) >= 200:
-            sma200 = _sma(closes, 200)
-            ta.price_vs_sma200 = ((current - sma200) / sma200) * 100
-
-        # --- Bollinger Bands (20, 2σ) ---
-        if len(closes) >= 20:
-            sma20 = _sma(closes, 20)
-            std20 = _std(closes[-20:])
-            upper = sma20 + 2 * std20
-            lower = sma20 - 2 * std20
-            band_range = upper - lower
-            if band_range > 0:
-                ta.bb_position = (current - lower) / band_range  # 0=lower, 1=upper
-
-        # --- ADX (14) ---
-        if len(closes) >= 28 and len(highs) >= 28:
-            ta.adx = _adx(highs, lows, closes, period=14)
-
-        # --- Trades shock (bonus signal — uses no_of_trades from PriceHistory) ---
-        if len(trades) >= 20 and trades[-1] > 0:
-            avg_trades_20 = sum(trades[-20:]) / 20
-            ta.avg_trades_20 = avg_trades_20
-            if avg_trades_20 > 0:
-                ta.trades_shock = trades[-1] / avg_trades_20
+        # Bollinger BB Pos
+        low = st_inds.get("bb_lower")
+        high = st_inds.get("bb_upper")
+        if low is not None and high is not None and (high - low) > 0:
+            ta.bb_position = (current - low) / (high - low)
 
         return ta
 

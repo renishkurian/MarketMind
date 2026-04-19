@@ -197,27 +197,25 @@ class ScoringService:
         """
         now = datetime.now(timezone.utc)
 
-        # Build the score column dict
-        score_cols = {
-            "composite_score":      result.composite_score,
-            "fundamental_score":    result.fundamental_score,
-            "technical_score":      result.technical_score,
-            "momentum_score":       result.momentum_score,
-            "sector_rank_score":    result.sector_rank_score,
-            "sector_percentile":    result.sector_percentile,
-            "sector_peer_count":    result.sector_peer_count,
-            "data_confidence":      result.data_confidence,
-            "fa_coverage":          result.fa_coverage,
-            "ta_coverage":          result.ta_coverage,
-            "momentum_coverage":    result.momentum_coverage,
-            "promoter_pledge_warning": result.promoter_pledge_warning,
-            "score_version":        result.score_version,
-            "scored_at":            now,
-            "score_profile":        result.profile,
-            "fa_breakdown":         result.fa_breakdown,
-            "ta_breakdown":         result.ta_breakdown,
-            "momentum_breakdown":   result.momentum_breakdown,
-        }
+        from backend.engine.scoring.composite_score import result_to_cache_dict
+        from backend.engine.scoring.mapper import build_signals_from_indicators
+        
+        # Build the score column dict using the unified helper
+        score_cols = result_to_cache_dict(result)
+        
+        # Update/Add dynamic fields that depend on specific context
+        score_cols["scored_at"] = now
+        score_cols["current_price"] = current_price
+        
+        # Derive expert signals (BUY/SELL) from indicator labels
+        signal_fields = build_signals_from_indicators(result.ta, result.ta)
+        score_cols.update(signal_fields)
+        
+        # Legacy fields for backward compatibility
+        score_cols["st_score"] = result.technical_score
+        score_cols["lt_score"] = result.composite_score
+        score_cols["confidence_pct"] = result.data_confidence * 100
+        score_cols["data_quality"] = "FULL" if result.fa_coverage >= 0.5 else "TECHNICALS_ONLY"
 
         # Check if a row already exists for this symbol+exchange
         existing = await self.db.execute(

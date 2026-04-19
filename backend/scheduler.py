@@ -15,9 +15,7 @@ from backend.utils.market_hours import is_market_open, get_current_ist_time
 from backend.data.fetcher import fetch_live_prices, fetch_fundamentals
 from backend.data.bhavcopy import load_bhavcopy_to_db
 from backend.engine.ai_engine import generate_insight
-from backend.engine.scoring.composite_score import (
-    CompositeScorer, ScoreConfig, SectorData, result_to_cache_dict
-)
+from backend.engine.scoring.composite_score import SectorData
 from backend.services.scoring_service import ScoringService
 
 logger = logging.getLogger(__name__)
@@ -157,18 +155,15 @@ async def recompute_signals_for(symbol: str, sector_vault: Dict[str, SectorData]
     async with SessionLocal() as session:
         try:
             # ── V2.1 SCORING SERVICE INTEGRATION ────────────────────────────────────
-            from backend.services.scoring_service import ScoringService
-            
+            # The service already handles:
+            # 1. Expert indicator compute (Overall_Trend, LT EMA rec logic)
+            # 2. Expert signal mapping (BUY/SELL/HOLD from trends)
+            # 3. Persistence of both V2.1 and Legacy columns (indicator_breakdown)
             service = ScoringService(session, profile="long_term_compounding")
             res = await service.score_symbol(symbol, exchange="NSE")
             
-            # Legacy fields for backward compatibility with existing UI components
-            st_signal = "BUY" if res.technical_score > 60 else "SELL" if res.technical_score < 40 else "HOLD"
-            lt_signal = "BUY" if res.composite_score > 65 else "SELL" if res.composite_score < 45 else "HOLD"
-            confidence = res.data_confidence * 100
-            
-            # The service already persisted the core v2.1 columns. 
-            # We just need to update legacy UI fields: signals, st/lt_score, and indicators.
+            # Broadcast update if results are successfully persisted
+            # We re-fetch to get the final computed columns (like change_pct)
             stmt = select(SignalsCache).where(
                 and_(SignalsCache.symbol == symbol, SignalsCache.exchange == "NSE")
             ).order_by(SignalsCache.computed_at.desc()).limit(1)
@@ -176,45 +171,12 @@ async def recompute_signals_for(symbol: str, sector_vault: Dict[str, SectorData]
             sig_res = await session.execute(stmt)
             signal_row = sig_res.scalar_one_or_none()
             
-            if signal_row:
-                signal_row.st_signal = st_signal
-                signal_row.lt_signal = lt_signal
-                signal_row.st_score = res.technical_score
-                signal_row.lt_score = res.composite_score
-                signal_row.confidence_pct = confidence
-                signal_row.data_quality = "FULL" if res.fa_coverage >= 0.5 else "TECHNICALS_ONLY"
-                
-                # Group V2.1 metrics into timeframe-based UI buckets
-                short_term = {}
-                long_term = {}
-                
-                # Map Technical Setup -> Short Term
-                short_term.update({k: {"score": v, "max": 100} for k, v in res.ta_breakdown.items()})
-                
-                # Map Momentum -> Split by Timeframe
-                for k, v in res.momentum_breakdown.items():
-                    if k in ["roc_20d", "roc_60d", "volume_trend", "trade_activity"]:
-                        short_term[k] = {"score": v, "max": 100}
-                    else:
-                        long_term[k] = {"score": v, "max": 100}
-
-                # Map Fundamentals -> Long Term
-                long_term.update({k: {"score": v, "max": 100} for k, v in res.fa_breakdown.items() if k != "pledge_penalty_on_roe"})
-
-                signal_row.indicator_breakdown = {
-                    "SHORT_TERM": short_term,
-                    "LONG_TERM": long_term
-                }
-                await session.commit()
-                
-                # Broadcast update if price metadata is available
-                if signal_row.current_price and signal_row.change_pct:
-                    await _safe_broadcast_price(symbol, float(signal_row.current_price), float(signal_row.change_pct))
+            if signal_row and signal_row.current_price and signal_row.change_pct:
+                await _safe_broadcast_price(symbol, float(signal_row.current_price), float(signal_row.change_pct))
             
-            logger.info(f"{symbol}: [V2.1 Institutional] Score={res.composite_score:.1f} Signals={lt_signal}")
+            logger.info(f"{symbol}: [V2.1 Institutional] Score={res.composite_score:.1f} Signal={signal_row.lt_signal if signal_row else 'N/A'}")
             
         except Exception as e:
-            await session.rollback()
             logger.error(f"{symbol}: Failed to recompute signals via service: {e}", exc_info=True)
             raise e
 
@@ -254,6 +216,7 @@ async def weekly_refresh():
             fund_data = await fetch_fundamentals(sym)
 
             async with SessionLocal() as session:
+                # Map to current DB columns (note: handles the new CAGR fields if fetcher returns them)
                 stmt = mysql_insert(FundamentalsCache).values(
                     symbol=sym,
                     fetched_at=datetime.now(),
@@ -261,12 +224,15 @@ async def weekly_refresh():
                     eps=fund_data.get("eps"),
                     roe=fund_data.get("roe"),
                     debt_equity=fund_data.get("debt_equity"),
-                    revenue_growth=fund_data.get("revenue_growth"),
+                    revenue_growth=fund_data.get("revenue_growth"), # YoY
+                    revenue_growth_3yr=fund_data.get("revenue_growth_3yr"), # CAGR
+                    pat_growth_3yr=fund_data.get("pat_growth_3yr"),
                     market_cap=fund_data.get("market_cap"),
                     data_quality=fund_data.get("data_quality", "MISSING"),
                 )
                 FUND_COLS = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
-                             "revenue_growth", "market_cap", "data_quality"]
+                             "revenue_growth", "revenue_growth_3yr", "pat_growth_3yr", 
+                             "market_cap", "data_quality"]
                 stmt = stmt.on_duplicate_key_update(
                     **{c: stmt.inserted[c] for c in FUND_COLS}
                 )
@@ -304,6 +270,7 @@ async def _generate_and_store_insight(symbol: str, trigger: str):
 
             sig_res = await session.execute(
                 select(SignalsCache).where(SignalsCache.symbol == symbol)
+                .order_by(SignalsCache.computed_at.desc()).limit(1)
             )
             sig = sig_res.scalars().first()
             signals = {
@@ -322,7 +289,7 @@ async def _generate_and_store_insight(symbol: str, trigger: str):
             fund = fund_res.scalars().first()
             fundamentals = {
                 k: (float(getattr(fund, k)) if getattr(fund, k) else None)
-                for k in ["pe_ratio", "eps", "roe", "debt_equity", "revenue_growth"]
+                for k in ["pe_ratio", "eps", "roe", "debt_equity", "revenue_growth", "revenue_growth_3yr"]
             } if fund else {}
 
         insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger)
@@ -332,7 +299,7 @@ async def _generate_and_store_insight(symbol: str, trigger: str):
                 symbol=symbol,
                 generated_at=datetime.now(),
                 trigger_reason=trigger,
-                skill_id=None, # Default for background triggers unless specified
+                skill_id=None,
                 verdict=insight_data.get("verdict"),
                 short_summary=insight_data.get("short_summary"),
                 long_summary=insight_data.get("long_summary"),
@@ -352,13 +319,12 @@ async def _fetch_all_sector_data() -> Dict[str, SectorData]:
     logger.info("Batch fetching sector data for institutional ranking...")
     vault = {}
     async with SessionLocal() as session:
-        # Fetch all fundamentals and recent signals
         res = await session.execute(
             select(
                 StockMaster.sector, 
                 FundamentalsCache.pe_ratio, 
                 FundamentalsCache.roe, 
-                FundamentalsCache.revenue_growth,
+                FundamentalsCache.revenue_growth_3yr,
                 SignalsCache.change_pct
             )
             .join(FundamentalsCache, StockMaster.symbol == FundamentalsCache.symbol)
@@ -367,7 +333,6 @@ async def _fetch_all_sector_data() -> Dict[str, SectorData]:
         )
         rows = res.all()
         
-        # Group by sector
         grouped: Dict[str, Dict[str, List[float]]] = {}
         for sector, pe, roe, rev, mom in rows:
             if not sector: continue

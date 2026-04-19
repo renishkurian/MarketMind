@@ -30,13 +30,13 @@ def build_ta_from_indicators(st: Dict[str, Any], lt: Dict[str, Any]) -> Technica
         return TechnicalData()
     
     price = st.get("close")
-    s20 = st.get("sma20")
-    s50 = st.get("sma50")
-    s200 = lt.get("sma200")
-    low = st.get("bb_lower")
-    high = st.get("bb_upper")
+    s20   = st.get("sma20")
+    s50   = st.get("sma50")
+    s200  = lt.get("sma200")
+    low   = st.get("bb_lower")
+    high  = st.get("bb_upper")
     
-    # Calculate Bollinger Position (0 = lower, 1 = upper)
+    # Bollinger Position (0 = lower band, 1 = upper band)
     bb_pos = None
     if price and low and high and (high - low) > 0:
         bb_pos = (price - low) / (high - low)
@@ -50,8 +50,41 @@ def build_ta_from_indicators(st: Dict[str, Any], lt: Dict[str, Any]) -> Technica
         bb_position=bb_pos,
         adx=lt.get("adx"),
         avg_trades_20=st.get("avg_trades_20"),
-        trades_shock=st.get("trades_shock")
+        trades_shock=st.get("trades_shock"),
+        ema_crossover=st.get("ema_crossover"),
+        macd_crossover=st.get("macd_crossover"),
+        overall_trend=st.get("overall_trend"),
+        lt_recommendation=lt.get("lt_recommendation")
     )
+
+def build_signals_from_indicators(st: Any, lt: Any) -> Dict[str, Any]:
+    """
+    Returns the composite signal fields that populate SignalsCache.st_signal / lt_signal.
+    Replaces the hardcoded threshold logic.
+    
+    Accepts either raw dicts (from indicators.py) or TechnicalData objects.
+    """
+    def get_val(obj, key):
+        if isinstance(obj, dict): return obj.get(key)
+        return getattr(obj, key, None)
+
+    overall = get_val(st, "overall_trend") or "Hold"
+    lt_rec   = get_val(lt, "lt_recommendation") or "Hold"
+
+    # Map to SignalsCache Enum values
+    def to_enum(s: str) -> str:
+        mapping = {
+            "Buy Signal": "BUY",
+            "Sell Signal": "SELL",
+            "Buy": "BUY",
+            "Sell": "SELL",
+        }
+        return mapping.get(s, "HOLD")
+
+    return {
+        "st_signal": to_enum(overall),
+        "lt_signal": to_enum(lt_rec),
+    }
 
 def build_ta_from_cache(sig: Optional[SignalsCache]) -> TechnicalData:
     """Legacy/Fallback: Parse the formatted strings in indicator_breakdown back into values."""
@@ -74,37 +107,46 @@ def build_ta_from_cache(sig: Optional[SignalsCache]) -> TechnicalData:
     return TechnicalData(
         rsi_14=parse_value(st.get("RSI"), "value"),
         macd_signal=parse_value(st.get("MACD"), "value"),
-        # SMA parsing still needs regex if stored as string "P:100 S20:90"
-        # but in scheduler we should use raw values. 
-        # For analysis.py fallback, we use regex.
     )
 
-def build_momentum_from_df(df: pd.DataFrame) -> MomentumData:
-    """Compute V2 Momentum metrics from price history DataFrame."""
+def build_momentum_from_df(df: pd.DataFrame, nifty_df: pd.DataFrame | None = None) -> MomentumData:
+    """
+    Compute V2 Momentum metrics from price history DataFrame.
+    Pass nifty_df (same date range) to enable relative_strength_nifty.
+    """
     if df.empty or len(df) < 20: 
         return MomentumData()
     
     close = df["close"]
-    # ROC (Rate of Change)
-    roc_20 = ((close.iloc[-1] - close.iloc[-20]) / close.iloc[-20] * 100) if len(df) >= 20 else None
-    roc_60 = ((close.iloc[-1] - close.iloc[-60]) / close.iloc[-60] * 100) if len(df) >= 60 else None
+    roc_20  = ((close.iloc[-1] - close.iloc[-20])  / close.iloc[-20]  * 100) if len(df) >= 20  else None
+    roc_60  = ((close.iloc[-1] - close.iloc[-60])  / close.iloc[-60]  * 100) if len(df) >= 60  else None
     roc_252 = ((close.iloc[-1] - close.iloc[-252]) / close.iloc[-252] * 100) if len(df) >= 252 else None
     
     # 52-week range rank
     high_52w = close.tail(252).max()
-    low_52w = close.tail(252).min()
+    low_52w  = close.tail(252).min()
     rank = (close.iloc[-1] - low_52w) / (high_52w - low_52w) if high_52w > low_52w else 0.5
     
     # Volume Trend
-    vol = df["volume"]
-    v20 = vol.tail(20).mean()
-    v90 = vol.tail(90).mean()
+    vol    = df["volume"]
+    v20    = vol.tail(20).mean()
+    v90    = vol.tail(90).mean() if len(df) >= 90 else v20
     vol_ratio = (v20 / v90) if v90 and v90 > 0 else 1.0
+
+    # Relative strength vs Nifty (6m / 126 bars)
+    rs_nifty = None
+    if nifty_df is not None and len(nifty_df) >= 127 and len(df) >= 127:
+        nifty_close = nifty_df["close"]
+        stock_ret  = close.iloc[-1]  / close.iloc[-127]
+        nifty_ret  = nifty_close.iloc[-1] / nifty_close.iloc[-127]
+        if nifty_ret > 0:
+            rs_nifty = stock_ret / nifty_ret
 
     return MomentumData(
         roc_20=roc_20,
         roc_60=roc_60,
         roc_252=roc_252,
         price_52w_rank=rank,
-        volume_ratio_20_90=vol_ratio
+        volume_ratio_20_90=vol_ratio,
+        relative_strength_nifty=rs_nifty,
     )

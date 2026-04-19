@@ -1106,21 +1106,35 @@ export default function DeepDive() {
                                 roc_1yr: "1Y ROC", roc_60d: "60d ROC", roc_20d: "20d ROC", volume_trend: "Vol Trend", "52w_rank": "52W Rank", rs_vs_nifty: "RS vs Nifty",
                                 pe_vs_5yr: "PE vs 5Y", roe_quality: "ROE", debt_equity: "D/E", revenue_growth_3yr: "Rev Growth", pat_growth_3yr: "PAT Growth", operating_margin: "Margin", pledge_penalty_on_roe: "Pledge Pnlty"
                               };
-                              const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
-                              const pct = (data.score !== null && data.max > 0) ? (data.score / data.max) * 100 : 0;
-                              const isMissing = data.score === null;
-                              const barColor = isMissing ? 'bg-gray-800' : (pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell');
-                              return (
-                                <div key={name} className="flex items-center gap-3">
-                                  <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title={displayName}>{displayName}</span>
-                                  <div className="flex-1 h-1.5 bg-gray-700/30 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${isMissing ? 0 : pct}%` }} />
+                                const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
+                                const isLabel = data.label !== undefined;
+                                const isMissing = !isLabel && data.score === null;
+                                const pct = (!isLabel && !isMissing && data.max > 0) ? (data.score / data.max) * 100 : 0;
+                                const barColor = isLabel ? 'bg-indigo-500/50' : (isMissing ? 'bg-gray-800' : (pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell'));
+                                
+                                // Format value display
+                                let valDisplay = '—';
+                                if (isLabel) {
+                                  if (name.includes('cross')) {
+                                    valDisplay = data.label === 1 ? 'Bull 📈' : data.label === -1 ? 'Bear 📉' : 'None';
+                                  } else {
+                                    valDisplay = data.label || '—';
+                                  }
+                                } else if (!isMissing) {
+                                  valDisplay = `${Math.round(data.score)}/${Math.round(data.max)}`;
+                                }
+
+                                return (
+                                  <div key={name} className="flex items-center gap-3">
+                                    <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title={displayName}>{displayName}</span>
+                                    <div className="flex-1 h-1.5 bg-gray-700/30 rounded-full overflow-hidden">
+                                      <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${isMissing ? 0 : (isLabel ? 100 : pct)}%` }} />
+                                    </div>
+                                    <span className={`font-mono text-[10px] text-right w-16 truncate ${isLabel ? 'text-indigo-400 font-bold' : 'text-dark-muted'}`}>
+                                      {isMissing ? 'N/A' : valDisplay}
+                                    </span>
                                   </div>
-                                  <span className="font-mono text-xs text-right w-12 text-dark-muted">
-                                    {isMissing ? 'N/A' : `${Math.round(data.score)}/${Math.round(data.max)}`}
-                                  </span>
-                                </div>
-                              );
+                                );
                             })}
                           </div>
                         </div>
