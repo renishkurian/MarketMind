@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Settings as SettingsIcon, Key, Save, Server, ShieldCheck, History, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, Key, Save, Server, ShieldCheck, History, AlertCircle, CheckCircle2, Activity, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -424,6 +424,36 @@ export default function Settings() {
                     Initiate Bulk Sync
                   </button>
                 </div>
+              </div>
+
+              {/* Fundamental Management Section */}
+              <div className="bg-dark-card border border-dark-border rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                 <Activity size={18} className="text-dark-muted" />
+                 <h3 className="text-sm font-bold">Fundamentals Refresh</h3>
+               </div>
+               <div className="space-y-4">
+                 <p className="text-xs text-dark-muted">
+                    Sync P/E, ROE, and EPS for all active portfolio stocks from Yahoo Finance. This will also re-trigger institutional scoring.
+                 </p>
+                 <button 
+                   onClick={async () => {
+                     try {
+                       const res = await axios.post(`${API_URL}/api/market/fundamentals/sync`, {}, {
+                         headers: { Authorization: `Bearer ${localStorage.getItem('mm_token')}` }
+                       });
+                       toast.success(res.data.message);
+                     } catch (err) {
+                       toast.error(err.response?.data?.detail || 'Failed to trigger bulk fundamentals sync');
+                     }
+                   }}
+                   className="w-full px-4 py-3 bg-accent text-white hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-accent/20 text-xs font-bold flex items-center justify-center gap-2"
+                 >
+                   <RefreshCw size={14} />
+                   Sync All Fundamentals
+                 </button>
+                 <p className="text-[10px] text-dark-muted italic">Note: This runs in the background and may take several minutes to complete.</p>
+               </div>
               </div>
             </div>
 

@@ -42,14 +42,14 @@ async def intraday_fetch():
     logger.info("Intraday fetch starting…")
     async with SessionLocal() as session:
         result = await session.execute(
-            select(StockMaster.symbol).where(StockMaster.is_active == True)
+            select(StockMaster.symbol, StockMaster.yahoo_symbol).where(StockMaster.is_active == True)
         )
-        symbols = [row[0] for row in result.all()]
+        symbols_map = {row[0]: row[1] for row in result.all() if row[1]}
 
-    if not symbols:
+    if not symbols_map:
         return
 
-    prices = await fetch_live_prices(symbols)
+    prices = await fetch_live_prices(symbols_map)
     if not prices:
         logger.warning("No price data returned from fetcher.")
         return
@@ -201,22 +201,23 @@ async def _check_price_spikes_and_notify():
 
 
 # ── JOB 3: Weekly fundamental + AI refresh (Mondays 08:00) ───────────────────
-async def weekly_refresh():
-    logger.info("Weekly refresh starting…")
+async def run_bulk_fundamental_sync():
+    """Logic for bulk fundamental refresh, reusable by scheduler and API."""
+    logger.info("Bulk fundamental sync starting…")
 
     async with SessionLocal() as session:
         result = await session.execute(
-            select(StockMaster.symbol).where(StockMaster.is_active == True)
+            select(StockMaster.symbol, StockMaster.yahoo_symbol).where(StockMaster.is_active == True)
         )
-        symbols = [row[0] for row in result.all()]
+        stocks = result.all()
 
-    for sym in symbols:
+    for sym, yf_sym in stocks:
         try:
-            # Refresh fundamentals
-            fund_data = await fetch_fundamentals(sym)
+            # Refresh fundamentals using designated Yahoo symbol
+            fund_data = await fetch_fundamentals(sym, yahoo_symbol=yf_sym)
 
             async with SessionLocal() as session:
-                # Map to current DB columns (note: handles the new CAGR fields if fetcher returns them)
+                # Map to current DB columns
                 stmt = mysql_insert(FundamentalsCache).values(
                     symbol=sym,
                     fetched_at=datetime.now(),
@@ -240,14 +241,20 @@ async def weekly_refresh():
                 await session.commit()
 
             # Recompute full signals with updated fundamentals
-            await recompute_signals_for(sym)
+            from backend.services.scoring_service import ScoringService
+            async with SessionLocal() as session:
+                service = ScoringService(session)
+                await service.score_symbol(sym, exchange="NSE")
 
-            # Generate weekly AI insight
+            # Generate weekly AI insight (optional but kept as per original weekly flow)
             await _generate_and_store_insight(sym, "WEEKLY")
 
         except Exception as e:
-            logger.error(f"Weekly refresh failed for {sym}: {e}")
+            logger.error(f"Fundamental sync failed for {sym}: {e}")
 
+async def weekly_refresh():
+    logger.info("Triggering automated weekly refresh job.")
+    await run_bulk_fundamental_sync()
     logger.info("Weekly refresh complete.")
 
 

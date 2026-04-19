@@ -250,6 +250,24 @@ class CompositeScoreResult:
     )
     profile: str = "long_term_compounding"
 
+    # Raw objects for downstream mapping / verification
+    fa_data: Optional[FundamentalData] = None
+    ta_data: Optional[TechnicalData] = None
+
+    @property
+    def data_quality(self) -> str:
+        """
+        Refined quality logic:
+        - fa_coverage >= 0.5                      -> FULL
+        - 0.1 <= fa_coverage < 0.5                -> PARTIAL
+        - fa_coverage < 0.1 (or missing entirely)  -> TECHNICALS_ONLY
+        """
+        if self.fa_coverage >= 0.5:
+            return "FULL"
+        if self.fa_coverage >= 0.1:
+            return "PARTIAL"
+        return "TECHNICALS_ONLY"
+
 
 # ---------------------------------------------------------------------------
 # Scoring Engine
@@ -307,6 +325,10 @@ class CompositeScorer:
         result.sector_rank_score  = sec_score
         result.sector_percentile  = sec_pct
         result.sector_peer_count  = sec_peers
+        
+        # Attach raw objects
+        result.fa_data = fa
+        result.ta_data = ta
 
         result.fa_breakdown       = fa_bd
         result.ta_breakdown       = ta_bd
@@ -740,8 +762,8 @@ def result_to_cache_dict(r: CompositeScoreResult) -> dict:
         "score_profile":           r.profile,
         "fa_breakdown":            r.fa_breakdown,
         "ta_breakdown":            r.ta_breakdown,
-        "momentum_breakdown":      r.momentum_breakdown,
-        "indicator_breakdown":     _build_ui_breakdown(r)
+        "indicator_breakdown":     _build_ui_breakdown(r),
+        "data_quality":            r.data_quality
     }
 
 def _build_ui_breakdown(r: CompositeScoreResult) -> dict:

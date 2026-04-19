@@ -208,14 +208,13 @@ class ScoringService:
         score_cols["current_price"] = current_price
         
         # Derive expert signals (BUY/SELL) from indicator labels
-        signal_fields = build_signals_from_indicators(result.ta, result.ta)
+        signal_fields = build_signals_from_indicators(result.ta_data, result.ta_data)
         score_cols.update(signal_fields)
         
         # Legacy fields for backward compatibility
         score_cols["st_score"] = result.technical_score
         score_cols["lt_score"] = result.composite_score
         score_cols["confidence_pct"] = result.data_confidence * 100
-        score_cols["data_quality"] = "FULL" if result.fa_coverage >= 0.5 else "TECHNICALS_ONLY"
 
         # Check if a row already exists for this symbol+exchange
         existing = await self.db.execute(

@@ -13,7 +13,7 @@ import asyncio
 
 from backend.data.db import (
     get_db, SessionLocal,
-    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction, AICallLog, AllocationLog
+    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction, AICallLog, AllocationLog, SystemConfig
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_admin, get_password_hash
@@ -672,8 +672,10 @@ async def get_stock_fundamentals(symbol: str, db: AsyncSession = Depends(get_db)
         select(FundamentalsCache).where(FundamentalsCache.symbol == symbol.upper())
     )
     fund = result.scalars().first()
-    if not fund:
-        raise HTTPException(status_code=404, detail="No fundamentals found")
+    # Join or fetch StockMaster metadata too
+    stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol.upper()))
+    stock_row = stock_res.scalar_one_or_none()
+
     return {
         "fetched_at": str(fund.fetched_at),
         "pe_ratio": float(fund.pe_ratio) if fund.pe_ratio else None,
@@ -683,6 +685,7 @@ async def get_stock_fundamentals(symbol: str, db: AsyncSession = Depends(get_db)
         "revenue_growth": float(fund.revenue_growth) if fund.revenue_growth else None,
         "market_cap": int(fund.market_cap) if fund.market_cap else None,
         "data_quality": fund.data_quality,
+        "yahoo_symbol": stock_row,
     }
 
 
@@ -863,6 +866,7 @@ class FundamentalUpdateRequest(BaseModel):
     debt_equity: Optional[float] = None
     revenue_growth: Optional[float] = None
     market_cap: Optional[float] = None
+    yahoo_symbol: Optional[str] = None
 
 @app.post("/api/stock/{symbol}/insight/generate")
 async def trigger_insight_generation(
@@ -939,9 +943,18 @@ async def update_fundamentals(
     stmt = stmt.on_duplicate_key_update(**cols_to_update)
     
     await db.execute(stmt)
+    
+    # 2. Update yahoo_symbol in StockMaster if provided
+    if update.yahoo_symbol is not None:
+        await db.execute(
+            update(StockMaster)
+            .where(StockMaster.symbol == symbol)
+            .values(yahoo_symbol=update.yahoo_symbol)
+        )
+    
     await db.commit()
     
-    # 2. Trigger signal recompute
+    # 3. Trigger signal recompute
     await recompute_signals_for(symbol)
     
     return {"message": f"Fundamentals updated and signals recomputed for {symbol}."}
@@ -959,8 +972,12 @@ async def sync_fundamental_data(
     from sqlalchemy.dialects.mysql import insert as mysql_insert
     symbol = symbol.upper()
     
-    # 1. Fetch from Yahoo
-    data = await fetch_fundamentals(symbol)
+    # 1. Fetch from StockMaster for Yahoo symbol mapping
+    stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol))
+    yf_sym = stock_res.scalar_one_or_none()
+    
+    # 2. Fetch from Yahoo
+    data = await fetch_fundamentals(symbol, yahoo_symbol=yf_sym)
     
     # 2. Persist
     stmt = mysql_insert(FundamentalsCache).values(
@@ -1187,6 +1204,17 @@ async def manual_bhavcopy_sync(req: BhavcopySyncRequest, admin: str = Depends(ge
             
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+@app.post("/api/market/fundamentals/sync")
+async def bulk_fundamental_sync(admin: str = Depends(get_current_admin)):
+    """Trigger a full refresh of fundamentals for all active stocks."""
+    from backend.scheduler import run_bulk_fundamental_sync
+    import asyncio
+    
+    # Run in background as it takes time
+    asyncio.create_task(run_bulk_fundamental_sync())
+    
+    return {"message": "Bulk fundamental sync initiated in the background."}
 
 @app.get("/api/market/bhavcopy/logs")
 async def get_bhavcopy_logs(limit: int = 20, db: AsyncSession = Depends(get_db), admin: str = Depends(get_current_admin)):

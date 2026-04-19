@@ -35,6 +35,16 @@ const SECTIONS = [
       { name: 'Bearish Veto', focus: 'Forensic AI detects accounting anomalies or high promoter pledge.' },
       { name: 'Trend Guardians', focus: 'SMA 50/200 gates protect against catching a falling knife.' },
     ]
+  },
+  {
+    title: 'The Neutral Baseline (Score 50)',
+    desc: 'Why do most metrics start at 50? Our engine is designed to be "Missing-Data Proof."',
+    icon: Info,
+    items: [
+      { name: 'Missing Data', focus: 'If a value like ROE is missing, the engine assigns a neutral 50 instead of a 0.' },
+      { name: 'No Unfair Bias', focus: 'This prevents a stock from looking "bad" just because its data provider is lagging.' },
+      { name: 'Trust confidence', focus: 'A score of 50 with low confidence means "We have no opinion yet due to lack of info."' },
+    ]
   }
 ];
 

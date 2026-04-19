@@ -38,6 +38,7 @@ class StockMaster(Base):
     type = Column(Enum('PORTFOLIO','WATCHLIST'), nullable=False, index=True)
     added_date = Column(Date, nullable=False)
     is_active = Column(Boolean, default=True)
+    yahoo_symbol = Column(String(20), index=True)
     
     # Portfolio specific fields
     quantity = Column(Numeric(14,4))
@@ -104,7 +105,7 @@ class SignalsCache(Base):
     lt_signal = Column(Enum('BUY','HOLD','SELL'), index=True)
     lt_score = Column(Numeric(5,2))
     confidence_pct = Column(Numeric(5,2))
-    data_quality = Column(Enum('FULL','TECHNICALS_ONLY'), default='FULL')
+    data_quality = Column(Enum('FULL', 'PARTIAL', 'TECHNICALS_ONLY'), default='FULL')
     flags = Column(JSON)
     indicator_breakdown = Column(JSON)
     

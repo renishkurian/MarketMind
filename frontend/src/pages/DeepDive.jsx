@@ -757,8 +757,8 @@ export default function DeepDive() {
           value={sig.data_quality ?? '—'}
           sub="Signal data quality"
           color={
-            sig.data_quality === 'HIGH' ? 'text-signal-buy' :
-            sig.data_quality === 'MEDIUM' ? 'text-signal-hold' : 'text-dark-muted'
+            sig.data_quality === 'FULL' ? 'text-signal-buy' :
+            sig.data_quality === 'PARTIAL' ? 'text-signal-hold' : 'text-dark-muted'
           }
         />
       </div>
@@ -1168,7 +1168,8 @@ export default function DeepDive() {
                         roe: fundamentals?.roe,
                         debt_equity: fundamentals?.debt_equity,
                         revenue_growth: fundamentals?.revenue_growth,
-                        market_cap: fundamentals?.market_cap
+                        market_cap: fundamentals?.market_cap,
+                        yahoo_symbol: fundamentals?.yahoo_symbol
                       });
                       setIsEditModalOpen(true);
                     }}
@@ -1455,6 +1456,20 @@ export default function DeepDive() {
             </div>
             
             <form onSubmit={handleManualUpdate} className="p-6 space-y-4">
+              <div className="col-span-full">
+                <label className="block text-[10px] font-bold text-accent uppercase mb-1.5 flex items-center gap-1.5">
+                  <RefreshCw size={10} /> Yahoo Finance Symbol
+                </label>
+                <input 
+                  type="text"
+                  placeholder="e.g. RELIANCE.NS"
+                  defaultValue={editData.yahoo_symbol}
+                  onChange={(e) => setEditData({ ...editData, yahoo_symbol: e.target.value.toUpperCase() })}
+                  className="w-full bg-dark-bg border border-accent/20 rounded-xl px-4 py-3 text-sm font-mono focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all placeholder:text-dark-muted/30"
+                />
+                <p className="text-[9px] text-dark-muted mt-1.5">When you click "Sync Yahoo", this symbol will be used for the fetch.</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { id: 'pe_ratio', label: 'P/E Ratio', placeholder: 'e.g. 25.5' },
