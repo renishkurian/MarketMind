@@ -2,10 +2,13 @@ import asyncio
 from datetime import datetime, timedelta
 import logging
 import pandas as pd
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update, and_
 from sqlalchemy.dialects.mysql import insert
 
-from backend.data.db import SessionLocal, PriceHistory, StockMaster, SyncLog, SystemConfig
+from backend.data.db import (
+    SessionLocal, PriceHistory, StockMaster, SyncLog, 
+    SystemConfig, SignalsCache
+)
 from backend.utils.market_hours import is_trading_day
 
 # Importers for modular logic
@@ -119,6 +122,25 @@ async def load_bhavcopy_to_db(target_date: datetime, sync_type: str = 'MANUAL', 
                     }
                     
                     await session.execute(stmt.on_duplicate_key_update(**update_dict))
+                    
+                    # ── Phase 3.5: Sync prev_close to SignalsCache ───────────────────
+                    # We also update the reference price so P&L is accurate next session.
+                    # This handles the "relay on bhavcopy if closed" requirement.
+                    sig_records = [{
+                        'symbol': r['internal_symbol'],
+                        'prev_close': r['close'],
+                        'computed_at': r['date'],
+                        'market_session': 'EOD'
+                    } for r in records]
+                    
+                    sig_stmt = insert(SignalsCache).values(sig_records)
+                    sig_update = {
+                        'prev_close': sig_stmt.inserted.prev_close,
+                        'computed_at': sig_stmt.inserted.computed_at,
+                        'market_session': 'EOD'
+                    }
+                    await session.execute(sig_stmt.on_duplicate_key_update(**sig_update))
+                    
                     await session.commit()
                 status = 'SUCCESS'
             else:

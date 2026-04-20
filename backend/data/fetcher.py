@@ -3,14 +3,46 @@ import pandas as pd
 import asyncio
 import httpx
 import logging
+import urllib.request
+import re
 from typing import List, Dict, Any, Union
 from datetime import datetime
+
+from backend.utils.market_hours import get_current_ist_time
 
 logger = logging.getLogger(__name__)
 
 def _get_yf_symbol(symbol: str) -> str:
     """Legacy helper. Callers should transition to using DB-defined yahoo_symbol."""
     return f"{symbol}.NS"
+
+def _get_live_ltp_google_sync(symbol: str) -> Union[float, None]:
+    """Synchronous web scraper for zero-delay Indian stock prices using Google Finance."""
+    try:
+        req = urllib.request.Request(
+            f'https://www.google.com/finance/quote/{symbol}:NSE',
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html = resp.read().decode('utf-8')
+            match = re.search(r'data-last-price=\"([^\"]+)\"', html)
+            if match:
+                return float(match.group(1).replace(',', ''))
+    except Exception as e:
+        logger.debug(f"Google Finance scrape failed for {symbol}: {e}")
+    return None
+
+async def _fetch_hybrid_overrides(internal_symbols: List[str]) -> Dict[str, float]:
+    """Concurrently scrapes Google Finance for a batch of symbols."""
+    overrides = {}
+    
+    async def fetch_one(sym: str):
+        val = await asyncio.to_thread(_get_live_ltp_google_sync, sym)
+        if val is not None:
+            overrides[sym] = val
+            
+    await asyncio.gather(*(fetch_one(s) for s in internal_symbols))
+    return overrides
 
 async def fetch_live_prices(symbols: Union[List[str], Dict[str, str]]) -> Dict[str, Dict[str, Any]]:
     """
@@ -35,7 +67,7 @@ async def fetch_live_prices(symbols: Union[List[str], Dict[str, str]]) -> Dict[s
         batch_yf = [symbols_map[s] for s in batch_internal]
         
         try:
-            df = yf.download(batch_yf, period='1d', interval='1d', progress=False, auto_adjust=False)
+            df = yf.download(batch_yf, period='1d', interval='1m', progress=False, auto_adjust=False)
             
             if not df.empty:
                 for sym_int in batch_internal:
@@ -60,11 +92,19 @@ async def fetch_live_prices(symbols: Union[List[str], Dict[str, str]]) -> Dict[s
                             "low": float(stock_data.get('Low', 0).iloc[0] if isinstance(stock_data.get('Low'), pd.Series) else stock_data.get('Low', 0)),
                             "close": float(close_val),
                             "volume": int(stock_data.get('Volume', 0).iloc[0] if isinstance(stock_data.get('Volume'), pd.Series) else stock_data.get('Volume', 0)),
-                            "timestamp": df.index[-1].to_pydatetime()
+                            "timestamp": get_current_ist_time()
                         }
         except Exception as e:
             logger.error(f"Error fetching live prices for batch {batch_internal}: {e}")
-            
+        
+        # --- HYBRID OVERRIDE ---
+        # Overwrite the delayed Yahoo close with the zero-delay Google LTP
+        gfin_overrides = await _fetch_hybrid_overrides(batch_internal)
+        for sym_int, true_live_price in gfin_overrides.items():
+            if sym_int in results:
+                # Set the close to the true live price
+                results[sym_int]["close"] = true_live_price
+                
         await asyncio.sleep(0.5)
         
     return results

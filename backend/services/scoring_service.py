@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.data.db import (
     StockMaster, SignalsCache, FundamentalsCache,
-    PriceHistory, AIInsights
+    PriceHistory, AIInsights, IntradayTicks
 )
 from backend.engine.scoring.composite_score import (
     CompositeScorer, ScoreConfig,
@@ -120,8 +120,18 @@ class ScoringService:
         )
 
         # 6. Persist scores to SignalsCache
-        current_price = await self._latest_close(symbol, exchange, as_of_date)
-        await self._upsert_signals_cache(symbol, exchange, result, current_price, as_of_date)
+        # Using Database-First Price Discovery to ensure accurate P&L
+        ctx = await self._get_price_context(symbol, exchange, as_of_date)
+        await self._upsert_score_to_cache(
+            symbol=symbol, 
+            exchange=exchange, 
+            result=result, 
+            current_price=ctx["current_price"],
+            prev_close=ctx["prev_close"],
+            change_pct=ctx["change_pct"],
+            market_session=ctx["market_session"],
+            as_of_date=as_of_date
+        )
 
         # 7. Backtest (optional — expensive, run in background job not per-request)
         bt_metrics: Optional[BacktestMetrics] = None
@@ -198,6 +208,9 @@ class ScoringService:
         exchange: str,
         result: CompositeScoreResult,
         current_price: Optional[float],
+        prev_close: Optional[float],
+        change_pct: Optional[float],
+        market_session: str,
         as_of_date: date,
     ) -> None:
         """
@@ -216,6 +229,9 @@ class ScoringService:
         # Update/Add dynamic fields that depend on specific context
         score_cols["scored_at"] = now
         score_cols["current_price"] = current_price
+        score_cols["prev_close"] = prev_close
+        score_cols["change_pct"] = change_pct
+        score_cols["market_session"] = market_session
         
         # Derive expert signals (BUY/SELL) from indicator labels
         score_cols["st_signal"] = self._to_signal_enum(result.ta_data.overall_trend)
@@ -502,6 +518,85 @@ class ScoringService:
         if not stock:
             raise ValueError(f"Stock {symbol} ({exchange}) not found in StockMaster")
         return stock
+
+    async def _get_price_context(
+        self, symbol: str, exchange: str, as_of_date: date
+    ) -> dict:
+        """
+        Database-First Price Discovery.
+        Returns {current_price, prev_close, change_pct, market_session}
+        """
+        # 1. Get the latest price from today's Ticks (Live)
+        today_start = datetime.combine(as_of_date, datetime.min.time())
+        tick_stmt = (
+            select(IntradayTicks.close, IntradayTicks.timestamp)
+            .where(
+                and_(
+                    IntradayTicks.symbol == symbol,
+                    IntradayTicks.timestamp >= today_start
+                )
+            )
+            .order_by(IntradayTicks.timestamp.desc())
+            .limit(1)
+        )
+        tick_res = await self.db.execute(tick_stmt)
+        latest_tick = tick_res.fetchone()
+        
+        # 2. Get the Reference Close (Previous Trading Day)
+        # We look for the most recent close on a date strictly before today
+        prev_stmt = (
+            select(PriceHistory.close, PriceHistory.date)
+            .where(
+                and_(
+                    PriceHistory.symbol == symbol,
+                    PriceHistory.exchange == exchange,
+                    PriceHistory.date < as_of_date
+                )
+            )
+            .order_by(PriceHistory.date.desc())
+            .limit(1)
+        )
+        prev_res = await self.db.execute(prev_stmt)
+        ref_close_row = prev_res.fetchone()
+        
+        # 3. Fallback: If no ticks today, use latest Bhavcopy as current_price
+        # (This handles the 'market closed' relay requirement)
+        curr_price = float(latest_tick.close) if latest_tick else None
+        session = "LIVE" if latest_tick else "EOD"
+        
+        if not curr_price:
+            # Check today's Bhavcopy first (if it's already imported)
+            today_bh_stmt = (
+                select(PriceHistory.close)
+                .where(
+                    and_(
+                        PriceHistory.symbol == symbol,
+                        PriceHistory.exchange == exchange,
+                        PriceHistory.date == as_of_date
+                    )
+                )
+            )
+            today_bh_res = await self.db.execute(today_bh_stmt)
+            curr_price = float(today_bh_res.scalar() or 0) or None
+            
+            # If still nothing, use the reference close as current (for weekend/early morning)
+            if not curr_price and ref_close_row:
+                curr_price = float(ref_close_row.close)
+                session = "CLOSED"
+
+        ref_close = float(ref_close_row.close) if ref_close_row else None
+        
+        # Calculate change %
+        change_pct = 0.0
+        if curr_price and ref_close and ref_close > 0:
+            change_pct = ((curr_price - ref_close) / ref_close) * 100
+            
+        return {
+            "current_price": curr_price,
+            "prev_close": ref_close,
+            "change_pct": round(change_pct, 2),
+            "market_session": session
+        }
 
     async def _latest_close(
         self, symbol: str, exchange: str, as_of_date: date
