@@ -110,25 +110,262 @@ def _build_messages(prompt: str) -> list:
 # Removed legacy _build_prompt in favor of SkillLoader for rich md templates
 
 def _build_fallback_prompt(
-    symbol: str, 
-    company_name: str, 
+    symbol: str,
+    company_name: str,
     trigger_reason: str,
     signals: dict,
-    fundamentals: dict
+    fundamentals: dict,
 ) -> str:
-    """Fallback if no skill_id is provided or skill fails."""
-    return f"""
-Analyze {company_name} ({symbol}).
+    """
+    Rich fallback used when no skill_id matches.
+    Passes composite score, all FA metrics, and signals context
+    so the AI produces meaningful analysis even without a skill template.
+    """
+    comp   = signals.get("composite_score", "N/A")
+    fa_s   = signals.get("fundamental_score", "N/A")
+    ta_s   = signals.get("technical_score", "N/A")
+    mom_s  = signals.get("momentum_score", "N/A")
+    pctile = signals.get("sector_percentile", "N/A")
+    st_sig = signals.get("st_signal", "HOLD")
+    lt_sig = signals.get("lt_signal", "HOLD")
+    price  = signals.get("current_price", "N/A")
+
+    pe      = fundamentals.get("pe_ratio", "N/A")
+    roe     = fundamentals.get("roe", "N/A")
+    de      = fundamentals.get("debt_equity", "N/A")
+    rev_g   = fundamentals.get("revenue_growth_3yr", "N/A")
+    pat_g   = fundamentals.get("pat_growth_3yr", "N/A")
+    margin  = fundamentals.get("operating_margin", "N/A")
+    pledge  = fundamentals.get("promoter_pledge_pct", "N/A")
+    sector  = signals.get("sector") or fundamentals.get("sector", "Unknown")
+
+    return f"""You are a senior equity analyst at an institutional fund focused on Indian markets (NSE/BSE).
+
+STOCK: {company_name} ({symbol}) | SECTOR: {sector} | PRICE: ₹{price}
 TRIGGER: {trigger_reason}
-SIGNALS: Short-Term {signals.get('st_signal')}, Long-Term {signals.get('lt_signal')}.
-Return ONLY a JSON object:
+
+SCORING ENGINE OUTPUT (MarketMind v2.1):
+  Composite Score    : {comp}/100
+  Fundamental Score  : {fa_s}/100  |  Technical: {ta_s}/100  |  Momentum: {mom_s}/100
+  Sector Percentile  : {pctile}th (beats this % of sector peers)
+  ST Signal: {st_sig}  |  LT Signal: {lt_sig}
+
+KEY FUNDAMENTALS:
+  PE Ratio: {pe}  |  ROE: {roe}%  |  Debt/Equity: {de}
+  Revenue CAGR (3yr): {rev_g}%  |  PAT CAGR (3yr): {pat_g}%
+  Operating Margin: {margin}%  |  Promoter Pledge: {pledge}%
+
+ANALYSIS INSTRUCTIONS:
+1. Evaluate the scoring engine output — is the composite score justified by the fundamentals?
+2. Identify the single biggest opportunity and single biggest risk for a 3-year horizon.
+3. Give a clear verdict: BUY / HOLD / SELL with one specific reason.
+4. Flag the promoter pledge if above 20% as a governance risk.
+5. Reference India-specific context (sector tailwinds, regulatory environment, GST/formalization).
+
+Return ONLY valid JSON — no markdown outside the reply field:
 {{
-    "short_summary": "2–3 sentence.",
-    "long_summary": "3–4 sentence.",
-    "verdict": "HOLD",
-    "key_risks": [],
-    "key_opportunities": [],
+    "short_summary": "2–3 sentence actionable summary with verdict and key reason.",
+    "long_summary": "3–4 paragraph analysis: scoring context, fundamental quality, key risk, India macro angle.",
+    "verdict": "BUY or HOLD or SELL",
+    "key_risks": ["specific risk 1", "specific risk 2"],
+    "key_opportunities": ["specific opportunity 1", "specific opportunity 2"],
     "sentiment_score": 0.0
+}}
+Note: sentiment_score is 0.0 (most bearish) to 1.0 (most bullish).
+"""
+
+
+def build_chart_chat_system_prompt(symbol: str, context_data: dict) -> str:
+    """
+    Clean, structured system prompt for the chart ASK feature.
+    Passes composite score upfront. Separates data sections clearly.
+    No placeholder text in the output schema.
+    """
+    import json
+
+    today     = context_data.get("today", {})
+    summary   = context_data.get("price_summary", {})
+    signals   = context_data.get("indicators", {})
+    news      = context_data.get("recent_news", [])
+    comp      = context_data.get("composite_score", "N/A")
+    st_sig    = context_data.get("current_st_signal", "HOLD")
+    lt_sig    = context_data.get("current_lt_signal", "HOLD")
+
+    news_block = "\n".join(f"• {h}" for h in news[:5]) if news else "No recent news found."
+
+    recent_bars = summary.get("recent_5_bars", [])
+    bars_block  = json.dumps(recent_bars, indent=2) if recent_bars else "Not available."
+
+    weekly = summary.get("weekly_candles", [])
+    weekly_block = json.dumps(weekly[-6:], indent=2) if weekly else "Not available."
+
+    return f"""You are MarketMind's institutional chart analyst for NSE/BSE Indian equities.
+Your role is to give precise, data-grounded technical analysis backed by live news context.
+
+═══ STOCK OVERVIEW ═══
+Symbol          : {symbol}
+Composite Score : {comp}/100
+ST Signal       : {st_sig}  |  LT Signal: {lt_sig}
+
+═══ TODAY'S VERIFIED INTRADAY DATA ═══
+Use these EXACT figures when discussing today's price action. Do not estimate.
+Date   : {today.get('date', 'N/A')}
+Open   : ₹{today.get('open', 'N/A')}
+High   : ₹{today.get('high', 'N/A')}
+Low    : ₹{today.get('low', 'N/A')}
+Close  : ₹{today.get('close', 'N/A')}  (prev close: ₹{today.get('prev_close', 'N/A')})
+Change : {today.get('change_pct', 'N/A')}%
+Volume : {today.get('volume', 'N/A')}
+
+═══ 90-DAY PRICE SUMMARY ═══
+Period change   : {summary.get('period_change_pct', 'N/A')}%  ({summary.get('period_start_close')} → {summary.get('period_end_close')})
+90d High / Low  : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
+Avg Daily Volume: {summary.get('avg_volume_90d')}
+SMA 20 / 50 / 90: ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+
+Last 5 Daily Bars:
+{bars_block}
+
+Weekly Candle Summary (last 6 weeks):
+{weekly_block}
+
+═══ INDICATOR SIGNALS ═══
+{json.dumps(signals, indent=2)}
+
+═══ LIVE NEWS (Google News) ═══
+Use these to explain fundamental triggers behind price moves.
+If no news matches the move, say "appears purely technical."
+{news_block}
+
+═══ RESPONSE RULES ═══
+1. Reply ONLY as valid JSON — no text outside the JSON object.
+2. Always cite today's verified High/Low when discussing intraday action.
+3. Identify support/resistance from weekly candles and SMA levels.
+4. State your buy/hold/sell conviction with a specific reason.
+5. Only include trend_lines that directly answer the question asked.
+6. Format all dates as YYYY-MM-DD matching the data above.
+
+Return this exact structure:
+{{
+  "reply": "Your markdown-formatted analysis — cite prices, signals, and news. Be precise and direct.",
+  "trend_lines": [
+    {{
+      "start_date": "YYYY-MM-DD",
+      "end_date": "YYYY-MM-DD",
+      "start_price": 0.0,
+      "end_price": 0.0,
+      "color": "green",
+      "label": "Support"
+    }}
+  ]
+}}
+Return trend_lines as [] if none apply.
+"""
+
+
+def build_fundamentals_research_prompt(symbol: str, company_name: str) -> str:
+    """
+    Grounded fundamentals research prompt.
+    """
+    from datetime import datetime
+    current_year = datetime.now().year
+
+    return f"""You are a senior equity research analyst specialising in NSE/BSE listed Indian companies.
+
+TASK: Research and extract the most recent financial data for: {company_name} ({symbol})
+
+DATA SOURCES TO USE (in priority order):
+1. NSE/BSE official exchange filings (quarterly results, annual report)
+2. screener.in or tickertape.in (India-focused fundamental databases)
+3. Company investor relations website
+4. moneycontrol.com or economictimes.com financial data
+
+IMPORTANT: Only use data from FY{current_year-1} or FY{current_year} (April {current_year-1}–March {current_year}).
+Do NOT use data older than 2 financial years. If you cannot find recent data, return null.
+
+DECIMAL CONVENTION (CRITICAL):
+- All percentage values must be plain numbers: ROE of 18.5% → 18.5, NOT 0.185
+- Revenue growth of 12% → 12.0, NOT 0.12
+- Operating margin of 20% → 20.0, NOT 0.20
+- This applies to ALL percentage fields without exception.
+
+Return ONLY a valid JSON object with these exact keys:
+{{
+    "pe_ratio": float or null,
+    "eps": float or null,
+    "roe": float or null,
+    "debt_equity": float or null,
+    "revenue_growth": float or null,
+    "market_cap": integer (INR) or null,
+    "revenue_growth_3yr": float or null,
+    "pat_growth_3yr": float or null,
+    "operating_margin": float or null,
+    "pe_5yr_avg": float or null,
+    "roe_3yr_avg": float or null,
+    "peg_ratio": float or null,
+    "pb_ratio": float or null,
+    "ev_ebitda": float or null,
+    "held_percent_institutions": float or null,
+    "promoter_holding": float or null,
+    "promoter_pledge_pct": float or null,
+    "analyst_rating": float or null,
+    "recommendation_key": "strong_buy" or "buy" or "hold" or "underperform" or "sell" or null,
+    "total_cash": integer (INR) or null,
+    "total_debt": integer (INR) or null,
+    "current_ratio": float or null,
+    "data_confidence": "HIGH" or "MEDIUM" or "LOW",
+    "data_source": "brief description of where data was found",
+    "data_as_of": "FY2024 Q3" or similar period label
+}}
+
+Return null for any metric you cannot find with confidence. Never invent numbers.
+data_confidence should reflect: HIGH = verified from official filing, MEDIUM = from financial portal,
+LOW = estimated or older than 1 financial year.
+"""
+
+
+def build_portfolio_allocation_prompt(amount: float, portfolio_summary: str) -> str:
+    """
+    Portfolio allocation prompt with India-specific guardrails.
+    """
+    return f"""You are a SEBI-registered portfolio manager allocating fresh capital for an Indian equity investor.
+
+ALLOCATION TASK:
+Distribute exactly ₹{amount:,.0f} across the portfolio below.
+The sum of all allocated_amount values MUST equal exactly {amount}.
+
+PORTFOLIO STATE:
+{portfolio_summary}
+
+ALLOCATION RULES:
+1. Weight higher toward stocks with composite_score > 65 and BUY signals.
+2. SECTOR CONCENTRATION: No single sector may receive more than 40% of the total.
+3. MINIMUM ALLOCATION: No stock receives less than ₹{max(500, amount * 0.03):,.0f}
+   (3% floor) — avoid meaningless micro-allocations.
+4. LIQUIDITY DISCOUNT: For SMALL-cap stocks, apply a 15% haircut to their 
+   score weight to account for liquidity risk.
+5. RISK-FREE CONTEXT: India 10-year gilt yields ~6.5%. Only allocate meaningfully 
+   to stocks where the composite score suggests potential to beat this hurdle.
+6. If any stock has promoter pledge > 30%, limit its allocation to max 10% of total.
+
+ROUNDING: After computing weights, adjust the largest allocation up or down
+by a few rupees to ensure the total sums to exactly {amount}.
+
+Return ONLY valid JSON:
+{{
+  "rationale": "2–3 sentence strategy: sector distribution rationale, score-based weighting logic, key risks flagged.",
+  "total_allocated": {amount},
+  "allocations": [
+    {{
+      "symbol": "TICKER",
+      "sector": "sector name",
+      "composite_score": 0.0,
+      "allocated_amount": 0.0,
+      "weight_pct": 0.0,
+      "estimated_qty": 0,
+      "reason": "One specific sentence: why this weight for this stock."
+    }}
+  ]
 }}
 """
 
@@ -209,38 +446,7 @@ async def generate_fundamentals(symbol: str, company_name: str = None) -> dict:
     }.get(provider, "gpt-4o")
 
     company_id = f"{company_name} ({symbol})" if company_name else symbol
-    prompt = f"""
-You are a top-tier equity research analyst. 
-Find the MOST RECENT available fundamental data for the company: {company_id} (NSE/BSE India).
-
-Research these specific metrics:
-1. P/E Ratio (Trailing)
-2. EPS (Trailing 12 Months)
-3. ROE (Return on Equity %)
-4. Debt to Equity Ratio
-5. Revenue Growth (Current YoY %)
-6. Market Capitalization (in INR)
-7. 3-Year Revenue CAGR (%)
-8. 3-Year PAT (Net Profit) CAGR (%)
-9. Operating Profit Margin (%)
-10. 5-Year Average P/E Ratio
-11. 3-Year Average ROE (%)
-
-Return ONLY a valid JSON object with these keys (use null if data is absolutely unavailable):
-{{
-    "pe_ratio": float,
-    "eps": float,
-    "roe": float (decimal, e.g. 0.15 for 15%),
-    "debt_equity": float,
-    "revenue_growth": float (decimal),
-    "market_cap": long,
-    "revenue_growth_3yr": float (decimal, e.g. 0.12),
-    "pat_growth_3yr": float (decimal, e.g. 0.15),
-    "operating_margin": float (decimal, e.g. 0.20),
-    "pe_5yr_avg": float,
-    "roe_3yr_avg": float (decimal)
-}}
-"""
+    prompt = build_fundamentals_research_prompt(symbol, company_id)
     messages = _build_messages(prompt)
     api_key = key_map[provider]
     
@@ -330,31 +536,48 @@ async def generate_insight(
         from backend.engine.consensus.skill_loader import SkillLoader, StockMeta
         from backend.engine.scoring.composite_score import CompositeScoreResult
         
-        # Build dummy StockMeta + CompositeScoreResult mapped from signals dictionary
+        # Build full StockMeta + CompositeScoreResult mapped from signals dictionary
         meta = StockMeta(
             symbol=symbol,
             isin=signals.get("isin", "N/A"),
             exchange=signals.get("exchange", "NSE"),
-            sector=signals.get("sector") or fundamentals.get("sector", "N/A"),
-            market_cap_cr=float(fundamentals.get("market_cap", 0)) / 10000000,
+            sector=signals.get("sector") or fundamentals.get("sector", "Unknown"),
+            market_cap_cr=float(fundamentals.get("market_cap", 0)) / 10_000_000,
             current_price=float(signals.get("current_price", 0)),
+
+            # ── Full FA fields (was only 4, now all 10) ──
             pe_ratio=fundamentals.get("pe_ratio"),
+            pe_5yr_avg=fundamentals.get("pe_5yr_avg"),
             roe=fundamentals.get("roe"),
+            roe_3yr_avg=fundamentals.get("roe_3yr_avg"),
             debt_equity=fundamentals.get("debt_equity"),
             revenue_growth_3yr=fundamentals.get("revenue_growth_3yr"),
+            pat_growth_3yr=fundamentals.get("pat_growth_3yr"),
+            operating_margin=fundamentals.get("operating_margin"),
+            promoter_holding=fundamentals.get("promoter_holding"),
+            promoter_pledge_pct=fundamentals.get("promoter_pledge_pct"),
+
+            # ── Momentum (from signals cache) ──
+            roc_252=signals.get("momentum_breakdown", {}).get("roc_1yr"),
+            roc_60=signals.get("momentum_breakdown", {}).get("roc_60d"),
+            volume_ratio_20_90=signals.get("momentum_breakdown", {}).get("volume_trend"),
         )
         setattr(meta, "company_name", company_name or symbol)
-        
+
         csr = CompositeScoreResult(
             symbol=symbol,
             isin=meta.isin,
-            fundamental_score=float(signals.get("lt_score", 0) or 0),
-            technical_score=float(signals.get("st_score", 0) or 0),
-            momentum_score=0.0,
-            sector_rank_score=0.0,
-            composite_score=0.0,
-            data_confidence=float(signals.get("confidence_pct", 50)) / 100.0,
-            fa_breakdown=signals.get("indicator_breakdown", {})
+            # ── All 4 component scores, not just 2 ──
+            composite_score=float(signals.get("composite_score", 0) or 0),
+            fundamental_score=float(signals.get("fundamental_score", 0) or 0),
+            technical_score=float(signals.get("technical_score", 0) or 0),
+            momentum_score=float(signals.get("momentum_score", 0) or 0),
+            sector_rank_score=float(signals.get("sector_rank_score", 0) or 0),
+            sector_percentile=float(signals.get("sector_percentile", 50) or 50),
+            data_confidence=float(signals.get("data_confidence", 0.5) or 0.5),
+            fa_breakdown=signals.get("fa_breakdown") or {},
+            ta_breakdown=signals.get("ta_breakdown") or {},
+            momentum_breakdown=signals.get("momentum_breakdown") or {},
         )
         
         try:
@@ -479,40 +702,7 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
     recent_news = await _fetch_symbol_news(symbol)
     context_data["recent_news"] = recent_news if recent_news else ["No recent news found."]
 
-    sys_prompt = f"""You are MarketMind's institutional chart analyst for NSE/BSE Indian equities.
-
-STOCK: {symbol}
-COMPOSITE SCORE: {context_data.get('composite_score', 'N/A')}/100
-ST SIGNAL: {context_data.get('current_st_signal')} | LT SIGNAL: {context_data.get('current_lt_signal')}
-
-AUTHORITATIVE PRICE DATA (use these exact figures — do not estimate):
-{json.dumps(context_data.get('today', {}), indent=2)}
-
-TECHNICAL CONTEXT (90-day history):
-{json.dumps(context_data.get('price_summary', {}), indent=2)}
-
-INDICATOR SIGNALS:
-{json.dumps(context_data.get('indicators', {}), indent=2)}
-
-RECENT NEWS (use to explain fundamental triggers):
-{chr(10).join(f'• {h}' for h in context_data.get('recent_news', ['None found']))}
-
-RESPONSE RULES:
-1. Reply in valid JSON only — no markdown outside the reply field.
-2. Cite today's verified H/L/Close. Never invent prices.
-3. Identify support/resistance levels from the weekly candles.
-4. If news explains the price move, cite it specifically.
-5. State buy/hold/sell conviction clearly with a reason.
-6. Only add trend_lines if they directly answer the question.
-
-Return EXACTLY this structure:
-{{
-  "reply": "<markdown analysis — 3-5 sentences, precise, opinionated>",
-  "trend_lines": [
-    {{"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD",
-      "start_price": 0.0, "end_price": 0.0, "color": "green", "label": "Support"}}
-  ]
-}}"""
+    sys_prompt = build_chart_chat_system_prompt(symbol, context_data)
 
     messages = [{"role": "system", "content": sys_prompt}] + user_messages
 
@@ -595,29 +785,7 @@ async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> 
         "st_signal": item["signal"]["st_signal"] if item["signal"] else "HOLD",
     } for item in portfolio_data], indent=2)
 
-    prompt = f"""
-You are a quantitative portfolio manager.
-I want to allocate a lump sum of EXACTLY {amount} among my current portfolio holdings.
-Here is the portfolio state with scores:
-{portfolio_summary}
-
-Instructions:
-1. Weight the distribution higher toward stocks with strong fundamentals/composite_scores and solid short-term setups.
-2. The sum of allocated amounts MUST equal exactly {amount}.
-3. Return the result in the following JSON format:
-{{
-  "rationale": "High-level reason for this distribution strategy based on the sectors and scores.",
-  "allocations": [
-    {{
-      "symbol": "TICKER",
-      "allocated_amount": 5000,
-      "estimated_qty": 10,
-      "reason": "Brief reason for this specific allocation weight."
-    }}
-  ]
-}}
-Ensure the response is ONLY valid JSON.
-"""
+    prompt = build_portfolio_allocation_prompt(amount, portfolio_summary)
     messages = [
         {"role": "system", "content": "You are a quantitative AI agent returning strictly valid JSON."},
         {"role": "user", "content": prompt}
