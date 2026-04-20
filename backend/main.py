@@ -13,7 +13,8 @@ import asyncio
 
 from backend.data.db import (
     get_db, SessionLocal,
-    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog, PortfolioTransaction, AICallLog, AllocationLog, SystemConfig
+    StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
+    PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_admin, get_password_hash
@@ -751,22 +752,91 @@ async def handle_chart_chat(
     history = hist_result.scalars().all()
     history.reverse() # chronological order
 
+    # Get today's true intraday OHLCV from IntradayTicks (the authoritative live source)
+    from sqlalchemy import func, cast, Date as SADate
+    from datetime import date as dt_date
+    today_date = dt_date.today()
+    intraday_result = await db.execute(
+        select(
+            func.min(IntradayTicks.open).label("open"),
+            func.max(IntradayTicks.high).label("high"),
+            func.min(IntradayTicks.low).label("low"),
+            IntradayTicks.close,
+            func.sum(IntradayTicks.volume).label("volume"),
+        )
+        .where(
+            IntradayTicks.symbol == symbol,
+            func.date(IntradayTicks.timestamp) == today_date,
+        )
+        .order_by(IntradayTicks.timestamp.desc())
+        .limit(1)
+    )
+    intraday_row = intraday_result.first()
+
+    # Aggregate 90 bars into compact summary to minimize AI token cost
+    closes = [float(h.close) for h in history]
+    highs  = [float(h.high)  for h in history]
+    lows   = [float(h.low)   for h in history]
+    vols   = [int(h.volume)  for h in history]
+
+    def sma(series, n):
+        return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
+
+    # Build weekly buckets (5 bars ≈ 1 week)
+    def weekly_aggregates(hist):
+        buckets = []
+        for i in range(0, len(hist), 5):
+            chunk = hist[i:i+5]
+            if not chunk: continue
+            buckets.append({
+                "week_start": str(chunk[0].date),
+                "open":  round(float(chunk[0].open), 2),
+                "high":  round(max(float(h.high) for h in chunk), 2),
+                "low":   round(min(float(h.low)  for h in chunk), 2),
+                "close": round(float(chunk[-1].close), 2),
+                "avg_vol": round(sum(int(h.volume) for h in chunk) / len(chunk)),
+            })
+        return buckets
+
+    price_summary = {
+        "period_days": len(history),
+        "period_start_close": round(closes[0], 2) if closes else None,
+        "period_end_close":   round(closes[-1], 2) if closes else None,
+        "period_change_pct":  round((closes[-1] - closes[0]) / closes[0] * 100, 2) if closes else None,
+        "90d_high": round(max(highs), 2) if highs else None,
+        "90d_low":  round(min(lows), 2) if lows else None,
+        "avg_volume_90d": round(sum(vols) / len(vols)) if vols else None,
+        "sma_20":  sma(closes, 20),
+        "sma_50":  sma(closes, 50),
+        "sma_90":  sma(closes, 90),
+        "weekly_candles": weekly_aggregates(history),
+        "recent_5_bars": [
+            {
+                "date": str(h.date), "open": round(float(h.open), 2),
+                "high": round(float(h.high), 2), "low": round(float(h.low), 2),
+                "close": round(float(h.close), 2), "volume": int(h.volume)
+            } for h in history[-5:]
+        ],
+    }
+
     # Format the context tightly
     context_data = {
         "current_st_signal": sig.st_signal if sig else "HOLD",
         "current_lt_signal": sig.lt_signal if sig else "HOLD",
         "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
         "indicators": sig.indicator_breakdown if sig else {},
-        "last_90_bars": [
-            {
-                "date": str(h.date),
-                "open": float(h.open),
-                "high": float(h.high),
-                "low": float(h.low),
-                "close": float(h.close),
-                "volume": int(h.volume)
-            } for h in history
-        ]
+        # ── TODAY's live intraday snapshot — use these exact values, do NOT guess ──
+        "today": {
+            "date": str(today_date),
+            "open": float(intraday_row.open) if intraday_row and intraday_row.open else None,
+            "high": float(intraday_row.high) if intraday_row and intraday_row.high else None,
+            "low": float(intraday_row.low) if intraday_row and intraday_row.low else None,
+            "close": float(sig.current_price) if sig and sig.current_price else (float(intraday_row.close) if intraday_row and intraday_row.close else None),
+            "prev_close": float(sig.prev_close) if sig and sig.prev_close else None,
+            "change_pct": float(sig.change_pct) if sig and sig.change_pct else None,
+            "volume": int(intraday_row.volume) if intraday_row and intraday_row.volume else None,
+        },
+        "price_summary": price_summary,  # aggregated — replaces raw 90-bar dump
     }
 
     try:

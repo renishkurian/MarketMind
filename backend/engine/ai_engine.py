@@ -480,16 +480,19 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
     context_data["recent_news"] = recent_news if recent_news else ["No recent news found."]
 
     sys_prompt = f"""You are an elite quantitative technical analyst examining internal charts for {symbol}.
-You have access to the following current signals, recent news, and the last 90 bars of OHLCV data:
+You have access to the following current signals, today's live intraday data, recent news, and the last 90 bars of OHLCV data:
 {json.dumps(context_data, indent=2)}
 
-You MUST answer the user's questions based on the provided technical data and real-time news context.
-Focus your analysis on obvious trends, RSI extremes, MACD crossovers, and horizontal support/resistance levels.
+IMPORTANT — DATA HIERARCHY:
+1. The "today" block contains the VERIFIED, AUTHORITATIVE intraday Open/High/Low/Close for today. Always use these exact figures when answering questions about today's price range, volatility, or intraday moves. Do NOT invent or guess today's prices.
+2. "last_90_bars" are the historical daily EOD bars. Use them for trend and momentum analysis only.
+3. "recent_news" contains live Google News headlines. Use them to explain fundamental triggers behind price moves.
+
 Synthesize the charting action with any fundamental triggers sourced from the 'recent_news' context. If no news is found, state that the movement appears purely technical.
 
 CRITICAL INSTRUCTION: You must strictly reply in valid JSON. Replace the placeholder values with your actual analysis using the following structure:
 {{
-  "reply": "<Write your actual markdown formatted analysis here. Explain the graph, RSI/MACD readings, real-world fundamental triggers from the news, and whether it's a good time to buy. Keep it concise, aggressive, and highly analytical. DO NOT output this placeholder text.>",
+  "reply": "<Write your actual markdown formatted analysis here. Explain the graph, RSI/MACD readings, CITE today's verified H/L, real-world fundamental triggers from the news, and whether it's a good time to buy. Keep it concise, aggressive, and highly analytical. DO NOT output this placeholder text.>",
   "trend_lines": [
     {{
       "start_date": "2023-01-01", 
