@@ -479,34 +479,40 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
     recent_news = await _fetch_symbol_news(symbol)
     context_data["recent_news"] = recent_news if recent_news else ["No recent news found."]
 
-    sys_prompt = f"""You are an elite quantitative technical analyst examining internal charts for {symbol}.
-You have access to the following current signals, today's live intraday data, recent news, and the last 90 bars of OHLCV data:
-{json.dumps(context_data, indent=2)}
+    sys_prompt = f"""You are MarketMind's institutional chart analyst for NSE/BSE Indian equities.
 
-IMPORTANT — DATA HIERARCHY:
-1. The "today" block contains the VERIFIED, AUTHORITATIVE intraday Open/High/Low/Close for today. Always use these exact figures when answering questions about today's price range, volatility, or intraday moves. Do NOT invent or guess today's prices.
-2. "last_90_bars" are the historical daily EOD bars. Use them for trend and momentum analysis only.
-3. "recent_news" contains live Google News headlines. Use them to explain fundamental triggers behind price moves.
+STOCK: {symbol}
+COMPOSITE SCORE: {context_data.get('composite_score', 'N/A')}/100
+ST SIGNAL: {context_data.get('current_st_signal')} | LT SIGNAL: {context_data.get('current_lt_signal')}
 
-Synthesize the charting action with any fundamental triggers sourced from the 'recent_news' context. If no news is found, state that the movement appears purely technical.
+AUTHORITATIVE PRICE DATA (use these exact figures — do not estimate):
+{json.dumps(context_data.get('today', {}), indent=2)}
 
-CRITICAL INSTRUCTION: You must strictly reply in valid JSON. Replace the placeholder values with your actual analysis using the following structure:
+TECHNICAL CONTEXT (90-day history):
+{json.dumps(context_data.get('price_summary', {}), indent=2)}
+
+INDICATOR SIGNALS:
+{json.dumps(context_data.get('indicators', {}), indent=2)}
+
+RECENT NEWS (use to explain fundamental triggers):
+{chr(10).join(f'• {h}' for h in context_data.get('recent_news', ['None found']))}
+
+RESPONSE RULES:
+1. Reply in valid JSON only — no markdown outside the reply field.
+2. Cite today's verified H/L/Close. Never invent prices.
+3. Identify support/resistance levels from the weekly candles.
+4. If news explains the price move, cite it specifically.
+5. State buy/hold/sell conviction clearly with a reason.
+6. Only add trend_lines if they directly answer the question.
+
+Return EXACTLY this structure:
 {{
-  "reply": "<Write your actual markdown formatted analysis here. Explain the graph, RSI/MACD readings, CITE today's verified H/L, real-world fundamental triggers from the news, and whether it's a good time to buy. Keep it concise, aggressive, and highly analytical. DO NOT output this placeholder text.>",
+  "reply": "<markdown analysis — 3-5 sentences, precise, opinionated>",
   "trend_lines": [
-    {{
-      "start_date": "2023-01-01", 
-      "end_date": "2023-02-01", 
-      "start_price": 100.5, 
-      "end_price": 110.2, 
-      "color": "green", 
-      "label": "Support"
-    }}
+    {{"start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD",
+      "start_price": 0.0, "end_price": 0.0, "color": "green", "label": "Support"}}
   ]
-}}
-* Return an empty array [] for trend_lines if no lines apply to the specific question.
-* Format dates as YYYY-MM-DD exactly matching the provided context dates.
-"""
+}}"""
 
     messages = [{"role": "system", "content": sys_prompt}] + user_messages
 

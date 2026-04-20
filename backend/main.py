@@ -824,7 +824,12 @@ async def handle_chart_chat(
         "current_st_signal": sig.st_signal if sig else "HOLD",
         "current_lt_signal": sig.lt_signal if sig else "HOLD",
         "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
-        "indicators": sig.indicator_breakdown if sig else {},
+        "indicators": {
+            "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
+            "ta": sig.ta_breakdown or {},
+            "fa": sig.fa_breakdown or {},
+            "momentum": sig.momentum_breakdown or {},
+        },
         # ── TODAY's live intraday snapshot — use these exact values, do NOT guess ──
         "today": {
             "date": str(today_date),

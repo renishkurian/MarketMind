@@ -615,10 +615,13 @@ export default function DeepDive() {
         const updated = [newSession];
         saveSessions(updated);
         setActiveChatSessionId(newSession.id);
-        sendChatMessage(
-          "Please analyze this chart based on RSI, MACD, and current price trends. State clearly if this is a good buy setup right now. Plot any important support/resistance trend lines.",
-          newSession.id
-        );
+        const autoMsg = signals
+          ? `Analyze ${symbol} chart. Current price ₹${Number(signals.current_price).toFixed(2)}, ` +
+            `composite score ${signals.composite_score}/100, ` +
+            `ST signal ${signals.st_signal}, LT signal ${signals.lt_signal}. ` +
+            `Is this a good long-term entry? Plot key support/resistance levels.`
+          : `Please analyze this ${symbol} chart. State if this is a good buy setup and plot key support/resistance.`;
+        sendChatMessage(autoMsg, newSession.id);
       }
     }
   };
