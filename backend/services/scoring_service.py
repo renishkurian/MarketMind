@@ -182,7 +182,17 @@ class ScoringService:
     # Persistence helpers
     # ------------------------------------------------------------------
 
-    async def _upsert_signals_cache(
+    def _to_signal_enum(self, val: Optional[str]) -> str:
+        """Map human labels to DB Enums (BUY/SELL/HOLD)."""
+        mapping = {
+            "Buy Signal": "BUY",
+            "Sell Signal": "SELL",
+            "Buy": "BUY",
+            "Sell": "SELL"
+        }
+        return mapping.get(val or "", "HOLD")
+
+    async def _upsert_score_to_cache(
         self,
         symbol: str,
         exchange: str,
@@ -208,8 +218,8 @@ class ScoringService:
         score_cols["current_price"] = current_price
         
         # Derive expert signals (BUY/SELL) from indicator labels
-        signal_fields = build_signals_from_indicators(result.ta_data, result.ta_data)
-        score_cols.update(signal_fields)
+        score_cols["st_signal"] = self._to_signal_enum(result.ta_data.overall_trend)
+        score_cols["lt_signal"] = self._to_signal_enum(result.ta_data.lt_recommendation)
         
         # Legacy fields for backward compatibility
         score_cols["st_score"] = result.technical_score
