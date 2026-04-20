@@ -57,11 +57,9 @@ const SKILLS = [
   { id: 'mckinsey_macro', name: 'McKinsey Macro', icon: '🌍', desc: 'Global & domestic macro impact analysis' },
   { id: 'renaissance_patterns', name: 'Renaissance Quant', icon: '🧬', desc: 'Statistical trends & seasonal anomalies' },
   { id: 'bain_strategy', name: 'Bain Strategy', icon: '📉', desc: 'Competitive moat & market share trajectory' },
-  { id: 'harvard_dividends', name: 'Harvard Income', icon: '🎓', desc: 'Sustainable yield & compounding projections' },
   { id: 'hindenburg_forensic', name: 'Hindenburg Audit', icon: '🔍', desc: 'Accounting red flags & governance risks' },
-  { id: 'ark_disruptive_tech', name: 'ARK Disruptive', icon: '🚀', desc: 'Exponential growth & disruptive tech scout' },
-  { id: 'peter_lynch_simple', name: 'Lynch Main St', icon: '🏠', desc: 'Consumer logic & "Invest in what you know"' },
-  { id: 'policy_lobbyist', name: 'Policy Lobbyist', icon: '🏛️', desc: 'PLI schemes & regulatory catalyst tracking' },
+  { id: 'ark_disruptive', name: 'ARK Disruptive', icon: '🚀', desc: 'Exponential growth & disruptive tech scout' },
+  { id: 'peter_lynch_simple', name: 'Lynch Main St', icon: '🏠', desc: 'Consumer logic & "Invest in what you know"' }
 ];
 
 // ── AI Insight Panel ──────────────────────────────────────────────────────

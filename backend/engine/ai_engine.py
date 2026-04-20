@@ -105,60 +105,33 @@ def _build_messages(prompt: str) -> list:
     return [{"role": "user", "content": prompt}]
 
 
-def _build_prompt(
-    symbol: str,
-    company_name: str,
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# Removed legacy _build_prompt in favor of SkillLoader for rich md templates
+
+def _build_fallback_prompt(
+    symbol: str, 
+    company_name: str, 
     trigger_reason: str,
-    price_history_df: pd.DataFrame,
     signals: dict,
-    fundamentals: dict,
-    skill_persona: str,
+    fundamentals: dict
 ) -> str:
-    price_summary = ""
-    if not price_history_df.empty and len(price_history_df) >= 90:
-        df_90 = price_history_df.tail(90)
-        start_p = float(df_90.iloc[0]["close"])
-        end_p = float(df_90.iloc[-1]["close"])
-        pct = (end_p - start_p) / start_p * 100
-        price_summary = (
-            f"Over the last 90 days, price moved from ₹{start_p:.2f} to "
-            f"₹{end_p:.2f} ({pct:+.2f}%)."
-        )
-
-    persona = skill_persona or "You are a senior financial analyst specialising in the Indian equity market."
-
+    """Fallback if no skill_id is provided or skill fails."""
     return f"""
-{skill_persona}
-
 Analyze {company_name} ({symbol}).
-
 TRIGGER: {trigger_reason}
-
-PRICE ACTION:
-{price_summary}
-
-SIGNALS:
-Short-Term: {signals.get('st_signal')} (Score: {signals.get('st_score')})
-Long-Term : {signals.get('lt_signal')} (Score: {signals.get('lt_score')})
-Confidence: {signals.get('confidence_pct')}%
-Data Quality: {signals.get('data_quality')}
-
-TECHNICAL BREAKDOWN:
-{json.dumps(signals.get('indicator_breakdown', {}), indent=2)}
-
-FUNDAMENTALS:
-{json.dumps(fundamentals, indent=2)}
-
+SIGNALS: Short-Term {signals.get('st_signal')}, Long-Term {signals.get('lt_signal')}.
 Return ONLY a JSON object:
 {{
-    "short_summary": "2–3 sentence short-term outlook.",
-    "long_summary": "3–4 sentence long-term thesis.",
-    "verdict": "one of: STRONG_BUY | BUY | ACCUMULATE | HOLD | WATCH | AVOID",
-    "key_risks": ["Risk 1", "Risk 2", "Risk 3"],
-    "key_opportunities": ["Opportunity 1", "Opportunity 2", "Opportunity 3"],
+    "short_summary": "2–3 sentence.",
+    "long_summary": "3–4 sentence.",
+    "verdict": "HOLD",
+    "key_risks": [],
+    "key_opportunities": [],
     "sentiment_score": 0.0
 }}
 """
+
 
 
 # ── Provider calls ────────────────────────────────────────────────────────────
@@ -351,20 +324,48 @@ async def generate_insight(
         "xai": ai_cfg["xai_model"],
     }.get(provider, "gpt-4o")
 
-    # Load skill and substitute variables
-    context = {
-        "SYMBOL": symbol,
-        "COMPANY_NAME": company_name or symbol,
-        "SECTOR": signals.get("sector") or fundamentals.get("sector") or "N/A",
-        "EXCHANGE": signals.get("exchange", "NSE"),
-        "ISIN": signals.get("isin", "N/A"),
-        "CURRENT_PRICE": signals.get("current_price", "N/A"),
-        "MARKET_CAP": fundamentals.get("market_cap", "N/A"),
-    }
-    skill_persona = _load_skill_prompt(skill_id, context) if skill_id else ""
+    # Load skill and build prompt via SkillLoader
+    prompt = None
+    if skill_id:
+        from backend.engine.consensus.skill_loader import SkillLoader, StockMeta
+        from backend.engine.scoring.composite_score import CompositeScoreResult
+        
+        # Build dummy StockMeta + CompositeScoreResult mapped from signals dictionary
+        meta = StockMeta(
+            symbol=symbol,
+            isin=signals.get("isin", "N/A"),
+            exchange=signals.get("exchange", "NSE"),
+            sector=signals.get("sector") or fundamentals.get("sector", "N/A"),
+            market_cap_cr=float(fundamentals.get("market_cap", 0)) / 10000000,
+            current_price=float(signals.get("current_price", 0)),
+            pe_ratio=fundamentals.get("pe_ratio"),
+            roe=fundamentals.get("roe"),
+            debt_equity=fundamentals.get("debt_equity"),
+            revenue_growth_3yr=fundamentals.get("revenue_growth_3yr"),
+        )
+        setattr(meta, "company_name", company_name or symbol)
+        
+        csr = CompositeScoreResult(
+            symbol=symbol,
+            isin=meta.isin,
+            fundamental_score=float(signals.get("lt_score", 0) or 0),
+            technical_score=float(signals.get("st_score", 0) or 0),
+            momentum_score=0.0,
+            sector_rank_score=0.0,
+            composite_score=0.0,
+            data_confidence=float(signals.get("confidence_pct", 50)) / 100.0,
+            fa_breakdown=signals.get("indicator_breakdown", {})
+        )
+        
+        try:
+            loader = SkillLoader()
+            prompt = loader.build_prompt(skill_id, meta, csr)
+        except Exception as e:
+            logger.error(f"Failed to load prompt for skill {skill_id}: {e}")
+            
+    if not prompt:
+        prompt = _build_fallback_prompt(symbol, company_name or symbol, trigger_reason, signals, fundamentals)
 
-    # Build prompt
-    prompt = _build_prompt(symbol, company_name or symbol, trigger_reason, price_history_df, signals, fundamentals, skill_persona)
     messages = _build_messages(prompt)
 
     # Call provider
@@ -419,6 +420,33 @@ async def generate_insight(
     return parsed  # ← was missing: caused insights to never be saved to AIInsights table
 
 
+import urllib.request
+import urllib.parse
+import xml.etree.ElementTree as ET
+import asyncio
+
+def _fetch_news_sync(symbol: str) -> list[str]:
+    """Synchronously fetches top news for a symbol using Google News RSS."""
+    try:
+        query = urllib.parse.quote(f'{symbol} stock India')
+        url = f'https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            xml_data = resp.read()
+            root = ET.fromstring(xml_data)
+            headlines = []
+            for item in root.findall('.//item')[:5]:
+                title = item.find('title').text if item.find('title') is not None else ''
+                pubDate = item.find('pubDate').text if item.find('pubDate') is not None else ''
+                if title:
+                    headlines.append(f'{pubDate}: {title}')
+            return headlines
+    except Exception as e:
+        logger.warning(f"Error fetching news for {symbol}: {e}")
+        return []
+
+async def _fetch_symbol_news(symbol: str) -> list[str]:
+    return await asyncio.to_thread(_fetch_news_sync, symbol)
 
 async def generate_chart_chat(symbol: str, user_messages: list, context_data: dict) -> dict:
     """
@@ -447,16 +475,21 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
         "xai": ai_cfg["xai_model"],
     }.get(provider, "gpt-4o")
 
+    # Fetch live news for fundamental context
+    recent_news = await _fetch_symbol_news(symbol)
+    context_data["recent_news"] = recent_news if recent_news else ["No recent news found."]
+
     sys_prompt = f"""You are an elite quantitative technical analyst examining internal charts for {symbol}.
-You have access to the following current signals and the last 90 bars of OHLCV data:
+You have access to the following current signals, recent news, and the last 90 bars of OHLCV data:
 {json.dumps(context_data, indent=2)}
 
-You MUST answer the user's questions based strictly on the provided technical data.
+You MUST answer the user's questions based on the provided technical data and real-time news context.
 Focus your analysis on obvious trends, RSI extremes, MACD crossovers, and horizontal support/resistance levels.
+Synthesize the charting action with any fundamental triggers sourced from the 'recent_news' context. If no news is found, state that the movement appears purely technical.
 
-CRITICAL INSTRUCTION: You must strictly reply in valid JSON using EXACTLY this schema:
+CRITICAL INSTRUCTION: You must strictly reply in valid JSON. Replace the placeholder values with your actual analysis using the following structure:
 {{
-  "reply": "Your markdown formatted text here. Explain the graph, RSI/MACD readings, and whether it's a good time to buy. Keep it concise, aggressive, and highly analytical.",
+  "reply": "<Write your actual markdown formatted analysis here. Explain the graph, RSI/MACD readings, real-world fundamental triggers from the news, and whether it's a good time to buy. Keep it concise, aggressive, and highly analytical. DO NOT output this placeholder text.>",
   "trend_lines": [
     {{
       "start_date": "2023-01-01", 

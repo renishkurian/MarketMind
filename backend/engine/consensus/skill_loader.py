@@ -264,6 +264,7 @@ class SkillLoader:
 
         subs: dict[str, Any] = {
             # Stock identity
+            "COMPANY_NAME": getattr(m, "company_name", m.symbol),
             "SYMBOL": m.symbol,
             "ISIN": m.isin,
             "EXCHANGE": m.exchange,
