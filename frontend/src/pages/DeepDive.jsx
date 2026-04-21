@@ -53,13 +53,13 @@ import MACDChart from '../components/charts/MACDChart';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const SKILLS = [
-  { id: 'goldman_screener', name: 'Goldman Screener', icon: '📊', desc: 'Institutional institutional-grade screening & targets' },
-  { id: 'mckinsey_macro', name: 'McKinsey Macro', icon: '🌍', desc: 'Global & domestic macro impact analysis' },
-  { id: 'renaissance_patterns', name: 'Renaissance Quant', icon: '🧬', desc: 'Statistical trends & seasonal anomalies' },
-  { id: 'bain_strategy', name: 'Bain Strategy', icon: '📉', desc: 'Competitive moat & market share trajectory' },
-  { id: 'hindenburg_forensic', name: 'Hindenburg Audit', icon: '🔍', desc: 'Accounting red flags & governance risks' },
-  { id: 'ark_disruptive', name: 'ARK Disruptive', icon: '🚀', desc: 'Exponential growth & disruptive tech scout' },
-  { id: 'peter_lynch_simple', name: 'Lynch Main St', icon: '🏠', desc: 'Consumer logic & "Invest in what you know"' }
+  { id: 'sebi_forensic', name: 'SEBI Forensic', icon: '🔍', desc: 'Accounting red flags & governance risks' },
+  { id: 'warren_buffett_quality', name: 'Warren Buffett', icon: '🦅', desc: 'High ROE, low debt & sustainable moats' },
+  { id: 'rj_india_growth', name: 'RJ India Cycle', icon: '🐂', desc: 'Macro cycle & sector tailwinds' },
+  { id: 'sequoia_moat', name: 'Sequoia Moat', icon: '🌲', desc: 'Pricing power & scalability analysis' },
+  { id: 'ark_disruptive', name: 'ARK Disruptive', icon: '🚀', desc: 'Exponential growth & disruptive tech' },
+  { id: 'goldman_screener', name: 'Goldman Screener', icon: '📊', desc: 'Institutional screening & targets' },
+  { id: 'peter_lynch_simple', name: 'Lynch Main St', icon: '🏠', desc: 'Consumer logic & retail insight' }
 ];
 
 // ── AI Insight Panel ──────────────────────────────────────────────────────
@@ -982,6 +982,29 @@ export default function DeepDive() {
                         )}
                       </div>
 
+                      {/* Quick Prompt Chips */}
+                      {!chatLoading && activeChatSessionId && (
+                        <div className="px-3 pb-3 flex gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+                          {[
+                            "Is this a good entry right now?",
+                            "Identify key support and resistance",
+                            "Explain the recent price move",
+                            `What's the risk/reward for next 3 months?`
+                          ].map(prompt => (
+                            <button
+                              key={prompt}
+                              onClick={() => {
+                                setChatInput(prompt);
+                                setTimeout(() => sendChatMessage(prompt), 10);
+                              }}
+                              className="shrink-0 px-3 py-1.5 bg-dark-card border border-dark-border hover:border-accent hover:bg-accent/5 rounded-full text-[10px] font-bold text-dark-muted hover:text-accent transition-all whitespace-nowrap"
+                            >
+                              {prompt}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Input Bar */}
                       <div className="p-3 border-t border-dark-border bg-dark-bg flex gap-2 shrink-0">
                         <input
@@ -1312,24 +1335,21 @@ export default function DeepDive() {
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-gray-900/50 border border-dark-border rounded-xl">
                 <div className="flex-1">
                   <h4 className="text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Analysis Skill / Persona</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {SKILLS.map(s => (
-                      <button
-                        key={s.id}
-                        onClick={() => setSelectedSkill(s.id)}
-                        className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all border ${
-                          selectedSkill === s.id 
-                          ? 'bg-accent/10 border-accent/40 text-accent' 
-                          : 'bg-dark-bg border-dark-border text-dark-muted hover:border-dark-muted'
-                        }`}
-                      >
-                        <span className="text-base">{s.icon}</span>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold truncate leading-none">{s.name}</p>
-                          <p className="text-[8px] opacity-60 truncate mt-0.5">{s.desc}</p>
-                        </div>
-                      </button>
-                    ))}
+                  <div className="relative group">
+                    <select
+                      value={selectedSkill}
+                      onChange={(e) => setSelectedSkill(e.target.value)}
+                      className="w-full bg-dark-bg border border-dark-border text-dark-text text-sm rounded-xl px-4 py-3 appearance-none focus:outline-none focus:border-accent transition-all cursor-pointer hover:border-dark-muted"
+                    >
+                      {SKILLS.map(s => (
+                        <option key={s.id} value={s.id} className="bg-dark-bg">
+                          {s.icon} {s.name} — {s.desc}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-dark-muted">
+                      <ArrowRight size={14} className="rotate-90" />
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">

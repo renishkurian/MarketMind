@@ -190,6 +190,9 @@ def build_chart_chat_system_prompt(symbol: str, context_data: dict) -> str:
     comp      = context_data.get("composite_score", "N/A")
     st_sig    = context_data.get("current_st_signal", "HOLD")
     lt_sig    = context_data.get("current_lt_signal", "HOLD")
+    bt        = context_data.get("backtest", {})
+    bt_str    = (f"{bt.get('cagr', 'N/A')}% CAGR, {bt.get('win_rate', 'N/A')}% Win Rate, {bt.get('sharpe', 'N/A')} Sharpe" 
+                 if bt.get('cagr') else "Not available")
 
     news_block = "\n".join(f"• {h}" for h in news[:5]) if news else "No recent news found."
 
@@ -206,6 +209,7 @@ Your role is to give precise, data-grounded technical analysis backed by live ne
 Symbol          : {symbol}
 Composite Score : {comp}/100
 ST Signal       : {st_sig}  |  LT Signal: {lt_sig}
+Backtest (2016+) : {bt_str}
 
 ═══ TODAY'S VERIFIED INTRADAY DATA ═══
 Use these EXACT figures when discussing today's price action. Do not estimate.

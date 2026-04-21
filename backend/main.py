@@ -842,6 +842,11 @@ async def handle_chart_chat(
             "volume": int(intraday_row.volume) if intraday_row and intraday_row.volume else None,
         },
         "price_summary": price_summary,  # aggregated — replaces raw 90-bar dump
+        "backtest": {
+            "cagr": float(sig.backtest_cagr) if sig and sig.backtest_cagr else None,
+            "win_rate": float(sig.backtest_win_rate) if sig and sig.backtest_win_rate else None,
+            "sharpe": float(sig.backtest_sharpe) if sig and sig.backtest_sharpe else None,
+        },
     }
 
     try:
@@ -1177,6 +1182,11 @@ async def _research_and_save_fundamentals(symbol: str):
         
         # 2. Persist to DB
         async with SessionLocal() as session:
+            # Map AI confidence to data_quality column
+            confidence = ai_data.get("data_confidence", "LOW")
+            # If LOW, keep as AI_RESEARCHED. If HIGH/MEDIUM, we consider it FULL coverage.
+            data_quality = "AI_RESEARCHED" if confidence == "LOW" else "FULL"
+
             stmt = mysql_insert(FundamentalsCache).values(
                 symbol=symbol,
                 fetched_at=datetime.now(),
@@ -1186,7 +1196,7 @@ async def _research_and_save_fundamentals(symbol: str):
                 debt_equity=ai_data.get("debt_equity"),
                 revenue_growth=ai_data.get("revenue_growth"),
                 market_cap=ai_data.get("market_cap"),
-                data_quality="AI_RESEARCHED"
+                data_quality=data_quality
             )
             FUND_COLS = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
                          "revenue_growth", "market_cap", "data_quality"]

@@ -449,35 +449,74 @@ class ScoringService:
         ai_client,
     ) -> None:
         skill_analyses: list[SkillAnalysis] = []
-
-        for skill_name in skill_names:
+        
+        # 1. ── Sequential Gate: Run Forensics First ──
+        forensic_skills = [s for s in skill_names if s in ("sebi_forensic", "hindenburg_forensic")]
+        other_skills    = [s for s in skill_names if s not in forensic_skills]
+        
+        for f_skill in forensic_skills:
             try:
-                prompt = self.skill_loader.build_prompt(
-                    skill_name=skill_name,
-                    stock_meta=meta,
-                    score_result=score_result,
-                    backtest_metrics=bt_metrics,
-                )
-                narrative = await ai_client.complete(
-                    prompt=prompt,
-                    max_tokens=1200,
-                    temperature=0.3,
-                )
-                verdict = self.consensus.extract_verdict(narrative)
-                info = self.skill_loader.SKILL_REGISTRY.get(skill_name, {})
-                skill_analyses.append(SkillAnalysis(
-                    skill_name=skill_name,
-                    display_name=info.get("display_name", skill_name),
-                    verdict=verdict,
-                    narrative=narrative,
-                    confidence=score_result.data_confidence,
-                ))
+                analysis = await self._execute_single_skill(f_skill, meta, score_result, bt_metrics, ai_client)
+                if analysis:
+                    skill_analyses.append(analysis)
+                    # GATE: If forensic says AVOID/CRITICAL, stop immediately
+                    if analysis.verdict in (SkillVerdict.AVOID, SkillVerdict.CRITICAL):
+                        print(f"[AI Gate] Forensic veto triggered by {f_skill}. Skipping remaining {len(other_skills)} skills.")
+                        await self._finalize_consensus_and_persist(meta, score_result, skill_analyses)
+                        return
             except Exception as exc:
-                print(f"[AI skill] {skill_name} failed: {exc}")
+                print(f"[AI Gate] Forensic skill {f_skill} failed: {exc}")
+
+        # 2. ── Parallel Execution: Run remaining skills ──
+        if other_skills:
+            import asyncio
+            tasks = [self._execute_single_skill(s, meta, score_result, bt_metrics, ai_client) for s in other_skills]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for res in results:
+                if res and isinstance(res, SkillAnalysis):
+                    skill_analyses.append(res)
+                elif isinstance(res, Exception):
+                    print(f"[AI skill] Parallel execution error: {res}")
 
         if not skill_analyses:
             return
 
+        await self._finalize_consensus_and_persist(meta, score_result, skill_analyses)
+
+    async def _execute_single_skill(
+        self, skill_name: str, meta: StockMeta, score_result: CompositeScoreResult, 
+        bt_metrics: Optional[BacktestMetrics], ai_client
+    ) -> Optional[SkillAnalysis]:
+        """Runs a single skill prompt via AI and extracts the verdict."""
+        try:
+            prompt = self.skill_loader.build_prompt(
+                skill_name=skill_name,
+                stock_meta=meta,
+                score_result=score_result,
+                backtest_metrics=bt_metrics,
+            )
+            narrative = await ai_client.complete(
+                prompt=prompt,
+                max_tokens=1200,
+                temperature=0.3,
+            )
+            verdict = self.consensus.extract_verdict(narrative)
+            info = self.skill_loader.SKILL_REGISTRY.get(skill_name, {})
+            return SkillAnalysis(
+                skill_name=skill_name,
+                display_name=info.get("display_name", skill_name),
+                verdict=verdict,
+                narrative=narrative,
+                confidence=score_result.data_confidence,
+            )
+        except Exception as exc:
+            print(f"[AI skill] {skill_name} failed: {exc}")
+            return None
+
+    async def _finalize_consensus_and_persist(
+        self, meta: StockMeta, score_result: CompositeScoreResult, skill_analyses: list[SkillAnalysis]
+    ) -> None:
+        """Computes consensus and saves results to AIInsights."""
         consensus = self.consensus.compute_consensus(
             symbol=meta.symbol,
             isin=meta.isin,
