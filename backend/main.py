@@ -1196,10 +1196,34 @@ async def _research_and_save_fundamentals(symbol: str):
                 debt_equity=ai_data.get("debt_equity"),
                 revenue_growth=ai_data.get("revenue_growth"),
                 market_cap=ai_data.get("market_cap"),
+                # -- v2.1 Expansion --
+                revenue_growth_3yr=ai_data.get("revenue_growth_3yr"),
+                pat_growth_3yr=ai_data.get("pat_growth_3yr"),
+                operating_margin=ai_data.get("operating_margin"),
+                pe_5yr_avg=ai_data.get("pe_5yr_avg"),
+                roe_3yr_avg=ai_data.get("roe_3yr_avg"),
+                peg_ratio=ai_data.get("peg_ratio"),
+                pb_ratio=ai_data.get("pb_ratio"),
+                ev_ebitda=ai_data.get("ev_ebitda"),
+                held_percent_institutions=ai_data.get("held_percent_institutions"),
+                promoter_holding=ai_data.get("promoter_holding"),
+                promoter_pledge_pct=ai_data.get("promoter_pledge_pct"),
+                analyst_rating=ai_data.get("analyst_rating"),
+                recommendation_key=ai_data.get("recommendation_key"),
+                total_cash=ai_data.get("total_cash"),
+                total_debt=ai_data.get("total_debt"),
+                current_ratio=ai_data.get("current_ratio"),
                 data_quality=data_quality
             )
-            FUND_COLS = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
-                         "revenue_growth", "market_cap", "data_quality"]
+            FUND_COLS = [
+                "fetched_at", "pe_ratio", "eps", "roe", "debt_equity",
+                "revenue_growth", "market_cap", "revenue_growth_3yr",
+                "pat_growth_3yr", "operating_margin", "pe_5yr_avg",
+                "roe_3yr_avg", "peg_ratio", "pb_ratio", "ev_ebitda",
+                "held_percent_institutions", "promoter_holding",
+                "promoter_pledge_pct", "analyst_rating", "recommendation_key",
+                "total_cash", "total_debt", "current_ratio", "data_quality"
+            ]
             stmt = stmt.on_duplicate_key_update(
                 **{c: stmt.inserted[c] for c in FUND_COLS}
             )

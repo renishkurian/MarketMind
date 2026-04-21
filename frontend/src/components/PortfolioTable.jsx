@@ -162,7 +162,18 @@ export default function PortfolioTable({ stocks }) {
                       <span className="text-dark-text font-medium truncate max-w-[200px]">
                         {stock.scp_name || stock.company_name}
                       </span>
-                      <span className="text-[10px] text-dark-muted font-mono">{stock.sector || 'N/A'}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-dark-muted font-mono">{stock.sector || 'N/A'}</span>
+                        {stock.market_cap_cat && stock.market_cap_cat !== 'UNKNOWN' && (
+                          <span className={`px-1 rounded-[4px] text-[8px] font-black tracking-tighter border ${
+                            stock.market_cap_cat === 'LARGE' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                            stock.market_cap_cat === 'MID' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {stock.market_cap_cat}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
 

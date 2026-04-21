@@ -33,16 +33,43 @@ export default function Portfolio() {
   );
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedSector, setSelectedSector] = useState('ALL');
 
   const filteredStocks = useMemo(() => {
-    if (!searchQuery.trim()) return portfolioStocks;
-    const q = searchQuery.toLowerCase();
-    return portfolioStocks.filter(s => 
-      s.symbol.toLowerCase().includes(q) || 
-      (s.company_name?.toLowerCase().includes(q)) ||
-      (s.scp_name?.toLowerCase().includes(q))
-    );
-  }, [portfolioStocks, searchQuery]);
+    let filtered = portfolioStocks;
+    
+    // Filter by Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(s => 
+        s.symbol.toLowerCase().includes(q) || 
+        (s.company_name?.toLowerCase().includes(q)) ||
+        (s.scp_name?.toLowerCase().includes(q))
+      );
+    }
+    
+    // Filter by Category (Market Cap)
+    if (selectedCategory !== 'ALL') {
+      filtered = filtered.filter(s => s.market_cap_cat === selectedCategory);
+    }
+    
+    // Filter by Sector
+    if (selectedSector !== 'ALL') {
+      filtered = filtered.filter(s => s.sector === selectedSector);
+    }
+    
+    return filtered;
+  }, [portfolioStocks, searchQuery, selectedCategory, selectedSector]);
+
+  // Extract unique sectors from portfolio for the filter
+  const sectors = useMemo(() => {
+    const s = new Set();
+    portfolioStocks.forEach(st => {
+      if (st.sector) s.add(st.sector);
+    });
+    return Array.from(s).sort();
+  }, [portfolioStocks]);
 
   const stats = useMemo(() => {
     let invested = 0;
@@ -259,15 +286,39 @@ export default function Portfolio() {
 
       {/* Table Actions / Search */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" size={18} />
-          <input 
-            type="text"
-            placeholder="Search by symbol or name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-dark-card border border-dark-border rounded-xl py-2.5 pl-10 pr-4 text-dark-text placeholder:text-dark-muted focus:border-accent focus:ring-1 focus:ring-accent transition-all outline-none"
-          />
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" size={18} />
+            <input 
+              type="text"
+              placeholder="Search by symbol or name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-dark-card border border-dark-border rounded-xl py-2 pr-4 pl-10 text-dark-text placeholder:text-dark-muted focus:border-accent focus:ring-1 focus:ring-accent transition-all outline-none"
+            />
+          </div>
+          
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full md:w-40 bg-dark-card border border-dark-border rounded-xl py-2 px-3 text-dark-text focus:border-accent focus:ring-1 focus:ring-accent transition-all outline-none appearance-none cursor-pointer font-medium text-sm"
+          >
+            <option value="ALL">All Sizes</option>
+            <option value="LARGE">Large Cap</option>
+            <option value="MID">Mid Cap</option>
+            <option value="SMALL">Small Cap</option>
+          </select>
+
+          <select
+            value={selectedSector}
+            onChange={(e) => setSelectedSector(e.target.value)}
+            className="w-full md:w-48 bg-dark-card border border-dark-border rounded-xl py-2 px-3 text-dark-text focus:border-accent focus:ring-1 focus:ring-accent transition-all outline-none appearance-none cursor-pointer font-medium text-sm"
+          >
+            <option value="ALL">All Sectors</option>
+            {sectors.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
         <div className="text-dark-muted text-xs font-medium">
           Showing {filteredStocks.length} of {portfolioStocks.length} stocks
