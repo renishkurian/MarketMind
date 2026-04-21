@@ -16,10 +16,11 @@ export const useAuthStore = create((set, get) => ({
       const { access_token } = res.data;
       
       localStorage.setItem('mm_token', access_token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       set({ token: access_token, isAuthenticated: true, loading: false });
       
-      // Setup axios interceptor for this session
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      // Fetch user profile immediately to populate role for UI
+      await get().checkAuth();
       
       return { success: true };
     } catch (err) {

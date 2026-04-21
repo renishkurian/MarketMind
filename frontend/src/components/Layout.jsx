@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Activity, BarChart2, Eye, Zap, Brain, Info,
   Sun, Moon, Wifi, WifiOff, Settings, LogOut,
-  Menu, X, ChevronLeft
+  Menu, X, ChevronLeft, Users
 } from 'lucide-react';
 import { useStockStore } from '../store/stockStore';
 import { useAuthStore } from '../store/authStore';
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
 export default function Layout({ children }) {
   const { marketStatus, theme, toggleTheme, isConnected, lastUpdate } = useStockStore();
   const { user, logout } = useAuthStore();
+  console.log("DEBUG: Layout user:", user);
   const navigate = useNavigate();
   const isOpen = marketStatus === 'OPEN';
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -112,6 +113,26 @@ export default function Layout({ children }) {
                 <span>{label}</span>
               </NavLink>
             ))}
+
+            {/* Admin only section */}
+            {user?.role === 'ADMIN' && (
+              <div className="pt-4 mt-4 border-t border-dark-border/30">
+                <p className="px-4 mb-2 text-[10px] font-bold text-dark-muted uppercase tracking-widest">Administration</p>
+                <NavLink
+                  to="/admin/users"
+                  className={({ isActive }) =>
+                    `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
+                      isActive
+                        ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                        : 'text-dark-muted hover:bg-accent/10 hover:text-accent'
+                    }`
+                  }
+                >
+                  <Users size={18} className="shrink-0 transition-transform group-hover:scale-110" />
+                  <span>User Management</span>
+                </NavLink>
+              </div>
+            )}
           </nav>
 
           {/* Stats Bar */}

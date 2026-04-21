@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import Portfolio from './pages/Portfolio';
 import Watchlist from './pages/Watchlist';
 import Opportunities from './pages/Opportunities';
+import AdminUsers from './pages/AdminUsers';
 import DeepDive from './pages/DeepDive';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -31,6 +32,10 @@ function AppInner() {
   // ... (keeping other effects)
 
   useWebSocket(isAuthenticated ? `${WS_URL}?token=${token}` : null);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -81,6 +86,10 @@ function AppInner() {
 
         <Route path="/methodology" element={
           <ProtectedRoute><Layout><Methodology /></Layout></ProtectedRoute>
+        } />
+
+        <Route path="/admin/users" element={
+          <ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />

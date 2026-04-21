@@ -120,10 +120,10 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
         return
 
     # Verify user
-    from backend.utils.auth import SECRET_KEY, ALGORITHM
-    from jose import jwt, JWTError
+    from backend.utils.auth import ALGORITHM
+    import jwt
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             await websocket.close(code=1008)
@@ -131,12 +131,13 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
         
         # Verify user exists
         res = await db.execute(select(User).where(User.email == email))
-        user = res.scalars().first()
-        if not user:
+        user = result_user = res.scalars().first()
+        if not result_user:
             await websocket.close(code=1008)
             return
+        user = result_user
             
-    except JWTError:
+    except jwt.PyJWTError:
         await websocket.close(code=1008)
         return
 
@@ -1505,6 +1506,38 @@ async def update_system_config(req: ConfigUpdateRequest, db: AsyncSession = Depe
     config.value = req.value
     await db.commit()
     return {"message": f"Successfully updated {req.key}"}
+
+@app.get("/api/admin/users")
+async def list_users(db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
+    result = await db.execute(select(User).order_by(User.id))
+    users = result.scalars().all()
+    return [{
+        "id": u.id,
+        "email": u.email,
+        "full_name": u.full_name,
+        "role": u.role,
+        "is_active": u.is_active,
+        "created_at": u.created_at.isoformat() if u.created_at else None
+    } for u in users]
+
+@app.patch("/api/admin/users/{user_id}")
+async def update_user(user_id: int, data: dict = Body(...), db: AsyncSession = Depends(get_db), admin: User = Depends(get_current_admin)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent admin from deactivating themselves for safety
+    if user.id == admin.id and "is_active" in data and not data["is_active"]:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own administrative account")
+
+    if "role" in data:
+        user.role = data["role"]
+    if "is_active" in data:
+        user.is_active = data["is_active"]
+        
+    await db.commit()
+    return {"message": "User updated successfully"}
 
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health")
