@@ -31,6 +31,25 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  signup: async (email, password, fullName) => {
+    set({ loading: true });
+    try {
+      await axios.post(`${API_URL}/api/auth/register`, { 
+        email, 
+        password, 
+        full_name: fullName 
+      });
+      set({ loading: false });
+      return { success: true };
+    } catch (err) {
+      set({ loading: false });
+      return { 
+        success: false, 
+        message: err.response?.data?.detail || 'Signup failed' 
+      };
+    }
+  },
+
   logout: () => {
     localStorage.removeItem('mm_token');
     delete axios.defaults.headers.common['Authorization'];

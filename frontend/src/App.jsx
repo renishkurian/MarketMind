@@ -10,6 +10,7 @@ import Watchlist from './pages/Watchlist';
 import Opportunities from './pages/Opportunities';
 import DeepDive from './pages/DeepDive';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Settings from './pages/Settings';
 import AILogs from './pages/AILogs';
 import Methodology from './pages/Methodology';
@@ -25,23 +26,11 @@ const ProtectedRoute = ({ children }) => {
 
 function AppInner() {
   const { theme } = useStockStore();
-  const { isAuthenticated, checkAuth } = useAuthStore();
-
-  // Initialize Auth check once on mount
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
-  // Initialize WebSocket at root if authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      // useWebSocket is a hook, it can't be called conditionally easily if it uses other hooks.
-      // But we call it inside the component. We'll handle connection logic inside the hook itself
-      // if it needs to wait for auth. For now, we'll keep it simple.
-    }
-  }, [isAuthenticated]);
+  const { isAuthenticated, checkAuth, token } = useAuthStore();
   
-  useWebSocket(isAuthenticated ? WS_URL : null);
+  // ... (keeping other effects)
+
+  useWebSocket(isAuthenticated ? `${WS_URL}?token=${token}` : null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -64,6 +53,7 @@ function AppInner() {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
         {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute><Navigate to="/portfolio" replace /></ProtectedRoute>} />

@@ -5,9 +5,12 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from backend.config import settings
+from backend.data.db import User, get_db
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing context - Using PBKDF2 to avoid bcrypt library conflicts in this environment
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # OAuth2 scheme for token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
@@ -40,8 +43,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_admin(token: str = Depends(oauth2_scheme)):
-    """FastAPI dependency to protect routes. Validates the JWT."""
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    """FastAPI dependency to protect routes. Validates the JWT and fetches the User."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -49,9 +52,25 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username != "admin":
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
-        return username
     except jwt.PyJWTError:
         raise credentials_exception
+    
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalars().first()
+    if user is None:
+        raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return user
+
+async def get_current_admin(current_user: User = Depends(get_current_user)):
+    """FastAPI dependency to protect admin-only routes."""
+    if current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user does not have enough privileges"
+        )
+    return current_user

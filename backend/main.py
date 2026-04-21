@@ -14,10 +14,11 @@ import asyncio
 from backend.data.db import (
     get_db, SessionLocal,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
-    PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks
+    PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
+    User
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
-from backend.utils.auth import verify_password, create_access_token, get_current_admin, get_password_hash
+from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
 from backend.config import settings
 from backend.api import analysis
 from backend.engine.ai_engine import generate_portfolio_allocation, generate_chart_chat
@@ -98,7 +99,11 @@ app = FastAPI(title="MarketMind API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -109,12 +114,39 @@ app.include_router(analysis.router)
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 @app.websocket("/ws/market")
 async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    # Verify user
+    from backend.utils.auth import SECRET_KEY, ALGORITHM
+    from jose import jwt, JWTError
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            await websocket.close(code=1008)
+            return
+        
+        # Verify user exists
+        res = await db.execute(select(User).where(User.email == email))
+        user = res.scalars().first()
+        if not user:
+            await websocket.close(code=1008)
+            return
+            
+    except JWTError:
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
-        # Send initial snapshot
+        # Send initial snapshot ISOLATED to this user
         result = await db.execute(
             select(StockMaster, SignalsCache)
             .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+            .where(StockMaster.user_id == user.id) # Isolation
             .where(StockMaster.is_active == True)
         )
         rows = result.all()
@@ -179,35 +211,73 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
+@app.post("/api/auth/register")
+async def register(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    email = data.get("email")
+    password = data.get("password")
+    full_name = data.get("full_name", "")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+    
+    res = await db.execute(select(User).where(User.email == email))
+    if res.scalars().first():
+        raise HTTPException(status_code=400, detail="User already registered")
+        
+    hashed = get_password_hash(password)
+    res = await db.execute(select(User))
+    role = "ADMIN" if res.scalars().first() is None else "USER"
+    
+    new_user = User(email=email, hashed_password=hashed, full_name=full_name, role=role)
+    db.add(new_user)
+    await db.commit()
+    return {"message": "User created", "role": role}
+
 @app.post("/api/auth/login")
-async def login(data: dict = Body(...)):
-    username = data.get("username")
+async def login(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    email = data.get("username") # OAuth2 sends 'username'
     password = data.get("password")
     
-    # Check against settings.ADMIN_PASSWORD (handling both plain and hashed for convenience)
-    is_valid = False
-    if password == settings.ADMIN_PASSWORD:
-        is_valid = True
-    else:
-        try:
-            is_valid = verify_password(password, settings.ADMIN_PASSWORD)
-        except:
-            is_valid = False
-
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    res = await db.execute(select(User).where(User.email == email))
+    user = res.scalars().first()
     
-    access_token = create_access_token(data={"sub": "admin"})
-    return {"access_token": access_token, "token_type": "bearer"}
+    if user and verify_password(password, user.hashed_password):
+        token = create_access_token(data={"sub": user.email})
+        return {"access_token": token, "token_type": "bearer"}
+        
+    # Legacy Admin Fallback (Bootstrap)
+    if email == "admin" and password == settings.ADMIN_PASSWORD:
+        res = await db.execute(select(User).where(User.email == "admin@marketmind.ai"))
+        admin_user = res.scalars().first()
+        if not admin_user:
+            admin_user = User(
+                email="admin@marketmind.ai",
+                hashed_password=get_password_hash(password),
+                full_name="System Admin",
+                role="ADMIN"
+            )
+            db.add(admin_user)
+            await db.commit()
+        token = create_access_token(data={"sub": admin_user.email})
+        return {"access_token": token, "token_type": "bearer"}
+
+    raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @app.get("/api/auth/verify")
-async def verify(admin: str = Depends(get_current_admin)):
-    return {"status": "authenticated", "user": admin}
+async def verify(current_user: User = Depends(get_current_user)):
+    return {
+        "status": "authenticated", 
+        "user": {
+            "email": current_user.email,
+            "full_name": current_user.full_name,
+            "role": current_user.role
+        }
+    }
 
 
 # ── Settings ───────────────────────────────────────────────────────────────
 @app.get("/api/settings")
-async def get_app_settings(admin: str = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
+async def get_app_settings(admin_user: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     # Load AI settings from DB (system_config), fallback to in-memory settings
     from backend.data.db import SystemConfig
     result = await db.execute(select(SystemConfig))
@@ -226,7 +296,7 @@ async def get_app_settings(admin: str = Depends(get_current_admin), db: AsyncSes
     }
 
 @app.post("/api/settings")
-async def update_app_settings(data: dict = Body(...), admin: str = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
+async def update_app_settings(data: dict = Body(...), admin_user: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     """Save AI settings to system_config DB table + update in-memory."""
     from backend.data.db import SystemConfig
     from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -274,10 +344,11 @@ async def get_status():
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 @app.get("/api/portfolio")
-async def get_portfolio(db: AsyncSession = Depends(get_db)):
+async def get_portfolio(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(StockMaster, SignalsCache)
         .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+        .where(StockMaster.user_id == current_user.id) # Isolation
         .where(StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
         .order_by(SignalsCache.confidence_pct.desc())
     )
@@ -285,7 +356,6 @@ async def get_portfolio(db: AsyncSession = Depends(get_db)):
     portfolio_data = []
     for stock, signal in rows:
         # Determine Accumulate/Buy More signal (price-agnostic)
-        # Rule: Strong fundamentals/moat (composite > 60) AND positive short-term momentum (st_signal == 'BUY')
         is_accumulate_recommended = False
         if signal and signal.composite_score is not None and signal.st_signal == 'BUY':
             if signal.composite_score > 60:
@@ -304,12 +374,11 @@ async def get_portfolio(db: AsyncSession = Depends(get_db)):
     
     return portfolio_data
 
-
 @app.post("/api/portfolio/import")
 async def import_portfolio(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    admin: str = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
     """Import portfolio holdings from an XLSX file."""
     import pandas as pd
@@ -339,6 +408,7 @@ async def import_portfolio(
             
             # Upsert into StockMaster
             stmt = mysql_insert(StockMaster).values(
+                user_id=current_user.id, # Isolation
                 symbol=symbol,
                 company_name=stock_data["name"],
                 isin=isin,
@@ -370,10 +440,13 @@ async def add_to_portfolio(
     company_name: str = Body(...),
     sector: str = Body(None),
     db: AsyncSession = Depends(get_db),
-    admin: str = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
     symbol = symbol.upper().strip()
-    existing = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol))
+    existing = await db.execute(select(StockMaster).where(
+        StockMaster.symbol == symbol, 
+        StockMaster.user_id == current_user.id
+    ))
     stock = existing.scalars().first()
 
     if stock:
@@ -383,6 +456,7 @@ async def add_to_portfolio(
         stock.is_active = True
     else:
         stock = StockMaster(
+            user_id=current_user.id, # Isolation
             symbol=symbol,
             company_name=company_name,
             sector=sector,
@@ -397,8 +471,11 @@ async def add_to_portfolio(
 
 
 @app.delete("/api/portfolio/{symbol}")
-async def remove_from_portfolio(symbol: str, db: AsyncSession = Depends(get_db), admin: str = Depends(get_current_admin)):
-    result = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol.upper()))
+async def remove_from_portfolio(symbol: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    result = await db.execute(select(StockMaster).where(
+        StockMaster.symbol == symbol.upper(),
+        StockMaster.user_id == current_user.id
+    ))
     stock = result.scalars().first()
     if not stock:
         raise HTTPException(status_code=404, detail="Stock not found")
@@ -410,7 +487,8 @@ async def remove_from_portfolio(symbol: str, db: AsyncSession = Depends(get_db),
 @app.post("/api/portfolio/allocate")
 async def allocate_portfolio(
     payload: dict = Body(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     amount = float(payload.get("amount", 10000))
     use_ai = bool(payload.get("use_ai", False))
@@ -422,6 +500,7 @@ async def allocate_portfolio(
     result = await db.execute(
         select(StockMaster, SignalsCache)
         .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+        .where(StockMaster.user_id == current_user.id) # Isolation
         .where(StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
     )
     rows = result.all()
@@ -490,6 +569,7 @@ async def allocate_portfolio(
 
     # Save to db
     log_entry = AllocationLog(
+        user_id=current_user.id, # Isolation
         total_amount=amount,
         allocation_type=allocation_type,
         allocations=allocation_result
@@ -502,10 +582,11 @@ async def allocate_portfolio(
 
 # ── Watchlist ─────────────────────────────────────────────────────────────────
 @app.get("/api/watchlist")
-async def get_watchlist(db: AsyncSession = Depends(get_db)):
+async def get_watchlist(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(StockMaster, SignalsCache)
         .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+        .where(StockMaster.user_id == current_user.id) # Isolation
         .where(StockMaster.type == "WATCHLIST", StockMaster.is_active == True)
     )
     rows = result.all()
@@ -525,10 +606,13 @@ async def add_to_watchlist(
     symbol: str = Body(...),
     company_name: str = Body(default=""),
     db: AsyncSession = Depends(get_db),
-    admin: str = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
     symbol = symbol.upper().strip()
-    existing = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol))
+    existing = await db.execute(select(StockMaster).where(
+        StockMaster.symbol == symbol,
+        StockMaster.user_id == current_user.id
+    ))
     stock = existing.scalars().first()
 
     if stock:
@@ -537,9 +621,9 @@ async def add_to_watchlist(
         stock.type = "WATCHLIST"
         stock.is_active = True
     else:
-        # Auto-resolve company name if not provided
         name = company_name or symbol
         stock = StockMaster(
+            user_id=current_user.id, # Isolation
             symbol=symbol,
             company_name=name,
             type="WATCHLIST",
@@ -557,8 +641,11 @@ async def add_to_watchlist(
 
 
 @app.delete("/api/watchlist/{symbol}")
-async def remove_from_watchlist(symbol: str, db: AsyncSession = Depends(get_db), admin: str = Depends(get_current_admin)):
-    result = await db.execute(select(StockMaster).where(StockMaster.symbol == symbol.upper()))
+async def remove_from_watchlist(symbol: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    result = await db.execute(select(StockMaster).where(
+        StockMaster.symbol == symbol.upper(),
+        StockMaster.user_id == current_user.id
+    ))
     stock = result.scalars().first()
     if not stock:
         raise HTTPException(status_code=404, detail="Stock not found")
@@ -596,6 +683,7 @@ async def get_opportunities(
     signal: str = None,
     min_confidence: float = 0,
     limit: int = 20,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     query = (
@@ -709,10 +797,14 @@ async def get_stock_fundamentals(symbol: str, db: AsyncSession = Depends(get_db)
 
 
 @app.get("/api/stock/{symbol}/lots")
-async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db)):
+async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await db.execute(
         select(PortfolioTransaction)
-        .where(PortfolioTransaction.symbol == symbol.upper(), PortfolioTransaction.status == 'OPEN')
+        .where(
+            PortfolioTransaction.symbol == symbol.upper(), 
+            PortfolioTransaction.status == 'OPEN',
+            PortfolioTransaction.user_id == current_user.id
+        )
         .order_by(PortfolioTransaction.buy_date.asc())
     )
     lots = result.scalars().all()
@@ -732,7 +824,8 @@ async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db)):
 async def handle_chart_chat(
     symbol: str,
     payload: dict = Body(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Handles an interactive chat about the chart, utilizing historical OHLC and Signals as context."""
     chat_history = payload.get("messages", [])
@@ -863,10 +956,16 @@ async def get_ai_logs(
     limit: int = 100,
     symbol: Optional[str] = None,
     trigger: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Return all AI insight logs for the AI Logs page, newest first."""
-    query = select(AIInsights).order_by(AIInsights.generated_at.desc()).limit(limit)
+    query = (
+        select(AIInsights)
+        .where(AIInsights.user_id == current_user.id) # Isolation
+        .order_by(AIInsights.generated_at.desc())
+        .limit(limit)
+    )
     if symbol:
         query = query.where(AIInsights.symbol == symbol.upper())
     if trigger:
@@ -894,10 +993,16 @@ async def get_ai_logs(
 async def get_ai_call_logs(
     limit: int = 100,
     symbol: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Return raw AI API call logs with token usage, payloads, and timing."""
-    query = select(AICallLog).order_by(AICallLog.called_at.desc()).limit(limit)
+    query = (
+        select(AICallLog)
+        .where(AICallLog.user_id == current_user.id) # Isolation
+        .order_by(AICallLog.called_at.desc())
+        .limit(limit)
+    )
     if symbol:
         query = query.where(AICallLog.symbol == symbol.upper())
     result = await db.execute(query)
@@ -926,10 +1031,17 @@ async def get_ai_call_logs(
 
 
 @app.get("/api/stock/{symbol}/insight")
-async def get_stock_insight(symbol: str, db: AsyncSession = Depends(get_db)):
+async def get_stock_insight(
+    symbol: str, 
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(AIInsights)
-        .where(AIInsights.symbol == symbol.upper())
+        .where(
+            AIInsights.symbol == symbol.upper(),
+            AIInsights.user_id == current_user.id # Isolation
+        )
         .order_by(AIInsights.generated_at.desc())
         .limit(1)
     )
@@ -981,7 +1093,7 @@ async def trigger_insight_generation(
         raise HTTPException(status_code=404, detail="Symbol not found in master")
 
     skill_id = req.skill_id if req else None
-    asyncio.create_task(_generate_and_save_insight(symbol.upper(), "MANUAL", skill_id))
+    asyncio.create_task(_generate_and_save_insight(symbol.upper(), "MANUAL", skill_id, current_user.id))
     return {"message": f"AI insight generation queued for {symbol} (Skill: {skill_id or 'General'})"}
 
 
@@ -1238,7 +1350,7 @@ async def _research_and_save_fundamentals(symbol: str):
         logger.error(f"AI Fund research background task failed for {symbol}: {e}")
 
 
-async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = None):
+async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = None, user_id: int = None):
     """Background task to generate and persist AI insight."""
     try:
         import pandas as pd
@@ -1293,6 +1405,7 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
 
         async with SessionLocal() as db:
             new_insight = AIInsights(
+                user_id=user_id, # Isolation
                 symbol=symbol,
                 generated_at=datetime.now(),
                 trigger_reason=trigger,
@@ -1314,7 +1427,7 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
 
 # ── Bhavcopy Manual Sync ──────────────────────────────────────────────────────
 @app.post("/api/market/bhavcopy/sync")
-async def manual_bhavcopy_sync(req: BhavcopySyncRequest, admin: str = Depends(get_current_admin)):
+async def manual_bhavcopy_sync(req: BhavcopySyncRequest, admin_user: User = Depends(get_current_admin)):
     """Manually trigger Bhavcopy download for a single date or a range."""
     try:
         from datetime import datetime
@@ -1338,7 +1451,7 @@ async def manual_bhavcopy_sync(req: BhavcopySyncRequest, admin: str = Depends(ge
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
 @app.post("/api/market/fundamentals/sync")
-async def bulk_fundamental_sync(admin: str = Depends(get_current_admin)):
+async def bulk_fundamental_sync(admin_user: User = Depends(get_current_admin)):
     """Trigger a full refresh of fundamentals for all active stocks."""
     from backend.scheduler import run_bulk_fundamental_sync
     import asyncio
@@ -1349,7 +1462,7 @@ async def bulk_fundamental_sync(admin: str = Depends(get_current_admin)):
     return {"message": "Bulk fundamental sync initiated in the background."}
 
 @app.get("/api/market/bhavcopy/logs")
-async def get_bhavcopy_logs(limit: int = 20, db: AsyncSession = Depends(get_db), admin: str = Depends(get_current_admin)):
+async def get_bhavcopy_logs(limit: int = 20, db: AsyncSession = Depends(get_db), admin_user: User = Depends(get_current_admin)):
     """Fetch recent Bhavcopy sync logs."""
     result = await db.execute(
         select(SyncLog).order_by(SyncLog.completed_at.desc()).limit(limit)

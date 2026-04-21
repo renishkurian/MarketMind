@@ -3,7 +3,8 @@ import sys
 import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger, ForeignKey
+from sqlalchemy.orm import relationship
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import settings
@@ -24,10 +25,27 @@ SessionLocal = async_sessionmaker(
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    full_name = Column(String(100))
+    role = Column(Enum('USER', 'ADMIN'), default='USER')
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    stocks = relationship("StockMaster", back_populates="user")
+    transactions = relationship("PortfolioTransaction", back_populates="user")
+    insights = relationship("AIInsights", back_populates="user")
+
 class StockMaster(Base):
     __tablename__ = "stocks_master"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True) # Multi-user
     symbol = Column(String(20), index=True, nullable=False)
     exchange = Column(Enum('NSE', 'BSE'), default='NSE', nullable=False, index=True)
     company_name = Column(String(100), nullable=False)
@@ -45,16 +63,27 @@ class StockMaster(Base):
     avg_buy_price = Column(Numeric(18,6))
     buy_date = Column(Date)
 
+    # Relationships
+    user = relationship("User", back_populates="stocks")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'symbol', 'type', name='uix_user_symbol_type'),
+    )
+
 class PortfolioTransaction(Base):
     __tablename__ = "portfolio_transactions"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True) # Multi-user
     symbol = Column(String(20), index=True, nullable=False)
     isin = Column(String(12), index=True)
     quantity = Column(Numeric(14,4), nullable=False)
     buy_price = Column(Numeric(18,6), nullable=False)
     buy_date = Column(Date, nullable=False)
     status = Column(Enum('OPEN', 'CLOSED'), default='OPEN', nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="transactions")
 
 class PriceHistory(Base):
     __tablename__ = "price_history"
@@ -198,6 +227,7 @@ class AIInsights(Base):
     __tablename__ = "ai_insights"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True) # Multi-user
     symbol = Column(String(20), index=True, nullable=False)
     generated_at = Column(DateTime, index=True, nullable=False)
     trigger_reason = Column(Enum('WEEKLY','PRICE_SPIKE','MANUAL'), nullable=False)
@@ -219,10 +249,14 @@ class AIInsights(Base):
     composite_score_snapshot = Column(Numeric(5, 2), nullable=True)
     score_version_snapshot = Column(String(10), nullable=True)
 
+    # Relationships
+    user = relationship("User", back_populates="insights")
+
 class AICallLog(Base):
     __tablename__ = "ai_call_logs"
 
     id                = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id           = Column(Integer, ForeignKey("users.id"), index=True) # Multi-user
     insight_id        = Column(Integer, nullable=True)           # FK to ai_insights (nullable)
     symbol            = Column(String(20), index=True, nullable=False)
     skill_id          = Column(String(50))
@@ -244,6 +278,7 @@ class AllocationLog(Base):
     __tablename__ = "allocation_logs"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True) # Multi-user
     allocated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     total_amount = Column(Numeric(14,2), nullable=False)
     allocation_type = Column(Enum('AI_DRIVEN', 'PROPORTIONAL'), nullable=False)

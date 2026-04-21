@@ -19,7 +19,7 @@ const NAV_ITEMS = [
 
 export default function Layout({ children }) {
   const { marketStatus, theme, toggleTheme, isConnected, lastUpdate } = useStockStore();
-  const { logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const isOpen = marketStatus === 'OPEN';
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -45,7 +45,7 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* ws status + theme + logout */}
+        {/* ws status + theme + user + logout */}
         <div className="flex items-center gap-1">
           <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-lg mr-1 ${
             isConnected ? 'text-signal-buy bg-signal-buy/10' : 'text-signal-sell bg-signal-sell/10'
@@ -53,10 +53,23 @@ export default function Layout({ children }) {
             {isConnected ? <Wifi size={13} /> : <WifiOff size={13} />}
             <span className="hidden sm:inline">{isConnected ? 'Live' : 'Offline'}</span>
           </div>
+          
           <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-accent/10 text-dark-muted hover:text-accent transition-all">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
-          <button onClick={() => { logout(); navigate('/login'); }} className="p-2 rounded-lg hover:bg-signal-sell/10 text-dark-muted hover:text-signal-sell transition-all">
+
+          {user && (
+            <div className="flex items-center gap-2 px-2 py-1 bg-accent/5 border border-accent/10 rounded-lg ml-1">
+              <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-[10px] font-bold text-white uppercase">
+                {user.full_name?.charAt(0) || user.email?.charAt(0)}
+              </div>
+              <span className="text-xs font-medium text-dark-text hidden md:inline max-w-[100px] truncate">
+                {user.full_name || user.email}
+              </span>
+            </div>
+          )}
+
+          <button onClick={() => { logout(); navigate('/login'); }} className="p-2 rounded-lg hover:bg-signal-sell/10 text-dark-muted hover:text-signal-sell transition-all ml-1" title="Logout">
             <LogOut size={17} />
           </button>
         </div>

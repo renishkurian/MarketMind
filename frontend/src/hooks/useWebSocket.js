@@ -11,7 +11,7 @@ export const useWebSocket = (url) => {
   } = useStockStore();
 
   const connect = () => {
-    if (ws.current?.readyState === WebSocket.OPEN) return;
+    if (!url || ws.current?.readyState === WebSocket.OPEN) return;
 
     ws.current = new WebSocket(url);
 
