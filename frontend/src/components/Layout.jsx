@@ -20,7 +20,6 @@ const NAV_ITEMS = [
 export default function Layout({ children }) {
   const { marketStatus, theme, toggleTheme, isConnected, lastUpdate } = useStockStore();
   const { user, logout } = useAuthStore();
-  console.log("DEBUG: Layout user:", user);
   const navigate = useNavigate();
   const isOpen = marketStatus === 'OPEN';
   const [sidebarOpen, setSidebarOpen] = useState(true);
