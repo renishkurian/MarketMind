@@ -145,54 +145,8 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
 
     await manager.connect(websocket)
     try:
-        # Send initial snapshot ISOLATED to this user
-        result = await db.execute(
-            select(StockMaster, SignalsCache)
-            .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
-            .where(StockMaster.user_id == user.id) # Isolation
-            .where(StockMaster.is_active == True)
-        )
-        rows = result.all()
-
-        # Fetch latest close price from price_history as fallback (for closed-market periods)
-        from sqlalchemy import func as sqlfunc
-        ph_sub = (
-            select(
-                PriceHistory.symbol,
-                sqlfunc.max(PriceHistory.date).label("max_date")
-            )
-            .group_by(PriceHistory.symbol)
-            .subquery()
-        )
-        ph_result = await db.execute(
-            select(PriceHistory.symbol, PriceHistory.close)
-            .join(ph_sub, (PriceHistory.symbol == ph_sub.c.symbol) & (PriceHistory.date == ph_sub.c.max_date))
-        )
-        last_close_map = {row.symbol: float(row.close) for row in ph_result.all()}
-
-        snapshot = []
-        for stock, signal in rows:
-            sig_data = _serialize_signal(signal)
-            # If signal has no current_price, fall back to last known close from price_history
-            if sig_data and not sig_data.get("current_price"):
-                sig_data["current_price"] = last_close_map.get(stock.symbol)
-            elif sig_data is None:
-                fallback_price = last_close_map.get(stock.symbol)
-                if fallback_price:
-                    sig_data = {"current_price": fallback_price}
-            item = {
-                "symbol": stock.symbol,
-                "company_name": stock.company_name,
-                "scp_name": stock.scp_name,
-                "sector": stock.sector,
-                "type": stock.type,
-                "quantity": float(stock.quantity) if stock.quantity else None,
-                "avg_buy_price": float(stock.avg_buy_price) if stock.avg_buy_price else None,
-                "buy_date": str(stock.buy_date) if stock.buy_date else None,
-                "signal": sig_data
-            }
-            snapshot.append(item)
-
+        # Send initial snapshot ISOLATED to this user using unified fetcher
+        snapshot = await _fetch_user_portfolio_stats(db, user, filter_type=None)
         await websocket.send_json({"type": "snapshot", "data": snapshot})
 
         # Send current market status
@@ -346,31 +300,83 @@ async def get_status():
 
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
+async def _fetch_user_portfolio_stats(db: AsyncSession, user: User, filter_type: str = "PORTFOLIO") -> list:
+    """Unified helper to fetch portfolio data with PriceHistory fallback logic."""
+    from sqlalchemy import func as sqlfunc
+    
+    query = select(StockMaster, SignalsCache).outerjoin(
+        SignalsCache, StockMaster.symbol == SignalsCache.symbol
+    ).where(StockMaster.user_id == user.id, StockMaster.is_active == True)
+    
+    if filter_type:
+        query = query.where(StockMaster.type == filter_type)
+        
+    result = await db.execute(query)
+    rows = result.all()
+
+    # Bulk fetch latest close price from price_history as fallback
+    ph_sub = (
+        select(PriceHistory.symbol, sqlfunc.max(PriceHistory.date).label("max_date"))
+        .group_by(PriceHistory.symbol)
+        .subquery()
+    )
+    ph_result = await db.execute(
+        select(PriceHistory.symbol, PriceHistory.close)
+        .join(ph_sub, (PriceHistory.symbol == ph_sub.c.symbol) & (PriceHistory.date == ph_sub.c.max_date))
+    )
+    last_close_map = {row.symbol: float(row.close) for row in ph_result.all()}
+
+    portfolio_data = []
+    for stock, signal in rows:
+        sig_data = _serialize_signal(signal)
+        
+        # Price Fallback Logic
+        if sig_data and not sig_data.get("current_price"):
+            sig_data["current_price"] = last_close_map.get(stock.symbol)
+        elif sig_data is None:
+            fb_price = last_close_map.get(stock.symbol)
+            if fb_price:
+                sig_data = {"current_price": fb_price}
+
+        # Sentiment & Recommendation
+        is_accumulate = False
+        if sig_data and sig_data.get("st_signal") == 'BUY' and (sig_data.get("composite_score") or 0) > 60:
+            is_accumulate = True
+
+        portfolio_data.append({
+            "symbol": stock.symbol,
+            "company_name": stock.company_name,
+            "scp_name": stock.scp_name,
+            "sector": stock.sector,
+            "type": stock.type,
+            "market_cap_cat": stock.market_cap_cat,
+            "quantity": float(stock.quantity) if stock.quantity else 0.0,
+            "avg_buy_price": float(stock.avg_buy_price) if stock.avg_buy_price else 0.0,
+            "buy_date": str(stock.buy_date) if stock.buy_date else None,
+            "added_date": str(stock.added_date) if stock.added_date else None,
+            "is_accumulate_recommended": is_accumulate,
+            "signal": sig_data
+        })
+    return portfolio_data
+
 @app.get("/api/portfolio")
 async def get_portfolio(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(StockMaster, SignalsCache)
-        .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
-        .where(StockMaster.user_id == current_user.id) # Isolation
-        .where(StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
-        .order_by(SignalsCache.confidence_pct.desc())
-    )
-    rows = result.all()
+    portfolio_data = await _fetch_user_portfolio_stats(db, current_user)
     
     # Check if we should trigger a background refresh
-    # Trigger if market is open AND either:
-    # a) No signals found
-    # b) Any signal is older than 5 minutes
     from backend.utils.market_hours import is_market_open
-    if is_market_open() and rows:
+    if is_market_open() and portfolio_data:
         needs_refresh = False
         now = datetime.now()
-        for _, signal in rows:
-            if not signal or not signal.computed_at or (now - signal.computed_at).total_seconds() > 300:
+        for item in portfolio_data:
+            sig = item.get("signal")
+            # We use computed_at in the frontend serialized as 'computed_at' or 'scored_at'
+            # Here we check the serialized dictionary. _serialize_signal puts computed_at
+            if not sig or not sig.get("computed_at"):
                 needs_refresh = True
                 break
         
@@ -378,25 +384,6 @@ async def get_portfolio(
             from backend.scheduler import intraday_fetch
             background_tasks.add_task(intraday_fetch)
             logger.info("Triggered background intraday_fetch via portfolio access.")
-
-    portfolio_data = []
-    for stock, signal in rows:
-        # Determine Accumulate/Buy More signal (price-agnostic)
-        is_accumulate_recommended = False
-        if signal and signal.composite_score is not None and signal.st_signal == 'BUY':
-            if signal.composite_score > 60:
-                is_accumulate_recommended = True
-
-        portfolio_data.append({
-            "symbol": stock.symbol,
-            "company_name": stock.company_name,
-            "sector": stock.sector,
-            "market_cap_cat": stock.market_cap_cat,
-            "quantity": float(stock.quantity) if stock.quantity else 0.0,
-            "avg_buy_price": float(stock.avg_buy_price) if stock.avg_buy_price else 0.0,
-            "is_accumulate_recommended": is_accumulate_recommended,
-            "signal": _serialize_signal(signal)
-        })
     
     return portfolio_data
 
@@ -1628,6 +1615,8 @@ def _serialize_signal(signal) -> dict:
         "fa_coverage": float(signal.fa_coverage) if signal.fa_coverage else 0,
         "indicator_breakdown": signal.indicator_breakdown,
         "fa_breakdown": signal.fa_breakdown,
+        "prev_close": float(signal.prev_close) if signal.prev_close is not None else None,
+        "backtest_sharpe": float(signal.backtest_sharpe) if signal.backtest_sharpe is not None else None,
         
         # -- Phase 3: Price Action --
         "fifty_two_week_high": float(signal.fifty_two_week_high) if signal.fifty_two_week_high else None,

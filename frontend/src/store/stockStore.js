@@ -16,6 +16,26 @@ export const useStockStore = create((set, get) => ({
     set({ stocks: newStocks });
   },
 
+  fetchPortfolio: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/portfolio`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // data.forEach(s => get().updatePrice(s.symbol, s.signal?.current_price, s.signal?.change_pct));
+        get().setStocks(data);
+      }
+    } catch (error) {
+      console.error("HTTP fetch failed:", error);
+    }
+  },
+
   updatePrice: (symbol, price, change_pct) => {
     set((state) => ({
       stocks: {

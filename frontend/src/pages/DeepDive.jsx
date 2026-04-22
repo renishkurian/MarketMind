@@ -219,14 +219,17 @@ export default function DeepDive() {
     setInsightLoading(true);
     setInsightError(false);
 
+    const token = localStorage.getItem('token') || localStorage.getItem('mm_token');
+    const headers = { 'Authorization': `Bearer ${token}` };
+
     // Parallel fetches
     const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes] = await Promise.allSettled([
-      fetch(`${API_URL}/api/stock/${symbol}/history`),
-      fetch(`${API_URL}/api/stock/${symbol}/insight`),
-      fetch(`${API_URL}/api/stock/${symbol}/signals`),
-      fetch(`${API_URL}/api/stock/${symbol}/fundamentals`),
-      fetch(`${API_URL}/api/stock/${symbol}/lots`),
-      fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`),
+      fetch(`${API_URL}/api/stock/${symbol}/history`, { headers }),
+      fetch(`${API_URL}/api/stock/${symbol}/insight`, { headers }),
+      fetch(`${API_URL}/api/stock/${symbol}/signals`, { headers }),
+      fetch(`${API_URL}/api/stock/${symbol}/fundamentals`, { headers }),
+      fetch(`${API_URL}/api/stock/${symbol}/lots`, { headers }),
+      fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`, { headers }),
     ]);
 
     if (histRes.status === 'fulfilled' && histRes.value.ok) {
@@ -267,7 +270,10 @@ export default function DeepDive() {
     if (stock?.isin) {
       setAnalysisLoading(true);
       try {
-        const aRes = await fetch(`${API_URL}/api/analysis/${stock.isin}/full`);
+        const token = localStorage.getItem('token') || localStorage.getItem('mm_token');
+        const aRes = await fetch(`${API_URL}/api/analysis/${stock.isin}/full`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (aRes.ok) {
           setAnalysis(await aRes.json());
         }

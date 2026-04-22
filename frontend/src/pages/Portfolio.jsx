@@ -11,8 +11,12 @@ import Loader from '../components/Loader';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function Portfolio() {
-  const { stocks, isConnected } = useStockStore();
+  const { stocks, isConnected, fetchPortfolio } = useStockStore();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    fetchPortfolio();
+  }, [fetchPortfolio]);
 
 
   const fileInputRef = useRef(null);
