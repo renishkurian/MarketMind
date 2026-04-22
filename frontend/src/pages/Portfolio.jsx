@@ -76,6 +76,9 @@ export default function Portfolio() {
     let currentVal = 0;
     let yesterdayVal = 0;
 
+    // Get local IST date string (YYYY-MM-DD)
+    const todayStr = new Date().toLocaleDateString('sv-SE'); // sv-SE is YYYY-MM-DD reliably
+
     portfolioStocks.forEach(stock => {
       const qty = stock.quantity || 0;
       const buy = stock.avg_buy_price || 0;
@@ -88,7 +91,13 @@ export default function Portfolio() {
       invested += qty * buy;
       currentVal += qty * current;
 
-      if (prev > 0) {
+      // Handle Day P&L Baseline
+      // If stock was bought TODAY, its "Yesterday Value" was effectively the amount we paid for it today.
+      const isBoughtToday = stock.added_date === todayStr;
+      
+      if (isBoughtToday) {
+        yesterdayVal += qty * buy;
+      } else if (prev > 0) {
         yesterdayVal += qty * prev;
       } else if (changePct !== 0 && current > 0) {
         // Derive yesterday's value from change percentage if PC is missing
