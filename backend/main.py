@@ -347,7 +347,11 @@ async def get_status():
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 @app.get("/api/portfolio")
-async def get_portfolio(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_portfolio(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user), 
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(StockMaster, SignalsCache)
         .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
@@ -356,6 +360,25 @@ async def get_portfolio(current_user: User = Depends(get_current_user), db: Asyn
         .order_by(SignalsCache.confidence_pct.desc())
     )
     rows = result.all()
+    
+    # Check if we should trigger a background refresh
+    # Trigger if market is open AND either:
+    # a) No signals found
+    # b) Any signal is older than 5 minutes
+    from backend.utils.market_hours import is_market_open
+    if is_market_open() and rows:
+        needs_refresh = False
+        now = datetime.now()
+        for _, signal in rows:
+            if not signal or not signal.computed_at or (now - signal.computed_at).total_seconds() > 300:
+                needs_refresh = True
+                break
+        
+        if needs_refresh:
+            from backend.scheduler import intraday_fetch
+            background_tasks.add_task(intraday_fetch)
+            logger.info("Triggered background intraday_fetch via portfolio access.")
+
     portfolio_data = []
     for stock, signal in rows:
         # Determine Accumulate/Buy More signal (price-agnostic)

@@ -54,6 +54,26 @@ async def intraday_fetch():
         logger.warning("No price data returned from fetcher.")
         return
 
+    # --- 1. Fetch Official Baselines (Yesterday Close) ---
+    baselines = {}
+    async with SessionLocal() as session:
+        # For each symbol, get the most recent EOD close from PriceHistory
+        # This prevents % change from being calculated against a stale or missing cache value
+        from sqlalchemy import func
+        
+        # Subquery to get latest date per symbol
+        subq = select(
+            PriceHistory.symbol, 
+            func.max(PriceHistory.date).label("max_date")
+        ).where(PriceHistory.symbol.in_(list(prices.keys()))).group_by(PriceHistory.symbol).subquery()
+        
+        baseline_query = select(PriceHistory.symbol, PriceHistory.close).join(
+            subq, and_(PriceHistory.symbol == subq.c.symbol, PriceHistory.date == subq.c.max_date)
+        )
+        baseline_res = await session.execute(baseline_query)
+        baselines = {row[0]: float(row[1]) for row in baseline_res.all()}
+
+    # --- 2. Record 5-Min Ticks ---
     ticks_data = []
     for sym, data in prices.items():
         ticks_data.append({
@@ -72,35 +92,42 @@ async def intraday_fetch():
             stmt = stmt.on_duplicate_key_update(close=stmt.inserted.close)
             await session.execute(stmt)
 
+        # --- 3. Update SignalsCache (Batch) ---
+        cache_updates = []
         for sym, data in prices.items():
-            cache_res = await session.execute(
-                select(SignalsCache).where(SignalsCache.symbol == sym)
+            prev_close = baselines.get(sym)
+            change_pct = 0.0
+            if prev_close and prev_close > 0:
+                change_pct = ((data["close"] - prev_close) / prev_close) * 100
+            
+            cache_updates.append({
+                "symbol": sym,
+                "exchange": "NSE",
+                "computed_at": data["timestamp"],
+                "market_session": "LIVE",
+                "current_price": data["close"],
+                "prev_close": prev_close,
+                "change_pct": change_pct
+            })
+            
+            # Trigger immediate broadcast
+            await _safe_broadcast_price(sym, data["close"], change_pct)
+
+        if cache_updates:
+            # Batch update SignalsCache using UPSERT
+            cache_stmt = mysql_insert(SignalsCache).values(cache_updates)
+            cache_stmt = cache_stmt.on_duplicate_key_update(
+                current_price=cache_stmt.inserted.current_price,
+                prev_close=cache_stmt.inserted.prev_close,
+                change_pct=cache_stmt.inserted.change_pct,
+                computed_at=cache_stmt.inserted.computed_at,
+                market_session=cache_stmt.inserted.market_session
             )
-            cache = cache_res.scalars().first()
-            change_pct = None
-
-            if cache:
-                if cache.prev_close and float(cache.prev_close) > 0:
-                    change_pct = ((data["close"] - float(cache.prev_close)) / float(cache.prev_close)) * 100
-                cache.current_price = data["close"]
-                if change_pct is not None:
-                    cache.change_pct = change_pct
-                cache.computed_at = data["timestamp"]
-                cache.market_session = "LIVE"
-            else:
-                cache = SignalsCache(
-                    symbol=sym,
-                    computed_at=data["timestamp"],
-                    market_session="LIVE",
-                    current_price=data["close"],
-                )
-                session.add(cache)
-
-            await _safe_broadcast_price(sym, data["close"], change_pct or 0.0)
+            await session.execute(cache_stmt)
 
         await session.commit()
 
-    logger.info(f"Intraday fetch complete — {len(prices)} symbols updated.")
+    logger.info(f"Intraday fetch complete — {len(prices)} symbols updated (Baseline verified).")
 
 
 # ── JOB 2: EOD Consolidation (weekdays 18:00) ────────────────────────────────

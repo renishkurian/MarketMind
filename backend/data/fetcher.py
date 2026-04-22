@@ -5,7 +5,7 @@ import httpx
 import logging
 import urllib.request
 import re
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 from datetime import datetime
 
 from backend.utils.market_hours import get_current_ist_time
@@ -16,20 +16,42 @@ def _get_yf_symbol(symbol: str) -> str:
     """Legacy helper. Callers should transition to using DB-defined yahoo_symbol."""
     return f"{symbol}.NS"
 
-def _get_live_ltp_google_sync(symbol: str) -> Union[float, None]:
-    """Synchronous web scraper for zero-delay Indian stock prices using Google Finance."""
+async def _get_live_ltp_google_async(symbol: str) -> Optional[float]:
+    """Asynchronous scraper for zero-delay Indian stock prices using Google Finance."""
+    url = f"https://www.google.com/finance/quote/{symbol}:NSE"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    
     try:
-        req = urllib.request.Request(
-            f'https://www.google.com/finance/quote/{symbol}:NSE',
-            headers={'User-Agent': 'Mozilla/5.0'}
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            html = resp.read().decode('utf-8')
-            match = re.search(r'data-last-price=\"([^\"]+)\"', html)
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                logger.debug(f"Google Finance {symbol} returned {resp.status_code}")
+                return None
+                
+            html = resp.text
+            
+            # Pattern 1: data-last-price attribute (Modern)
+            match = re.search(r'data-last-price="([^"]+)"', html)
             if match:
                 return float(match.group(1).replace(',', ''))
+                
+            # Pattern 2: JSON-LD or script context (Fallback)
+            # Google often embeds current price in a JSON structure
+            match = re.search(r'\["(\d+\.\d+)",\d+,\d+,"INR"\]', html)
+            if match:
+                return float(match.group(1))
+
+            # Pattern 3: Simple currency pattern (Last resort)
+            # Look for ₹ symbol or specific class names often used for price
+            match = re.search(r'₹(\d+,?\d*\.?\d*)', html)
+            if match:
+                return float(match.group(1).replace(',', ''))
+
     except Exception as e:
-        logger.debug(f"Google Finance scrape failed for {symbol}: {e}")
+        logger.debug(f"Google scraper error for {symbol}: {e}")
     return None
 
 async def _fetch_hybrid_overrides(internal_symbols: List[str]) -> Dict[str, float]:
@@ -37,7 +59,7 @@ async def _fetch_hybrid_overrides(internal_symbols: List[str]) -> Dict[str, floa
     overrides = {}
     
     async def fetch_one(sym: str):
-        val = await asyncio.to_thread(_get_live_ltp_google_sync, sym)
+        val = await _get_live_ltp_google_async(sym)
         if val is not None:
             overrides[sym] = val
             
