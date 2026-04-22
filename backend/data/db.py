@@ -281,9 +281,15 @@ class AllocationLog(Base):
     user_id = Column(Integer, ForeignKey("users.id"), index=True) # Multi-user
     allocated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     total_amount = Column(Numeric(14,2), nullable=False)
-    allocation_type = Column(Enum('AI_DRIVEN', 'PROPORTIONAL'), nullable=False)
+    allocation_type = Column(String(30), nullable=False) # e.g. MVO, HRP, CVAR
     allocations = Column(JSON, nullable=False)  # Array of {symbol, amount, units, reason}
     ai_call_id = Column(Integer, nullable=True)  # FK to ai_call_logs if used
+    
+    # Metadata for Smart Allocation
+    lookback_days = Column(Integer, nullable=True)
+    expected_return = Column(Numeric(8,4), nullable=True)
+    expected_volatility = Column(Numeric(8,4), nullable=True)
+    expected_sharpe = Column(Numeric(6,3), nullable=True)
 
 class SystemConfig(Base):
     __tablename__ = "system_config"

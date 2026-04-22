@@ -22,7 +22,7 @@ export default function Portfolio() {
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [allocateAmount, setAllocateAmount] = useState(10000);
   const [allocateLimit, setAllocateLimit] = useState('');
-  const [useAI, setUseAI] = useState(false);
+  const [strategy, setStrategy] = useState('AI_PULSE');
   const [isAllocating, setIsAllocating] = useState(false);
   const [allocationResult, setAllocationResult] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -168,7 +168,7 @@ export default function Portfolio() {
     try {
       const payload = {
         amount: parseFloat(allocateAmount),
-        use_ai: useAI
+        strategy: strategy
       };
       if (allocateLimit.trim() !== '') {
          payload.limit = parseInt(allocateLimit, 10);
@@ -389,9 +389,9 @@ export default function Portfolio() {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-left">
               <div className="flex flex-col md:flex-row gap-4 items-center">
-                <div className="flex-1 w-full flex flex-col items-start text-left">
+                <div className="flex-1 w-full">
                   <label className="block text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Amount to Allocate (₹)</label>
                   <input 
                     type="number" 
@@ -400,31 +400,46 @@ export default function Portfolio() {
                     className="w-full bg-dark-card border border-dark-border text-lg font-mono font-bold text-dark-text rounded-xl p-3 focus:outline-none focus:border-accent transition-colors"
                   />
                 </div>
-                <div className="w-full md:w-32 flex flex-col items-start text-left">
+                <div className="w-full md:w-48">
+                  <label className="block text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Strategy</label>
+                  <select 
+                    value={strategy}
+                    onChange={(e) => setStrategy(e.target.value)}
+                    className="w-full bg-dark-card border border-dark-border rounded-xl p-3 text-sm font-semibold text-dark-text focus:outline-none focus:border-accent transition-colors cursor-pointer"
+                  >
+                    <option value="AI_PULSE">AI Pulse (Conviction)</option>
+                    <option value="HRP">Smart Stability (HRP)</option>
+                    <option value="MVO">Modern Classic (MVO)</option>
+                    <option value="BLACK_LITTERMAN">Confidence (BL)</option>
+                    <option value="ERC">Balanced Risk (ERC)</option>
+                    <option value="CVAR">Tail-Risk (CVaR)</option>
+                  </select>
+                </div>
+                <div className="w-full md:w-32">
                   <label className="block text-xs font-bold text-dark-muted uppercase tracking-wider mb-2">Max Stocks</label>
                   <input 
                     type="number" 
                     placeholder="All"
                     value={allocateLimit}
                     onChange={(e) => setAllocateLimit(e.target.value)}
-                    className="w-full bg-dark-card border border-dark-border text-lg font-mono font-bold text-dark-text rounded-xl p-3 focus:outline-none focus:border-accent transition-colors placeholder:text-gray-600/50"
+                    className="w-full bg-dark-card border border-dark-border text-lg font-mono font-bold text-dark-text rounded-xl p-2.5 focus:outline-none focus:border-accent transition-colors placeholder:text-gray-600/50"
                   />
                 </div>
-                <div className="flex flex-col border border-dark-border bg-dark-card rounded-xl p-3 mt-4 md:mt-0 items-center justify-center h-[76px] self-end">
-                  <label className="text-xs font-bold text-dark-muted uppercase mb-2">Use AI</label>
-                  <button 
-                    onClick={() => setUseAI(!useAI)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useAI ? 'bg-signal-buy' : 'bg-gray-600'}`}
-                  >
-                    <span className={`inline-block w-4 h-4 transform rounded-full bg-white transition-transform ${useAI ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
               </div>
+
+              <p className="text-[11px] text-dark-muted leading-relaxed">
+                {strategy === 'AI_PULSE' && "Weighted by AI conviction scores. Fastest but doesn't account for stock correlations."}
+                {strategy === 'HRP' && "Gold standard for stability. Clusters stocks behaviorally to ensure true diversification."}
+                {strategy === 'MVO' && "Maximizes return-per-unit-of-risk. Math-heavy model based on Markowitz's efficient frontier."}
+                {strategy === 'BLACK_LITTERMAN' && "Blends 10-year market equilibrium with our AI's proprietary conviction 'views'."}
+                {strategy === 'ERC' && "Conservative approach where every stock contributes the exact same risk to the total."}
+                {strategy === 'CVAR' && "Survival-focused. Specifically optimizes to minimize potential for heavy losses during crashes."}
+              </p>
 
               <button 
                 onClick={handleAllocate}
                 disabled={isAllocating}
-                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-accent/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isAllocating ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -433,10 +448,29 @@ export default function Portfolio() {
               </button>
 
               {allocationResult && (
-                <div className="space-y-4 pt-4 border-t border-dark-border animate-in slide-in-from-bottom flex flex-col">
+                <div className="space-y-4 pt-6 border-t border-dark-border animate-in slide-in-from-top-4 flex flex-col">
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex-1 min-w-[120px] bg-dark-card border border-dark-border rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Lookback</p>
+                      <p className="text-sm font-bold text-dark-text tracking-tight">{allocationResult.lookback_days || 'Latest'} Days</p>
+                    </div>
+                    {allocationResult.metrics?.expected_sharpe > 0 && (
+                      <div className="flex-1 min-w-[120px] bg-dark-card border border-dark-border rounded-xl p-3">
+                        <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Est. Sharpe</p>
+                        <p className="text-sm font-bold text-signal-buy tracking-tight">{allocationResult.metrics.expected_sharpe.toFixed(2)}</p>
+                      </div>
+                    )}
+                    {allocationResult.metrics?.expected_volatility > 0 && (
+                      <div className="flex-1 min-w-[120px] bg-dark-card border border-dark-border rounded-xl p-3">
+                        <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Est. Volatility</p>
+                        <p className="text-sm font-bold text-signal-sell tracking-tight">{(allocationResult.metrics.expected_volatility * 100).toFixed(1)}%</p>
+                      </div>
+                    )}
+                  </div>
+                  
                   {allocationResult.rationale && (
-                    <div className="bg-signal-buy/10 border border-signal-buy/20 rounded-xl p-4 text-sm text-signal-buy leading-relaxed">
-                      <span className="font-bold">Strategy:</span> {allocationResult.rationale}
+                    <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 text-xs text-dark-text leading-relaxed italic">
+                      {allocationResult.rationale}
                     </div>
                   )}
                   <div className="border border-dark-border rounded-xl bg-dark-card overflow-hidden">

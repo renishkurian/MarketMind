@@ -7,9 +7,10 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from typing import List, Dict, Optional, Any
 import logging
 import os
-from datetime import datetime, date
 import json
 import asyncio
+import pandas as pd
+from datetime import datetime, date, timedelta
 
 from backend.data.db import (
     get_db, SessionLocal,
@@ -22,6 +23,7 @@ from backend.utils.auth import verify_password, create_access_token, get_current
 from backend.config import settings
 from backend.api import analysis
 from backend.engine.ai_engine import generate_portfolio_allocation, generate_chart_chat
+from backend.engine.allocation_engine import calculate_allocation
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -492,88 +494,89 @@ async def allocate_portfolio(
     current_user: User = Depends(get_current_user)
 ):
     amount = float(payload.get("amount", 10000))
-    use_ai = bool(payload.get("use_ai", False))
     limit = payload.get("limit")
+    strategy = payload.get("strategy", "AI_PULSE").upper()
 
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be greater than 0")
 
+    # 1. Fetch active portfolio stocks
     result = await db.execute(
         select(StockMaster, SignalsCache)
         .outerjoin(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
-        .where(StockMaster.user_id == current_user.id) # Isolation
+        .where(StockMaster.user_id == current_user.id)
         .where(StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
     )
     rows = result.all()
     if not rows:
         raise HTTPException(status_code=400, detail="No active portfolio stocks found")
 
+    # 2. Extract symbols & scores for basic filtering
     portfolio_data = []
     for stock, signal in rows:
         portfolio_data.append({
             "symbol": stock.symbol,
             "sector": stock.sector,
+            "composite_score": float(signal.composite_score) if signal and signal.composite_score else 50.0,
+            "current_price": float(signal.current_price) if signal and signal.current_price else 1.0,
             "signal": _serialize_signal(signal) if signal else None
         })
 
-    # Sort descending by composite score to find the strongest stocks
-    portfolio_data.sort(
-        key=lambda x: float(x["signal"]["composite_score"] or 0) if x["signal"] else 0.0, 
-        reverse=True
-    )
-
-    # Apply top N limit if requested
+    # Sort by score and applying limit
+    portfolio_data.sort(key=lambda x: x["composite_score"], reverse=True)
     if limit is not None and str(limit).strip():
         try:
             limit_int = int(limit)
             if limit_int > 0:
                 portfolio_data = portfolio_data[:limit_int]
-        except ValueError:
-            pass
+        except ValueError: pass
 
-    allocation_result = {}
-    allocation_type = "AI_DRIVEN" if use_ai else "PROPORTIONAL"
+    symbols = [p["symbol"] for p in portfolio_data]
+    current_prices = {p["symbol"]: p["current_price"] for p in portfolio_data}
+    ai_scores = {p["symbol"]: p["composite_score"] for p in portfolio_data}
 
-    if use_ai:
-        try:
-            allocation_result = await generate_portfolio_allocation(amount, portfolio_data)
-        except Exception as e:
-            logger.error(f"AI Allocation failed, falling back to proportional: {e}")
-            use_ai = False
-            allocation_type = "PROPORTIONAL"
-
-    if not use_ai:
-        # Fallback proportional allocation based on composite scores
-        total_score = sum([float(p["signal"]["composite_score"] or 50) for p in portfolio_data if p["signal"]])
-        if total_score == 0:
-            total_score = len(portfolio_data) * 50
+    # 3. Preparation for Math Strategies: Fetch 10-year returns matrix if needed
+    returns_df = pd.DataFrame()
+    lookback_days = 0
+    if strategy != "AI_PULSE":
+        # We need historical data for HRP, MVO, BL, ERC, CVAR
+        lookback_days = 365 * 10 
+        start_date = date.today() - timedelta(days=lookback_days)
         
-        allocs = []
-        for p in portfolio_data:
-            score = float(p["signal"]["composite_score"] or 50) if p["signal"] else 50.0
-            weight = score / total_score
-            alloc_amt = amount * weight
-            price = p["signal"]["current_price"] if p["signal"] and p["signal"]["current_price"] else 1.0
-            
-            allocs.append({
-                "symbol": p["symbol"],
-                "allocated_amount": round(alloc_amt, 2),
-                "estimated_qty": round(alloc_amt / float(price), 2) if price else 0,
-                "reason": f"Proportional allocation based on composite score of {score:.1f}"
-            })
-            
-        allocs.sort(key=lambda x: x["allocated_amount"], reverse=True)
-        allocation_result = {
-            "rationale": "Mathematical proportional allocation based on AI composite scores.",
-            "allocations": allocs
-        }
+        history_result = await db.execute(
+            select(PriceHistory.symbol, PriceHistory.date, PriceHistory.close)
+            .where(PriceHistory.symbol.in_(symbols))
+            .where(PriceHistory.date >= start_date)
+            .order_by(PriceHistory.date.asc())
+        )
+        history_rows = history_result.all()
+        if history_rows:
+            raw_df = pd.DataFrame(history_rows, columns=["symbol", "date", "close"])
+            raw_df["close"] = raw_df["close"].astype(float)
+            # Pivot to get returns matrix: rows=date, cols=symbol
+            pivot_df = raw_df.pivot(index="date", columns="symbol", values="close").ffill()
+            returns_df = pivot_df.pct_change().dropna(how="all")
 
-    # Save to db
+    # 4. Invoke Allocation Engine
+    allocation_result = calculate_allocation(
+        strategy=strategy,
+        amount=amount,
+        returns_df=returns_df,
+        ai_scores=ai_scores,
+        current_prices=current_prices
+    )
+
+    # 5. Save results to db
+    metrics = allocation_result.get("metrics", {})
     log_entry = AllocationLog(
-        user_id=current_user.id, # Isolation
+        user_id=current_user.id,
         total_amount=amount,
-        allocation_type=allocation_type,
-        allocations=allocation_result
+        allocation_type=allocation_result.get("strategy", strategy),
+        allocations=allocation_result.get("allocations", []),
+        lookback_days=lookback_days if not returns_df.empty else 0,
+        expected_return=metrics.get("expected_return"),
+        expected_volatility=metrics.get("expected_volatility"),
+        expected_sharpe=metrics.get("expected_sharpe")
     )
     db.add(log_entry)
     await db.commit()
@@ -713,7 +716,12 @@ async def get_opportunities(
 
 # ── Stock Detail ──────────────────────────────────────────────────────────────
 @app.get("/api/stock/{symbol}/history")
-async def get_stock_history(symbol: str, days: int = 365, db: AsyncSession = Depends(get_db)):
+async def get_stock_history(
+    symbol: str, 
+    days: int = 365, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     result = await db.execute(
         select(PriceHistory)
         .where(PriceHistory.symbol == symbol.upper())
@@ -737,7 +745,11 @@ async def get_stock_history(symbol: str, days: int = 365, db: AsyncSession = Dep
 
 
 @app.get("/api/stock/{symbol}/signals")
-async def get_stock_signals(symbol: str, db: AsyncSession = Depends(get_db)):
+async def get_stock_signals(
+    symbol: str, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Return the full signal + indicator breakdown for a stock."""
     result = await db.execute(
         select(SignalsCache).where(SignalsCache.symbol == symbol.upper())
@@ -757,7 +769,11 @@ async def get_stock_signals(symbol: str, db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/api/stock/{symbol}/fundamentals")
-async def get_stock_fundamentals(symbol: str, db: AsyncSession = Depends(get_db)):
+async def get_stock_fundamentals(
+    symbol: str, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     result = await db.execute(
         select(FundamentalsCache).where(FundamentalsCache.symbol == symbol.upper())
     )
@@ -1084,7 +1100,7 @@ async def trigger_insight_generation(
     symbol: str, 
     req: Optional[InsightGenerateRequest] = None,
     db: AsyncSession = Depends(get_db), 
-    admin: str = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
     """Manually trigger AI insight generation for a symbol."""
     # Validate symbol exists
@@ -1102,7 +1118,7 @@ async def trigger_insight_generation(
 async def trigger_fundamental_research(
     symbol: str,
     db: AsyncSession = Depends(get_db),
-    admin: str = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     background_tasks: BackgroundTasks = None
 ):
     """Trigger AI to research and fill in missing fundamental data."""
@@ -1175,7 +1191,7 @@ async def update_fundamentals(
 async def sync_fundamental_data(
     symbol: str, 
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
     """Trigger a fresh fetch of fundamentals from Yahoo Finance."""
     from backend.data.fetcher import fetch_fundamentals
@@ -1219,7 +1235,7 @@ async def sync_fundamental_data(
 async def recompute_stock_signals(
     symbol: str,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
     """Manually trigger a re-computation of all signals for a symbol."""
     from backend.scheduler import recompute_signals_for, _fetch_all_sector_data
