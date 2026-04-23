@@ -25,3 +25,5 @@ backend/data/bse_bhavcopy.py
 scratch/
 *samco*
 *.log
+*.sql
+*.tar.xz
