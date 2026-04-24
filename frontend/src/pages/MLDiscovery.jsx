@@ -92,6 +92,13 @@ export default function MLDiscovery() {
     );
   }
 
+  // Display date formatting helper
+  const displayDate = (dateStr) => {
+    if (!dateStr) return "Just now";
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? "Just now" : date.toLocaleString();
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700 relative">
       
@@ -108,7 +115,8 @@ export default function MLDiscovery() {
               <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-white/5 rounded-lg text-dark-muted"><ChevronRight /></button>
             </div>
             
-            <div className="space-y-3 overflow-y-auto h-[cacl(100vh-120px)] pr-2 custom-scrollbar">
+            <div className="space-y-3 overflow-y-auto h-[calc(100vh-120px)] pr-2 custom-scrollbar">
+              {history.length === 0 && <p className="text-center text-dark-muted py-10 text-sm italic">No past snapshots found.</p>}
               {history.map(s => (
                 <button 
                   key={s.id}
@@ -122,8 +130,8 @@ export default function MLDiscovery() {
                     <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">ID: {s.id}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-dark-text">{s.summary?.avg_projected_return}% Avg</span>
-                    <span className="text-xs text-dark-muted">{s.summary?.stock_count} stocks</span>
+                    <span className="text-sm font-bold text-dark-text">{s.summary?.avg_projected_return || 0}% Avg</span>
+                    <span className="text-xs text-dark-muted">{s.summary?.stock_count || 0} stocks</span>
                   </div>
                 </button>
               ))}
@@ -141,7 +149,7 @@ export default function MLDiscovery() {
           </h1>
           <div className="flex items-center gap-3 mt-2">
             <p className="text-dark-muted text-sm">
-              Snapshot from: <span className="text-dark-text font-bold">{new Date(currentSnapshot?.created_at).toLocaleString()}</span>
+              Snapshot from: <span className="text-dark-text font-bold">{displayDate(currentSnapshot?.created_at)}</span>
             </p>
             <div className="w-1 h-1 bg-dark-border rounded-full" />
             <button onClick={() => setShowHistory(true)} className="text-accent text-xs font-bold hover:underline flex items-center gap-1">
@@ -179,7 +187,9 @@ export default function MLDiscovery() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-dark-card border border-dark-border p-6 rounded-2xl">
           <p className="text-[10px] font-bold text-dark-muted uppercase tracking-widest mb-1">Avg Projected Return</p>
-          <p className="text-2xl font-black text-signal-buy">{currentSnapshot?.summary?.avg_projected_return}%</p>
+          <p className="text-2xl font-black text-signal-buy">
+            {currentSnapshot?.summary?.avg_projected_return?.toFixed(3) || "0.000"}%
+          </p>
         </div>
         <div className="bg-dark-card border border-dark-border p-6 rounded-2xl">
           <p className="text-[10px] font-bold text-dark-muted uppercase tracking-widest mb-1">High Confidence Signals</p>

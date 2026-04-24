@@ -68,12 +68,17 @@ async def get_portfolio_alpha(
     results = sorted(results, key=lambda x: x['confidence_score'], reverse=True)
 
     if save and results:
-        # Calculate summary
-        avg_ret = sum(r['prediction_5d_return'] for r in results) / len(results)
+        # Calculate summary with better precision
+        total_ret = sum(float(r.get('prediction_5d_return', 0)) for r in results)
+        avg_ret = total_ret / len(results)
+        
+        # Logging to debug zero average
+        print(f"ML Summary: Total={total_ret}, Count={len(results)}, Avg={avg_ret}")
+        
         summary = {
-            "avg_projected_return": round(avg_ret, 2),
+            "avg_projected_return": round(float(avg_ret), 2),
             "stock_count": len(results),
-            "high_confidence_count": len([r for r in results if r['confidence_score'] > 0.7])
+            "high_confidence_count": len([r for r in results if r.get('confidence_score', 0) > 0.7])
         }
         
         snapshot = MLSnapshot(
