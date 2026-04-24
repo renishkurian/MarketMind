@@ -26,25 +26,32 @@ class WarRoomEngine:
         Runs a Multi-Model Deep Research on a stock combining ML and Real-time AI reasoning.
         """
         try:
+            print(f"DEBUG: Starting War Room Research for {symbol}")
             # 1. Fetch Basic Data
             stmt = select(StockMaster).where(StockMaster.symbol == symbol)
             res = await self.db.execute(stmt)
             stock = res.scalars().first()
             if not stock:
+                print(f"DEBUG: Symbol {symbol} not found in DB")
                 return {"error": "Stock not found"}
 
             # 2. Get the 'Oracle' ML Score
+            print(f"DEBUG: Running Oracle ML for {symbol}...")
             from backend.features.oracle.oracle_engine import OracleEngine
             oracle = OracleEngine(self.db)
             ml_analysis = await oracle.get_conviction_prediction(symbol)
+            print(f"DEBUG: Oracle ML Score for {symbol}: {ml_analysis.get('conviction_score')}%")
             
             # 3. Fetch Latest News (Pro Intel)
+            print(f"DEBUG: Fetching News Intel for {symbol}...")
             from backend.utils.pro_research import ProResearchUtility
             intel = await ProResearchUtility.get_market_pulse(symbol)
             news_headlines = intel.get('headlines', [])
+            print(f"DEBUG: Fetched {len(news_headlines)} headlines for {symbol}")
             news_str = "\n".join([f"- {h}" for h in news_headlines]) if news_headlines else "No recent headlines found."
             
             # 4. Synthesize with LLM
+            print(f"DEBUG: Synthesizing with AI for {symbol}...")
             prompt = f"""
             TRANSFORM INTO: Elite Indian Institutional Trader.
             SYMBOL: {symbol}
@@ -75,19 +82,23 @@ class WarRoomEngine:
                 user_id=user_id
             )
             
-            content = ai_raw.get('reply', '')
             intelligence = {}
-            
-            # Robust JSON extraction
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if match:
-                try:
-                    intelligence = json.loads(match.group())
-                except Exception as je:
-                    logger.error(f"JSON Parse Error for {symbol}: {je}")
-                    intelligence = {"pro_verdict": content[:250], "market_sentiment": "Analyzing..."}
+            if isinstance(ai_raw, dict) and "pro_verdict" in ai_raw:
+                print(f"DEBUG: AI returned structured JSON for {symbol}")
+                intelligence = ai_raw
             else:
-                intelligence = {"pro_verdict": content[:250], "market_sentiment": "Analyzing..."}
+                content = ai_raw.get('reply', '') if isinstance(ai_raw, dict) else str(ai_raw)
+                print(f"DEBUG: AI Response for {symbol} received (Length: {len(content)})")
+                # Robust JSON extraction for string fallbacks
+                match = re.search(r'\{.*\}', content, re.DOTALL)
+                if match:
+                    try:
+                        intelligence = json.loads(match.group())
+                    except Exception as je:
+                        logger.error(f"JSON Parse Error for {symbol}: {je}")
+                        intelligence = {"pro_verdict": content[:500], "market_sentiment": "Analyzing..."}
+                else:
+                    intelligence = {"pro_verdict": content[:500], "market_sentiment": "Analyzing..."}
 
             # Ensure lists exist for UI mapping
             if "bull_case" not in intelligence or not isinstance(intelligence["bull_case"], list):
