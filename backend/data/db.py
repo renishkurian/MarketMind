@@ -199,16 +199,6 @@ class FundamentalsCache(Base):
     book_value = Column(Numeric(10,2))
     ebitda = Column(BigInteger)
 
-class MLSnapshot(Base):
-    __tablename__ = "ml_snapshots"
-    
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), index=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    data = Column(JSON) # Array of predictions
-    summary = Column(JSON) # Overall desk stats (avg return, etc)
-
-    user = relationship("User")
     held_percent_institutions = Column(Numeric(6,2))
     shares_outstanding = Column(BigInteger)
     
@@ -222,6 +212,17 @@ class MLSnapshot(Base):
     promoter_holding = Column(Numeric(6,2))
     promoter_pledge_pct = Column(Numeric(6,2))
     data_quality = Column(Enum('FULL', 'PARTIAL', 'MISSING', 'AI_RESEARCHED', 'VERIFIED'), default='FULL')
+
+class MLSnapshot(Base):
+    __tablename__ = "ml_snapshots"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    data = Column(JSON) # Array of predictions
+    summary = Column(JSON) # Overall desk stats (avg return, etc)
+
+    user = relationship("User")
 
 class SyncLog(Base):
     __tablename__ = "sync_logs"
