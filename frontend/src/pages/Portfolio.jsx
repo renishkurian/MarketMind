@@ -22,11 +22,13 @@ export default function Portfolio() {
   const fileInputRef = useRef(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  // ── Modal / feature state — must be declared before any early returns ────
+  // ── Modal / feature state — must be declared before any early returns ———
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [allocateAmount, setAllocateAmount] = useState(10000);
   const [allocateLimit, setAllocateLimit] = useState('');
   const [strategy, setStrategy] = useState('AI_PULSE');
+  const [targetVolatility, setTargetVolatility] = useState(15);   // % p.a.
+  const [targetReturn, setTargetReturn] = useState(12);           // % p.a.
   const [isAllocating, setIsAllocating] = useState(false);
   const [allocationResult, setAllocationResult] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -180,16 +182,19 @@ export default function Portfolio() {
     setIsAllocating(true);
     setAllocationResult(null);
     try {
+      const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
       const payload = {
         amount: parseFloat(allocateAmount),
-        strategy: strategy
+        strategy: strategy,
+        // #9: pass slider targets only for the relevant strategies
+        ...(strategy === 'EFFICIENT_RISK'   && { target_volatility: targetVolatility }),
+        ...(strategy === 'EFFICIENT_RETURN' && { target_return: targetReturn }),
       };
       if (allocateLimit.trim() !== '') {
          payload.limit = parseInt(allocateLimit, 10);
       }
-      
       const res = await axios.post(`${API_URL}/api/portfolio/allocate`, payload, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('mm_token')}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       setAllocationResult(res.data);
       toast.success("Allocation calculated successfully!");
@@ -429,6 +434,9 @@ export default function Portfolio() {
                     <option value="CVAR">Tail-Risk (CVaR)</option>
                     <option value="CDAR">Drawdown Shield (CDaR)</option>
                     <option value="SEMIVARIANCE">Downside Only (Semi)</option>
+                    <option disabled className="text-dark-muted text-[10px]">── Target-Based ──</option>
+                    <option value="EFFICIENT_RISK">Max Return ≤ Vol% ↕</option>
+                    <option value="EFFICIENT_RETURN">Min Risk ≥ Return% ↕</option>
                   </select>
                 </div>
                 <div className="w-full md:w-32">
@@ -444,15 +452,53 @@ export default function Portfolio() {
               </div>
 
               <p className="text-[11px] text-dark-muted leading-relaxed">
-                {strategy === 'AI_PULSE' && "Weighted by AI conviction scores. Fastest but doesn't account for stock correlations."}
-                {strategy === 'HRP' && "Gold standard for stability. Clusters stocks behaviorally to ensure true diversification."}
-                {strategy === 'MVO' && "Maximizes return-per-unit-of-risk using EMA returns + shrinkage covariance + sector caps."}
-                {strategy === 'BLACK_LITTERMAN' && "Blends market-cap equilibrium prior with AI conviction 'views'. Correct theoretical BL prior."}
-                {strategy === 'ERC' && "True Equal Risk Contribution — every stock contributes exactly the same portfolio volatility."}
-                {strategy === 'CVAR' && "Survival-focused. Minimises expected loss in the worst 5% of market scenarios (CVaR)."}
-                {strategy === 'CDAR' && "Drawdown-aware. Minimises expected drawdown during the worst market periods — ideal for long-term NSE investors."}
+                {strategy === 'AI_PULSE' && "Weighted by AI conviction scores. Fastest — doesn't account for stock correlations."}
+                {strategy === 'HRP' && "Gold standard for stability. Clusters stocks behaviorally with time-decay covariance for NSE momentum portfolios."}
+                {strategy === 'MVO' && "Maximizes return-per-unit-of-risk using EMA returns + shrinkage covariance + sector caps (≤40% per sector)."}
+                {strategy === 'BLACK_LITTERMAN' && "Market-cap equilibrium prior + CAPM/AI conviction views + sector constraints. Correct theoretical BL."}
+                {strategy === 'ERC' && "True Equal Risk Contribution — every stock contributes the exact same marginal volatility to the total."}
+                {strategy === 'CVAR' && "Survival-focused. Minimises the expected loss in the worst 5% of market scenarios (Conditional Value at Risk)."}
+                {strategy === 'CDAR' && "Drawdown-aware. Minimises expected drawdown during worst periods — ideal for long-term NSE investors."}
                 {strategy === 'SEMIVARIANCE' && "Downside-only risk. Only penalises negative volatility — upside swings are never punished."}
+                {strategy === 'EFFICIENT_RISK' && `Maximum return portfolio with ≤${targetVolatility}% annual volatility. Use the slider below to set your risk tolerance.`}
+                {strategy === 'EFFICIENT_RETURN' && `Minimum-risk portfolio targeting ≥${targetReturn}% annual return. Use the slider below to set your return goal.`}
               </p>
+
+              {/* #9: Conditional sliders for target-based strategies */}
+              {strategy === 'EFFICIENT_RISK' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-dark-muted uppercase tracking-wider">
+                    <span>Max Annual Volatility</span>
+                    <span className="text-accent font-black text-sm">{targetVolatility}%</span>
+                  </div>
+                  <input
+                    type="range" min="5" max="50" step="1"
+                    value={targetVolatility}
+                    onChange={e => setTargetVolatility(Number(e.target.value))}
+                    className="w-full accent-accent h-2 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-dark-muted">
+                    <span>5% (Conservative)</span><span>50% (Aggressive)</span>
+                  </div>
+                </div>
+              )}
+              {strategy === 'EFFICIENT_RETURN' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-dark-muted uppercase tracking-wider">
+                    <span>Min Annual Return</span>
+                    <span className="text-signal-buy font-black text-sm">{targetReturn}%</span>
+                  </div>
+                  <input
+                    type="range" min="5" max="60" step="1"
+                    value={targetReturn}
+                    onChange={e => setTargetReturn(Number(e.target.value))}
+                    className="w-full accent-accent h-2 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-dark-muted">
+                    <span>5% (Defensive)</span><span>60% (Ambitious)</span>
+                  </div>
+                </div>
+              )}
 
               <button 
                 onClick={handleAllocate}

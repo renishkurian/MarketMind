@@ -506,6 +506,9 @@ async def allocate_portfolio(
     amount = float(payload.get("amount", 10000))
     limit = payload.get("limit")
     strategy = payload.get("strategy", "AI_PULSE").upper()
+    # #9: Target-based strategies — read slider values from payload
+    target_volatility = float(payload["target_volatility"]) / 100 if payload.get("target_volatility") else None
+    target_return = float(payload["target_return"]) / 100 if payload.get("target_return") else None
 
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be greater than 0")
@@ -597,6 +600,21 @@ async def allocate_portfolio(
             pivot_df = raw_df.pivot(index="date", columns="symbol", values="close").ffill()
             returns_df = pivot_df.pct_change().dropna(how="all")
 
+    # 4b. Fetch Nifty50 prices for CAPM-based BL prior (#13)
+    nifty_prices = pd.Series(dtype=float)
+    if strategy in ("BLACK_LITTERMAN",) and not returns_df.empty:
+        nifty_result = await db.execute(
+            select(PriceHistory.date, PriceHistory.close)
+            .where(PriceHistory.symbol == "NIFTY50")
+            .where(PriceHistory.date >= (date.today() - timedelta(days=lookback_days)))
+            .order_by(PriceHistory.date.asc())
+        )
+        nifty_rows = nifty_result.all()
+        if nifty_rows:
+            nifty_prices = pd.Series(
+                {row.date: float(row.close) for row in nifty_rows}
+            )
+
     # 5. Invoke Allocation Engine with full context
     allocation_result = calculate_allocation(
         strategy=strategy,
@@ -607,6 +625,9 @@ async def allocate_portfolio(
         market_caps=market_caps,
         sector_map=sector_map,
         prev_weights=prev_weights,
+        nifty_prices=nifty_prices,
+        target_volatility=target_volatility,
+        target_return=target_return,
     )
 
     # 6. Save results to db

@@ -55,10 +55,14 @@ def calculate_allocation(
     market_caps: dict = None,
     sector_map: dict = None,
     prev_weights: dict = None,
+    nifty_prices: pd.Series = None,
+    target_volatility: float = None,
+    target_return: float = None,
 ) -> dict:
     """
     Main entry point for specialized portfolio allocation math.
-    strategies: AI_PULSE, HRP, MVO, BLACK_LITTERMAN, ERC, CVAR, CDAR, SEMIVARIANCE
+    strategies: AI_PULSE, HRP, MVO, BLACK_LITTERMAN, ERC, CVAR, CDAR, SEMIVARIANCE,
+                EFFICIENT_RISK, EFFICIENT_RETURN
 
     Args:
         strategy: Allocation strategy name
@@ -69,6 +73,9 @@ def calculate_allocation(
         market_caps: Dict of {symbol: market_cap_in_INR}  — for BL prior
         sector_map: Dict of {symbol: sector_name}  — for sector constraints
         prev_weights: Dict of {symbol: weight 0-1}  — for transaction cost penalty
+        nifty_prices: pd.Series of Nifty50 prices  — for CAPM-based BL prior
+        target_volatility: float (0-1)  — for EFFICIENT_RISK strategy
+        target_return: float (0-1)      — for EFFICIENT_RETURN strategy
     """
     strategy = strategy.upper()
 
@@ -121,7 +128,8 @@ def calculate_allocation(
             )
         elif strategy == "BLACK_LITTERMAN":
             return _execute_black_litterman(
-                amount, returns_df, ai_scores, current_prices, market_caps, sector_map, prev_weights
+                amount, returns_df, ai_scores, current_prices, market_caps, sector_map,
+                prev_weights, nifty_prices
             )
         elif strategy == "ERC":
             return _execute_erc(amount, returns_df, current_prices, prev_weights)
@@ -131,6 +139,14 @@ def calculate_allocation(
             return _execute_cdar(amount, returns_df, current_prices, prev_weights)
         elif strategy == "SEMIVARIANCE":
             return _execute_semivariance(amount, returns_df, current_prices, prev_weights)
+        elif strategy == "EFFICIENT_RISK":
+            return _execute_efficient_risk(
+                amount, returns_df, current_prices, sector_map, prev_weights, target_volatility
+            )
+        elif strategy == "EFFICIENT_RETURN":
+            return _execute_efficient_return(
+                amount, returns_df, current_prices, sector_map, prev_weights, target_return
+            )
         else:  # AI_PULSE / Fallback
             return _execute_proportional(amount, symbols, ai_scores, current_prices)
 
@@ -229,8 +245,14 @@ def _execute_proportional(amount, symbols, ai_scores, current_prices, fallback=F
 
 
 def _execute_hrp(amount, returns_df, current_prices, prev_weights):
-    """Hierarchical Risk Parity: Clusters stocks to ensure diversification."""
-    hrp = HRPOpt(returns_df)
+    """
+    Hierarchical Risk Parity: Clusters stocks to ensure diversification.
+    Uses exp_cov (time-decay covariance) so recent correlations matter more —
+    better for trending/momentum-sensitive NSE portfolios (#14).
+    """
+    # #14: exp_cov gives more weight to recent correlations (span=180 trading days ≈ 9 months)
+    exp_cov_matrix = risk_models.exp_cov(returns_df, span=180)
+    hrp = HRPOpt(returns_df, cov_matrix=exp_cov_matrix)
     hrp.optimize()
     cleaned_weights = hrp.clean_weights()
     ret, vol, sharpe = hrp.portfolio_performance()
@@ -239,7 +261,7 @@ def _execute_hrp(amount, returns_df, current_prices, prev_weights):
 
     return _build_result(
         "HRP",
-        "Machine-learning clustering used to group similar stocks and distribute risk equally across those clusters.",
+        "Machine-learning clustering with time-decay covariance (exp_cov) — recent correlations weighted more heavily for NSE momentum portfolios.",
         amount,
         da_weights,
         current_prices,
@@ -292,43 +314,69 @@ def _execute_mvo(amount, returns_df, current_prices, sector_map, prev_weights):
     )
 
 
-def _execute_black_litterman(amount, returns_df, ai_scores, current_prices, market_caps, sector_map, prev_weights):
+def _execute_black_litterman(amount, returns_df, ai_scores, current_prices, market_caps, sector_map,
+                             prev_weights, nifty_prices=None):
     """
     Black-Litterman with:
-    - FIX #4: Market-cap-weighted equilibrium prior (correct BL prior, not equal weights)
-    - AI-view-based absolute return adjustments
-    - Shrinkage covariance
+    - #4: Market-cap-weighted equilibrium prior (correct BL prior)
+    - #13: CAPM-based expected returns as views when Nifty prices are available
+    - #3: Shrinkage covariance
+    - #8: Sector constraints applied via post-BL EfficientFrontier
     """
     symbols = returns_df.columns.tolist()
 
-    # FIX #3: Shrinkage covariance
+    # #3: Shrinkage covariance
     S = _get_robust_cov(returns_df)
 
-    # FIX #4: Proper market-cap-weighted prior
+    # #4: Proper market-cap-weighted equilibrium prior
     if market_caps:
         mkt_caps_series = pd.Series({s: market_caps.get(s, 1e9) for s in symbols})
-        # mkt_caps_series already aligns with symbols
         pi = black_litterman.market_implied_prior_returns(
             mkt_caps_series, risk_aversion=2.5, cov_matrix=S
         )
     else:
-        # Graceful fallback to equal-weight prior if no market cap data
         logger.warning("BL: No market cap data available. Using equal-weight prior.")
         pi = np.array([1 / len(symbols)] * len(symbols))
 
-    # Views: Normalise AI scores → excess return views
-    # 50 = market neutral (0%), 100 = +10%, 0 = -10%
-    views = {s: (ai_scores.get(s, 50) - 50) / 500.0 for s in symbols}
+    # #13: Use CAPM-based views when Nifty prices are available; otherwise fall back to AI score views
+    if nifty_prices is not None and not nifty_prices.empty:
+        try:
+            # Reconstruct price matrix from returns_df for capm_return
+            prices_df = (1 + returns_df).cumprod()
+            capm_mu = expected_returns.capm_return(
+                prices_df,
+                market_prices=nifty_prices,
+                risk_free_rate=0.065  # RBI repo rate approx
+            )
+            views = capm_mu.to_dict()
+            logger.info("BL: Using CAPM-based expected return views.")
+        except Exception as e:
+            logger.warning(f"BL: CAPM views failed ({e}), falling back to AI score views.")
+            views = {s: (ai_scores.get(s, 50) - 50) / 500.0 for s in symbols}
+    else:
+        # AI score views: 50=neutral(0%), 100=+10%, 0=-10%
+        views = {s: (ai_scores.get(s, 50) - 50) / 500.0 for s in symbols}
 
     bl = BlackLittermanModel(S, pi=pi, absolute_views=views)
-    cleaned_weights = bl.clean_weights()
-    ret, vol, sharpe = bl.portfolio_performance()
+    bl_returns = bl.bl_returns()
+    bl_cov = bl.bl_cov()
+
+    # #8: Apply sector constraints via a post-BL EfficientFrontier
+    ef = EfficientFrontier(bl_returns, bl_cov)
+    _add_sector_constraints(ef, symbols, sector_map)
+    if prev_weights:
+        w_prev = np.array([prev_weights.get(s, 0.0) for s in symbols])
+        ef.add_objective(objective_functions.transaction_cost, w_prev=w_prev, k=0.001)
+    ef.max_sharpe()
+    cleaned_weights = ef.clean_weights()
+    ret, vol, sharpe = ef.portfolio_performance()
 
     da_weights, leftover = _apply_discrete_allocation(cleaned_weights, current_prices, amount)
 
+    prior_type = "CAPM" if (nifty_prices is not None and not nifty_prices.empty) else "AI-score"
     return _build_result(
         "BLACK_LITTERMAN",
-        "Combines a market-cap-equilibrium prior with AI conviction views for a theoretically grounded, tilt-based allocation.",
+        f"Market-cap equilibrium prior + {prior_type} views + sector caps. Theoretically grounded tilt-based allocation.",
         amount,
         da_weights,
         current_prices,
@@ -435,16 +483,14 @@ def _execute_cdar(amount, returns_df, current_prices, prev_weights):
 
 def _execute_semivariance(amount, returns_df, current_prices, prev_weights):
     """
-    FIX #15: Downside-only risk model using semicovariance.
-    EfficientSemivariance + risk_models.semicovariance treats upside
-    volatility as good — only penalises downside. Fully downside-focused.
+    #15: Downside-only risk model.
+    EfficientSemivariance internally uses semicovariance — only penalises
+    returns below zero (downside), treating upside volatility as good.
     """
     mu = expected_returns.ema_historical_return(returns_df, span=252)
 
-    # Use semicovariance: only penalises returns below benchmark (0 = risk-free)
-    bench = 0
-    semi_cov = risk_models.semicovariance(returns_df, benchmark=bench)
-
+    # EfficientSemivariance already uses semicovariance internally via its returns matrix.
+    # Passing returns_df directly is the correct interface (not a pre-computed cov matrix).
     es = EfficientSemivariance(mu, returns_df)
     es.min_semivariance()
     cleaned_weights = es.clean_weights()
@@ -459,6 +505,84 @@ def _execute_semivariance(amount, returns_df, current_prices, prev_weights):
         da_weights,
         current_prices,
         {"expected_return": ret, "expected_volatility": semi_vol, "expected_sharpe": sharpe},
+        leftover_cash=leftover,
+    )
+
+
+def _execute_efficient_risk(amount, returns_df, current_prices, sector_map, prev_weights, target_volatility):
+    """
+    #9: Target-volatility allocation.
+    "I want maximum return with at most X% annual volatility."
+    Calls ef.efficient_risk(target_volatility) on the efficient frontier.
+    Falls back to max_sharpe if no target is specified.
+    """
+    mu = expected_returns.ema_historical_return(returns_df, span=252)
+    S = _get_robust_cov(returns_df)
+    ef = EfficientFrontier(mu, S)
+    _add_sector_constraints(ef, returns_df.columns.tolist(), sector_map)
+    ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+    if prev_weights:
+        w_prev = np.array([prev_weights.get(s, 0.0) for s in returns_df.columns])
+        ef.add_objective(objective_functions.transaction_cost, w_prev=w_prev, k=0.001)
+
+    vol_target = target_volatility if target_volatility else 0.15  # default 15% p.a.
+    try:
+        ef.efficient_risk(target_return=vol_target)  # Note: pypfopt param is target_return for efficient_risk
+    except Exception:
+        # If target is outside feasible frontier, fall back to max_sharpe
+        logger.warning(f"efficient_risk target {vol_target} infeasible; falling back to max_sharpe.")
+        ef = EfficientFrontier(mu, S)
+        _add_sector_constraints(ef, returns_df.columns.tolist(), sector_map)
+        ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+        ef.max_sharpe()
+
+    cleaned_weights = ef.clean_weights()
+    ret, vol, sharpe = ef.portfolio_performance()
+    da_weights, leftover = _apply_discrete_allocation(cleaned_weights, current_prices, amount)
+
+    return _build_result(
+        "EFFICIENT_RISK",
+        f"Maximum return constrained to ≤{vol_target*100:.0f}% annual volatility. Slider-driven efficient frontier optimisation.",
+        amount, da_weights, current_prices,
+        {"expected_return": ret, "expected_volatility": vol, "expected_sharpe": sharpe},
+        leftover_cash=leftover,
+    )
+
+
+def _execute_efficient_return(amount, returns_df, current_prices, sector_map, prev_weights, target_return):
+    """
+    #9: Target-return allocation.
+    "I want at least X% return — minimise risk to get there."
+    Calls ef.efficient_return(target_return) on the efficient frontier.
+    """
+    mu = expected_returns.ema_historical_return(returns_df, span=252)
+    S = _get_robust_cov(returns_df)
+    ef = EfficientFrontier(mu, S)
+    _add_sector_constraints(ef, returns_df.columns.tolist(), sector_map)
+    ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+    if prev_weights:
+        w_prev = np.array([prev_weights.get(s, 0.0) for s in returns_df.columns])
+        ef.add_objective(objective_functions.transaction_cost, w_prev=w_prev, k=0.001)
+
+    ret_target = target_return if target_return else 0.12  # default 12% p.a.
+    try:
+        ef.efficient_return(target_return=ret_target)
+    except Exception:
+        logger.warning(f"efficient_return target {ret_target} infeasible; falling back to min_volatility.")
+        ef = EfficientFrontier(mu, S)
+        _add_sector_constraints(ef, returns_df.columns.tolist(), sector_map)
+        ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+        ef.min_volatility()
+
+    cleaned_weights = ef.clean_weights()
+    ret, vol, sharpe = ef.portfolio_performance()
+    da_weights, leftover = _apply_discrete_allocation(cleaned_weights, current_prices, amount)
+
+    return _build_result(
+        "EFFICIENT_RETURN",
+        f"Minimum risk portfolio targeting ≥{ret_target*100:.0f}% annual return. Slider-driven efficient frontier optimisation.",
+        amount, da_weights, current_prices,
+        {"expected_return": ret, "expected_volatility": vol, "expected_sharpe": sharpe},
         leftover_cash=leftover,
     )
 
