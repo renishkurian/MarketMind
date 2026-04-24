@@ -169,6 +169,7 @@ class SignalsCache(Base):
     backtest_win_rate = Column(Numeric(5, 2), nullable=True)
     backtest_sharpe = Column(Numeric(5, 2), nullable=True)
     backtest_max_drawdown = Column(Numeric(6, 2), nullable=True)
+    backtest_avg_return = Column(Numeric(6, 2), nullable=True)
     backtest_trades = Column(SmallInteger, nullable=True)
 
 class FundamentalsCache(Base):

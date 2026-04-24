@@ -297,6 +297,7 @@ class ScoringService:
                 backtest_win_rate=bt.win_rate,
                 backtest_sharpe=bt.sharpe_ratio,
                 backtest_max_drawdown=bt.max_drawdown,
+                backtest_avg_return=bt.avg_return,
                 backtest_trades=bt.trades_taken,
             )
         )

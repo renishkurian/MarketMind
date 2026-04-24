@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     MYSQL_DB: str = "marketmind"
     
     ANTHROPIC_API_KEY: str = ""
-    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20240620"
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-5"
     
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-5.4"

@@ -68,6 +68,11 @@ async def broadcast_market_status(status: str):
 # ── App Lifespan (startup / shutdown) ────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.APP_ENV == "production":
+        if settings.SECRET_KEY == "supersecretkey":
+            raise RuntimeError("FATAL: SECRET_KEY must be changed from default before running in production.")
+        if settings.ADMIN_PASSWORD == "admin":
+            raise RuntimeError("FATAL: ADMIN_PASSWORD must be changed from default before running in production.")
     # Startup: attach broadcast hook and start scheduler
     from backend import scheduler as sched_module
     sched_module.broadcast_price_update = broadcast_price_update
@@ -1050,6 +1055,7 @@ async def handle_chart_chat(
             "win_rate": float(sig.backtest_win_rate) if sig and sig.backtest_win_rate else None,
             "sharpe": float(sig.backtest_sharpe) if sig and sig.backtest_sharpe else None,
             "max_drawdown": float(sig.backtest_max_drawdown) if sig and sig.backtest_max_drawdown else None,
+            "avg_return": float(sig.backtest_avg_return) if sig and sig.backtest_avg_return else None,
         },
     }
 

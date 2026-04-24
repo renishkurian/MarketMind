@@ -42,7 +42,7 @@ async def _get_ai_settings() -> dict:
             "openai_key": db_cfg.get("OPENAI_API_KEY", settings.OPENAI_API_KEY),
             "openai_model": db_cfg.get("OPENAI_MODEL", settings.OPENAI_MODEL) or "gpt-4o",
             "anthropic_key": db_cfg.get("ANTHROPIC_API_KEY", settings.ANTHROPIC_API_KEY),
-            "anthropic_model": db_cfg.get("ANTHROPIC_MODEL", settings.ANTHROPIC_MODEL) or "claude-3-5-sonnet-20240620",
+            "anthropic_model": db_cfg.get("ANTHROPIC_MODEL", settings.ANTHROPIC_MODEL) or "claude-sonnet-4-5",
             "xai_key": db_cfg.get("XAI_API_KEY", settings.XAI_API_KEY),
             "xai_model": db_cfg.get("XAI_MODEL", settings.XAI_MODEL) or "grok-beta",
         }
@@ -53,7 +53,7 @@ async def _get_ai_settings() -> dict:
             "openai_key": settings.OPENAI_API_KEY,
             "openai_model": settings.OPENAI_MODEL or "gpt-4o",
             "anthropic_key": settings.ANTHROPIC_API_KEY,
-            "anthropic_model": settings.ANTHROPIC_MODEL or "claude-3-5-sonnet-20240620",
+            "anthropic_model": settings.ANTHROPIC_MODEL or "claude-sonnet-4-5",
             "xai_key": settings.XAI_API_KEY,
             "xai_model": settings.XAI_MODEL or "grok-beta",
         }
