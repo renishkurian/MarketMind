@@ -1049,6 +1049,7 @@ async def handle_chart_chat(
             "cagr": float(sig.backtest_cagr) if sig and sig.backtest_cagr else None,
             "win_rate": float(sig.backtest_win_rate) if sig and sig.backtest_win_rate else None,
             "sharpe": float(sig.backtest_sharpe) if sig and sig.backtest_sharpe else None,
+            "max_drawdown": float(sig.backtest_max_drawdown) if sig and sig.backtest_max_drawdown else None,
         },
     }
 

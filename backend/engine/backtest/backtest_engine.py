@@ -135,7 +135,7 @@ class BacktestMetrics:
             f"Median: {self.median_return:.1f}%",
             f"  CAGR: {self.cagr:.1f}% | Sharpe: {self.sharpe_ratio:.2f} | "
             f"Max drawdown: {self.max_drawdown:.1f}%",
-            f"  Best trade: +{self.best_trade:.1f}% | Worst trade: {self.worst_trade:.1f}%",
+            f"Best trade: +{self.best_trade:.1f}% | Worst trade: {self.worst_trade:.1f}%",
         ]
         if self.walk_forward_windows:
             consistent = sum(
@@ -146,6 +146,32 @@ class BacktestMetrics:
                 f"windows profitable."
             )
         return "\n".join(lines)
+
+    def to_dict(self) -> dict:
+        """Returns a JSON-serializable dictionary of all metrics."""
+        return {
+            "symbol": self.symbol,
+            "isin": self.isin,
+            "signal_type": self.signal_type,
+            "score_threshold": self.score_threshold,
+            "hold_days": self.hold_days,
+            "start_date": str(self.start_date),
+            "end_date": str(self.end_date),
+            "total_signals": self.total_signals,
+            "trades_taken": self.trades_taken,
+            "winners": self.winners,
+            "losers": self.losers,
+            "win_rate": self.win_rate,
+            "avg_return": self.avg_return,
+            "median_return": self.median_return,
+            "best_trade": self.best_trade,
+            "worst_trade": self.worst_trade,
+            "max_drawdown": self.max_drawdown,
+            "cagr": self.cagr,
+            "sharpe_ratio": self.sharpe_ratio,
+            "sortino_ratio": self.sortino_ratio,
+            "walk_forward_windows": self.walk_forward_windows,
+        }
 
 
 # ---------------------------------------------------------------------------

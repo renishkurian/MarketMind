@@ -187,7 +187,16 @@ async def recompute_signals_for(symbol: str, sector_vault: Dict[str, SectorData]
             # 2. Expert signal mapping (BUY/SELL/HOLD from trends)
             # 3. Persistence of both V2.1 and Legacy columns (indicator_breakdown)
             service = ScoringService(session, profile="long_term_compounding")
-            res = await service.score_symbol(symbol, exchange="NSE")
+            
+            # Bug 1 & Fix 2: Trigger backtest if not already persisted
+            # Check if backtest_cagr already exists to avoid heavy EOD re-compute
+            bt_stmt = select(SignalsCache.backtest_cagr).where(
+                and_(SignalsCache.symbol == symbol, SignalsCache.exchange == "NSE")
+            )
+            bt_res = await session.execute(bt_stmt)
+            existing_cagr = bt_res.scalar_one_or_none()
+            
+            res = await service.score_symbol(symbol, exchange="NSE", run_backtest=(existing_cagr is None))
             
             # Broadcast update if results are successfully persisted
             # We re-fetch to get the final computed columns (like change_pct)
