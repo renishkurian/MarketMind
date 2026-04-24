@@ -17,6 +17,7 @@ import AILogs from './pages/AILogs';
 import Methodology from './pages/Methodology';
 import MLDiscovery from './pages/MLDiscovery';
 import PortfolioOptimizer from './pages/PortfolioOptimizer';
+import OracleAI from './pages/OracleAI';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
@@ -82,6 +83,9 @@ function AppInner() {
         } />
         <Route path="/optimizer" element={
           <ProtectedRoute><Layout><PortfolioOptimizer /></Layout></ProtectedRoute>
+        } />
+        <Route path="/oracle" element={
+          <ProtectedRoute><Layout><OracleAI /></Layout></ProtectedRoute>
         } />
 
         <Route path="/stock/:symbol" element={

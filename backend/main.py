@@ -124,6 +124,9 @@ app.include_router(ml_routes.router)
 from backend.features.portfolio_opt import opt_routes
 app.include_router(opt_routes.router)
 
+from backend.features.oracle import oracle_routes
+app.include_router(oracle_routes.router)
+
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 @app.websocket("/ws/market")
 async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
