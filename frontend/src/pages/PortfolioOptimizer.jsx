@@ -125,6 +125,40 @@ export default function PortfolioOptimizer() {
             </p>
         </div>
       </div>
+
+      {/* ── Terminologies & Meanings ───────────────────────────────────── */}
+      <div className="pt-12 border-t border-dark-border/40">
+        <h2 className="text-xl font-bold text-dark-text mb-6 flex items-center gap-2">
+            <Info size={20} className="text-accent" />
+            Optimizer Glossary
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-2">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Sharpe Ratio</h4>
+                <p className="text-xs text-dark-muted leading-relaxed">
+                    Measured as (Return - RiskFreeRate) / Volatility. It tells us if your returns are due to smart investment decisions or excessive risk.
+                </p>
+            </div>
+            <div className="space-y-2">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Max Sharpe Weight</h4>
+                <p className="text-xs text-dark-muted leading-relaxed">
+                    The specific allocation percentage that historical data suggests will give you the most "bang for your buck" (Highest Sharpe).
+                </p>
+            </div>
+            <div className="space-y-2">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Annual Volatility</h4>
+                <p className="text-xs text-dark-muted leading-relaxed">
+                    The expected fluctuation in your portfolio's value over a year. Lower volatility means a smoother, less stressful investment ride.
+                </p>
+            </div>
+            <div className="space-y-2">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Efficient Frontier</h4>
+                <p className="text-xs text-dark-muted leading-relaxed">
+                    A mathematical curve representing portfolios that have the maximum possible return for every given level of risk.
+                </p>
+            </div>
+        </div>
+      </div>
     </div>
   );
 }
