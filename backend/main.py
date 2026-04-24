@@ -544,15 +544,46 @@ async def allocate_portfolio(
     symbols = [p["symbol"] for p in portfolio_data]
     current_prices = {p["symbol"]: p["current_price"] for p in portfolio_data}
     ai_scores = {p["symbol"]: p["composite_score"] for p in portfolio_data}
+    sector_map = {p["symbol"]: (p["sector"] or "Unknown") for p in portfolio_data}
 
-    # 3. Preparation for Math Strategies: Fetch 10-year returns matrix if needed
+    # 3a. Fetch market caps from FundamentalsCache for true Black-Litterman prior
+    market_caps = {}
+    fund_result = await db.execute(
+        select(FundamentalsCache.symbol, FundamentalsCache.market_cap)
+        .where(FundamentalsCache.symbol.in_(symbols))
+    )
+    for row in fund_result.all():
+        if row.market_cap:
+            market_caps[row.symbol] = float(row.market_cap)
+
+    # 3b. Fetch current holdings weights for rebalancing transaction cost penalty
+    prev_weights = {}
+    tx_result = await db.execute(
+        select(PortfolioTransaction)
+        .where(
+            PortfolioTransaction.user_id == current_user.id,
+            PortfolioTransaction.symbol.in_(symbols),
+            PortfolioTransaction.status == "OPEN"
+        )
+    )
+    tx_rows = tx_result.scalars().all()
+    if tx_rows:
+        total_tx_value = sum(
+            float(t.quantity) * current_prices.get(t.symbol, 1.0)
+            for t in tx_rows
+        )
+        if total_tx_value > 0:
+            for t in tx_rows:
+                sym_value = float(t.quantity) * current_prices.get(t.symbol, 1.0)
+                prev_weights[t.symbol] = sym_value / total_tx_value
+
+    # 4. Preparation for Math Strategies: Fetch 10-year returns matrix if needed
     returns_df = pd.DataFrame()
     lookback_days = 0
     if strategy != "AI_PULSE":
-        # We need historical data for HRP, MVO, BL, ERC, CVAR
-        lookback_days = 365 * 10 
+        lookback_days = 365 * 10
         start_date = date.today() - timedelta(days=lookback_days)
-        
+
         history_result = await db.execute(
             select(PriceHistory.symbol, PriceHistory.date, PriceHistory.close)
             .where(PriceHistory.symbol.in_(symbols))
@@ -563,20 +594,22 @@ async def allocate_portfolio(
         if history_rows:
             raw_df = pd.DataFrame(history_rows, columns=["symbol", "date", "close"])
             raw_df["close"] = raw_df["close"].astype(float)
-            # Pivot to get returns matrix: rows=date, cols=symbol
             pivot_df = raw_df.pivot(index="date", columns="symbol", values="close").ffill()
             returns_df = pivot_df.pct_change().dropna(how="all")
 
-    # 4. Invoke Allocation Engine
+    # 5. Invoke Allocation Engine with full context
     allocation_result = calculate_allocation(
         strategy=strategy,
         amount=amount,
         returns_df=returns_df,
         ai_scores=ai_scores,
-        current_prices=current_prices
+        current_prices=current_prices,
+        market_caps=market_caps,
+        sector_map=sector_map,
+        prev_weights=prev_weights,
     )
 
-    # 5. Save results to db
+    # 6. Save results to db
     metrics = allocation_result.get("metrics", {})
     log_entry = AllocationLog(
         user_id=current_user.id,
