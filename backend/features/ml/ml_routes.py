@@ -76,7 +76,7 @@ async def get_portfolio_alpha(
         print(f"ML Summary: Total={total_ret}, Count={len(results)}, Avg={avg_ret}")
         
         summary = {
-            "avg_projected_return": round(float(avg_ret), 2),
+            "avg_projected_return": float(avg_ret),
             "stock_count": len(results),
             "high_confidence_count": len([r for r in results if r.get('confidence_score', 0) > 0.7])
         }
