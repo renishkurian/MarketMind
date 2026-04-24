@@ -198,6 +198,17 @@ class FundamentalsCache(Base):
     ev_ebitda = Column(Numeric(10,2))
     book_value = Column(Numeric(10,2))
     ebitda = Column(BigInteger)
+
+class MLSnapshot(Base):
+    __tablename__ = "ml_snapshots"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    data = Column(JSON) # Array of predictions
+    summary = Column(JSON) # Overall desk stats (avg return, etc)
+
+    user = relationship("User")
     held_percent_institutions = Column(Numeric(6,2))
     shares_outstanding = Column(BigInteger)
     
