@@ -8,11 +8,16 @@ import toast from 'react-hot-toast';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function WarRoom() {
-  const { portfolio } = useStockStore();
+  const { stocks, fetchPortfolio } = useStockStore();
+  const portfolioArray = Object.values(stocks);
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [loading, setLoading] = useState(false);
   const [research, setResearch] = useState(null);
   const [logs, setLogs] = useState([]);
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, [fetchPortfolio]);
 
   const addLog = (msg) => {
     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg }]);
@@ -60,7 +65,7 @@ export default function WarRoom() {
             <Radio className="text-accent animate-pulse" size={16} />
             <h2 className="text-xs font-black text-dark-text uppercase tracking-widest text-white">War Room Assets</h2>
         </div>
-        {portfolio.map(stock => (
+        {portfolioArray.map(stock => (
             <button 
                 key={stock.symbol}
                 onClick={() => runResearch(stock.symbol)}
