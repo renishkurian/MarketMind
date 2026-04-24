@@ -425,8 +425,10 @@ export default function Portfolio() {
                     <option value="HRP">Smart Stability (HRP)</option>
                     <option value="MVO">Modern Classic (MVO)</option>
                     <option value="BLACK_LITTERMAN">Confidence (BL)</option>
-                    <option value="ERC">Balanced Risk (ERC)</option>
+                    <option value="ERC">Equal Risk (ERC)</option>
                     <option value="CVAR">Tail-Risk (CVaR)</option>
+                    <option value="CDAR">Drawdown Shield (CDaR)</option>
+                    <option value="SEMIVARIANCE">Downside Only (Semi)</option>
                   </select>
                 </div>
                 <div className="w-full md:w-32">
@@ -444,10 +446,12 @@ export default function Portfolio() {
               <p className="text-[11px] text-dark-muted leading-relaxed">
                 {strategy === 'AI_PULSE' && "Weighted by AI conviction scores. Fastest but doesn't account for stock correlations."}
                 {strategy === 'HRP' && "Gold standard for stability. Clusters stocks behaviorally to ensure true diversification."}
-                {strategy === 'MVO' && "Maximizes return-per-unit-of-risk. Math-heavy model based on Markowitz's efficient frontier."}
-                {strategy === 'BLACK_LITTERMAN' && "Blends 10-year market equilibrium with our AI's proprietary conviction 'views'."}
-                {strategy === 'ERC' && "Conservative approach where every stock contributes the exact same risk to the total."}
-                {strategy === 'CVAR' && "Survival-focused. Specifically optimizes to minimize potential for heavy losses during crashes."}
+                {strategy === 'MVO' && "Maximizes return-per-unit-of-risk using EMA returns + shrinkage covariance + sector caps."}
+                {strategy === 'BLACK_LITTERMAN' && "Blends market-cap equilibrium prior with AI conviction 'views'. Correct theoretical BL prior."}
+                {strategy === 'ERC' && "True Equal Risk Contribution — every stock contributes exactly the same portfolio volatility."}
+                {strategy === 'CVAR' && "Survival-focused. Minimises expected loss in the worst 5% of market scenarios (CVaR)."}
+                {strategy === 'CDAR' && "Drawdown-aware. Minimises expected drawdown during the worst market periods — ideal for long-term NSE investors."}
+                {strategy === 'SEMIVARIANCE' && "Downside-only risk. Only penalises negative volatility — upside swings are never punished."}
               </p>
 
               <button 
@@ -464,24 +468,36 @@ export default function Portfolio() {
               {allocationResult && (
                 <div className="space-y-4 pt-6 border-t border-dark-border animate-in slide-in-from-top-4 flex flex-col">
                   <div className="flex flex-wrap gap-3">
-                    <div className="flex-1 min-w-[120px] bg-dark-card border border-dark-border rounded-xl p-3">
+                    <div className="flex-1 min-w-[110px] bg-dark-card border border-dark-border rounded-xl p-3">
                       <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Lookback</p>
                       <p className="text-sm font-bold text-dark-text tracking-tight">{allocationResult.lookback_days || 'Latest'} Days</p>
                     </div>
                     {allocationResult.metrics?.expected_sharpe > 0 && (
-                      <div className="flex-1 min-w-[120px] bg-dark-card border border-dark-border rounded-xl p-3">
+                      <div className="flex-1 min-w-[110px] bg-dark-card border border-dark-border rounded-xl p-3">
                         <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Est. Sharpe</p>
                         <p className="text-sm font-bold text-signal-buy tracking-tight">{allocationResult.metrics.expected_sharpe.toFixed(2)}</p>
                       </div>
                     )}
                     {allocationResult.metrics?.expected_volatility > 0 && (
-                      <div className="flex-1 min-w-[120px] bg-dark-card border border-dark-border rounded-xl p-3">
+                      <div className="flex-1 min-w-[110px] bg-dark-card border border-dark-border rounded-xl p-3">
                         <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Est. Volatility</p>
                         <p className="text-sm font-bold text-signal-sell tracking-tight">{(allocationResult.metrics.expected_volatility * 100).toFixed(1)}%</p>
                       </div>
                     )}
+                    {allocationResult.metrics?.expected_return > 0 && (
+                      <div className="flex-1 min-w-[110px] bg-dark-card border border-dark-border rounded-xl p-3">
+                        <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Est. Return</p>
+                        <p className="text-sm font-bold text-signal-buy tracking-tight">{(allocationResult.metrics.expected_return * 100).toFixed(1)}%</p>
+                      </div>
+                    )}
+                    {allocationResult.leftover_cash > 0 && (
+                      <div className="flex-1 min-w-[110px] bg-dark-card border border-orange-500/30 rounded-xl p-3">
+                        <p className="text-[10px] font-bold text-orange-400 uppercase mb-1">Leftover Cash</p>
+                        <p className="text-sm font-bold text-orange-400 tracking-tight">₹{allocationResult.leftover_cash.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                      </div>
+                    )}
                   </div>
-                  
+
                   {allocationResult.rationale && (
                     <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 text-xs text-dark-text leading-relaxed italic">
                       {allocationResult.rationale}
@@ -493,7 +509,8 @@ export default function Portfolio() {
                         <tr>
                           <th className="px-4 py-3">Symbol</th>
                           <th className="px-4 py-3 text-right">Allocation (₹)</th>
-                          <th className="px-4 py-3 text-right">Est. Qty</th>
+                          <th className="px-4 py-3 text-right">Exact Shares</th>
+                          <th className="px-4 py-3 text-right">Leftover ₹</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-dark-border">
@@ -501,15 +518,18 @@ export default function Portfolio() {
                           <tr key={idx} className="hover:bg-gray-800/40 transition-colors">
                             <td className="px-4 py-3">
                               <span className="font-mono font-bold text-accent">{item.symbol}</span>
-                              <div className="text-[10px] text-dark-muted font-sans font-normal mt-0.5 line-clamp-2" title={item.reason}>
-                                {item.reason}
+                              <div className="text-[10px] text-dark-muted font-sans font-normal mt-0.5 line-clamp-1" title={item.reason}>
+                                {item.weight_pct}% weight
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right font-mono font-bold text-signal-buy whitespace-nowrap">
                               ₹{parseFloat(item.allocated_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </td>
-                            <td className="px-4 py-3 text-right font-mono text-dark-muted whitespace-nowrap">
-                              {parseFloat(item.estimated_qty).toFixed(1)}
+                            <td className="px-4 py-3 text-right font-mono font-bold text-dark-text whitespace-nowrap">
+                              {item.shares ?? Math.floor(item.estimated_qty ?? 0)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-dark-muted whitespace-nowrap text-xs">
+                              {item.leftover_cash != null ? `₹${parseFloat(item.leftover_cash).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'}
                             </td>
                           </tr>
                         ))}
