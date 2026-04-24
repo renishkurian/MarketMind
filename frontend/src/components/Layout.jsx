@@ -23,6 +23,7 @@ const NAV_SECTIONS = [
       { path: '/ml-discovery',  label: 'Alpha Discovery', Icon: Brain      },
       { path: '/optimizer',     label: 'Portfolio Opt',   Icon: PieChart   },
       { path: '/oracle',        label: 'The Oracle',      Icon: Trophy     },
+      { path: '/war-room',      label: 'War Room',        Icon: Shield     },
     ]
   },
   {
