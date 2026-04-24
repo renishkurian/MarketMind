@@ -16,7 +16,7 @@ async def get_deep_research(
     Triggers a Pro-Tier Deep Research on a symbol.
     """
     engine = WarRoomEngine(db)
-    result = await engine.get_deep_research(symbol)
+    result = await engine.get_deep_research(symbol, user_id=current_user.id)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

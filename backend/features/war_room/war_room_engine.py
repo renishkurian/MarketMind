@@ -21,7 +21,7 @@ class WarRoomEngine:
     def __init__(self, db):
         self.db = db
 
-    async def get_deep_research(self, symbol: str) -> Dict:
+    async def get_deep_research(self, symbol: str, user_id: int = None) -> Dict:
         """
         Runs a Multi-Model Deep Research on a stock combining ML and Real-time AI reasoning.
         """
@@ -71,7 +71,8 @@ class WarRoomEngine:
                 symbol=symbol,
                 trigger_reason="WAR_ROOM_DEEP_RESEARCH",
                 messages=[{"role": "user", "content": prompt}],
-                system_prompt="You are a Pro-Tier Quant+Fundamental Synthesizer. Return ONLY JSON."
+                system_prompt="You are a Pro-Tier Quant+Fundamental Synthesizer. Return ONLY JSON.",
+                user_id=user_id
             )
             
             content = ai_raw.get('reply', '')

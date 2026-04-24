@@ -74,6 +74,7 @@ async def _write_call_log(
     status: str = "SUCCESS",
     error_message: Optional[str] = None,
     insight_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> None:
     """Persist a log entry to ai_call_logs."""
     try:
@@ -94,6 +95,7 @@ async def _write_call_log(
                 request_payload=messages,
                 response_raw=response_dict,
                 called_at=datetime.utcnow(),
+                user_id=user_id,
             )
             session.add(entry)
             await session.commit()
@@ -497,6 +499,7 @@ async def generate_insight(
     trigger_reason: str,
     skill_id: Optional[str] = None,
     company_name: Optional[str] = None,
+    user_id: Optional[int] = None,
 ) -> dict:
     """
     Generates an AI insight, logs every call to ai_call_logs, and returns
@@ -642,6 +645,7 @@ async def generate_insight(
         duration_ms=duration_ms,
         status=status,
         error_message=error_message,
+        user_id=user_id,
     )
 
     return parsed  # ← was missing: caused insights to never be saved to AIInsights table
@@ -650,7 +654,8 @@ async def generate_pro_research(
     symbol: str, 
     messages: list, 
     system_prompt: str = "You are an elite institutional trader.",
-    trigger_reason: str = "PRO_RESEARCH"
+    trigger_reason: str = "PRO_RESEARCH",
+    user_id: Optional[int] = None
 ) -> dict:
     """
     High-flexibility entry point for deep AI research.
@@ -724,7 +729,8 @@ async def generate_pro_research(
         completion_tokens=completion_tokens,
         duration_ms=duration_ms,
         status=status,
-        error_message=error_msg
+        error_message=error_msg,
+        user_id=user_id
     )
     
     return res_dict
