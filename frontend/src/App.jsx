@@ -15,6 +15,7 @@ import Signup from './pages/Signup';
 import Settings from './pages/Settings';
 import AILogs from './pages/AILogs';
 import Methodology from './pages/Methodology';
+import MLDiscovery from './pages/MLDiscovery';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
@@ -74,6 +75,9 @@ function AppInner() {
         } />
         <Route path="/settings" element={
           <ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>
+        } />
+        <Route path="/ml-discovery" element={
+          <ProtectedRoute><Layout><MLDiscovery /></Layout></ProtectedRoute>
         } />
 
         <Route path="/stock/:symbol" element={

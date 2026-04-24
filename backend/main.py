@@ -69,7 +69,7 @@ async def broadcast_market_status(status: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.APP_ENV == "production":
-        if settings.SECRET_KEY == "supersecretkey":
+        if settings.SECRET_KEY == "marketmind_secure_vault_key_2026_reloaded_for_institutional_grade_stability":
             raise RuntimeError("FATAL: SECRET_KEY must be changed from default before running in production.")
         if settings.ADMIN_PASSWORD == "admin":
             raise RuntimeError("FATAL: ADMIN_PASSWORD must be changed from default before running in production.")
@@ -117,6 +117,8 @@ app.add_middleware(
 )
 
 app.include_router(analysis.router)
+from backend.features.ml import ml_routes
+app.include_router(ml_routes.router)
 
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 @app.websocket("/ws/market")
@@ -1673,6 +1675,7 @@ def _serialize_signal(signal) -> dict:
     return {
         "current_price": float(signal.current_price) if signal.current_price is not None else None,
         "change_pct": float(signal.change_pct) if signal.change_pct is not None else None,
+        "computed_at": signal.computed_at.isoformat() if signal.computed_at else None,
         "st_signal": signal.st_signal,
         "lt_signal": signal.lt_signal,
         "st_score": float(signal.st_score) if signal.st_score is not None else None,

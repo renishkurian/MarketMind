@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { path: '/watchlist',     label: 'Watchlist',     Icon: Eye        },
   { path: '/opportunities', label: 'Opportunities', Icon: Zap        },
   { path: '/ai-logs',       label: 'AI Logs',       Icon: Brain      },
+  { path: '/ml-discovery',  label: 'ML Discovery',  Icon: Zap        },
   { path: '/methodology',   label: 'Methodology',   Icon: Info       },
   { path: '/settings',      label: 'Settings',      Icon: Settings   },
 ];
