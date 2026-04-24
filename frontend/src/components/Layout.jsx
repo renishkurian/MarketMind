@@ -8,16 +8,31 @@ import {
 import { useStockStore } from '../store/stockStore';
 import { useAuthStore } from '../store/authStore';
 
-const NAV_ITEMS = [
-  { path: '/portfolio',     label: 'Portfolio',     Icon: BarChart2 },
-  { path: '/watchlist',     label: 'Watchlist',     Icon: Eye        },
-  { path: '/opportunities', label: 'Opportunities', Icon: Zap        },
-  { path: '/ml-discovery',  label: 'ML Discovery',  Icon: Brain      },
-  { path: '/optimizer',     label: 'Optimizer',     Icon: PieChart   },
-  { path: '/oracle',        label: 'The Oracle',    Icon: Trophy     },
-  { path: '/ai-logs',       label: 'AI Logs',       Icon: LayoutDashboard },
-  { path: '/methodology',   label: 'Methodology',   Icon: Info       },
-  { path: '/settings',      label: 'Settings',      Icon: Settings   },
+const NAV_SECTIONS = [
+  {
+    label: 'Market',
+    items: [
+      { path: '/portfolio',     label: 'Portfolio',     Icon: BarChart2 },
+      { path: '/watchlist',     label: 'Watchlist',     Icon: Eye        },
+      { path: '/opportunities', label: 'Opportunities', Icon: Zap        },
+    ]
+  },
+  {
+    label: 'AI Intelligence',
+    items: [
+      { path: '/ml-discovery',  label: 'Alpha Discovery', Icon: Brain      },
+      { path: '/optimizer',     label: 'Portfolio Opt',   Icon: PieChart   },
+      { path: '/oracle',        label: 'The Oracle',      Icon: Trophy     },
+    ]
+  },
+  {
+    label: 'System',
+    items: [
+      { path: '/ai-logs',       label: 'AI Logs',       Icon: LayoutDashboard },
+      { path: '/methodology',   label: 'Methodology',   Icon: Info       },
+      { path: '/settings',      label: 'Settings',      Icon: Settings   },
+    ]
+  }
 ];
 
 export default function Layout({ children }) {
@@ -97,23 +112,30 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          {/* Nav links */}
-          <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
-            {NAV_ITEMS.map(({ path, label, Icon }) => (
-              <NavLink
-                key={path}
-                to={path}
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
-                    isActive
-                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                      : 'text-dark-muted hover:bg-accent/10 hover:text-accent'
-                  }`
-                }
-              >
-                <Icon size={18} className="shrink-0 transition-transform group-hover:scale-110" />
-                <span>{label}</span>
-              </NavLink>
+          {/* Nav links grouped by Section */}
+          <nav className="flex-1 py-6 px-3 space-y-8 overflow-y-auto custom-scrollbar">
+            {NAV_SECTIONS.map((section) => (
+              <div key={section.label} className="space-y-1.5">
+                <p className="px-4 mb-3 text-[10px] font-black text-dark-muted/50 uppercase tracking-[0.2em]">
+                   {section.label}
+                </p>
+                {section.items.map(({ path, label, Icon }) => (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
+                        isActive
+                          ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                          : 'text-dark-muted hover:bg-accent/10 hover:text-accent'
+                      }`
+                    }
+                  >
+                    <Icon size={18} className="shrink-0 transition-transform group-hover:scale-110" />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
             ))}
 
             {/* Admin only section */}
