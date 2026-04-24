@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sqlalchemy import select
-from backend.data.db import PriceHistory, StockMaster, FundamentalsCache, AICallLog
+from backend.data.db import PriceHistory, StockMaster, FundamentalsCache, AICallLog, WarRoomSnapshot
 from backend.engine import ai_engine
 import logging
 from typing import Dict, List
@@ -52,11 +52,27 @@ class WarRoomEngine:
             
             # 4. Synthesize with LLM
             print(f"DEBUG: Synthesizing with AI for {symbol}...")
+            
+            f_raw = ml_analysis.get('fundamentals_raw') or {}
+            f_str = f"""
+            - ROE: {f_raw.get('roe', 'N/A')}%
+            - D/E: {f_raw.get('debt_equity', 'N/A')}
+            - PEG: {f_raw.get('peg_ratio', 'N/A')}
+            - Margins: {f_raw.get('operating_margin', 'N/A')}%
+            - P/E: {f_raw.get('pe_ratio', 'N/A')}
+            """ if f_raw else "Fundamental data stream unavailable."
+
             prompt = f"""
             TRANSFORM INTO: Elite Indian Institutional Trader.
             SYMBOL: {symbol}
             ML SIGNAL: {ml_analysis.get('conviction_score', 50)}% Conviction | {ml_analysis.get('projected_30d_return', 0)}% target.
-            FUNDAMENTALS: {", ".join(ml_analysis.get('buffett_insights', ['No fundamental anomaliesDetected']))}
+            
+            FUNDAMENTAL METRICS:
+            {f_str}
+            
+            BUFFETT INSIGHTS:
+            {", ".join(ml_analysis.get('buffett_insights', ['Neutral visibility']))}
+            
             RECENT NEWS HEADLINES:
             {news_str}
             
@@ -106,13 +122,29 @@ class WarRoomEngine:
             if "bear_case" not in intelligence or not isinstance(intelligence["bear_case"], list):
                 intelligence["bear_case"] = ["Market noise/volatility"]
 
-            return {
+            # 5. Build Result
+            result = {
                 "symbol": symbol,
                 "ml_data": ml_analysis,
                 "ai_intelligence": intelligence,
                 "news_analyzed": news_headlines[:8],
                 "generated_at": datetime.datetime.utcnow().isoformat()
             }
+
+            # 6. Save Snapshot
+            try:
+                new_snap = WarRoomSnapshot(
+                    user_id=user_id,
+                    symbol=symbol,
+                    intel_score=ml_analysis.get('conviction_score', 0),
+                    snapshot_data=result
+                )
+                self.db.add(new_snap)
+                await self.db.commit()
+            except Exception as se:
+                logger.error(f"Failed to save War Room Snapshot: {se}")
+
+            return result
             
         except Exception as e:
             import traceback
@@ -129,3 +161,20 @@ class WarRoomEngine:
                 },
                 "generated_at": datetime.datetime.utcnow().isoformat()
             }
+    async def get_latest_snapshot(self, symbol: str, user_id: int) -> Dict:
+        """
+        Retrieves the most recent research snapshot for this user/symbol.
+        """
+        stmt = (
+            select(WarRoomSnapshot)
+            .where(WarRoomSnapshot.user_id == user_id, WarRoomSnapshot.symbol == symbol)
+            .order_by(WarRoomSnapshot.created_at.desc())
+        )
+        res = await self.db.execute(stmt)
+        snap = res.scalars().first()
+        if snap:
+            data = snap.snapshot_data
+            data["from_cache"] = True
+            data["created_at"] = snap.created_at.isoformat()
+            return data
+        return None

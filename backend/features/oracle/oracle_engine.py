@@ -6,6 +6,7 @@ from backend.data.db import PriceHistory, StockMaster, FundamentalsCache
 import logging
 from typing import Dict, List
 import datetime
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +59,12 @@ class OracleEngine:
         
         # 4. XGBoost Training (Oracle Model)
         model = XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.05, random_state=42)
-        model.fit(X, y)
+        await asyncio.to_thread(model.fit, X, y)
         
         # 5. Inference
         latest_X = df[['dist_sma_200', 'volatility']].tail(1).values
-        prediction = model.predict(latest_X)[0]
+        prediction = await asyncio.to_thread(model.predict, latest_X)
+        prediction = prediction[0]
         
         # 6. Fundamental Scoring (Quality Filter)
         quality_score = 50 # Default
@@ -94,5 +96,13 @@ class OracleEngine:
             "projected_30d_return": round(float(prediction) * 100, 2),
             "quality_grade": "Strong" if quality_score > 70 else "Neutral",
             "buffett_insights": reasons,
+            "fundamentals_raw": {
+                "roe": float(fund.roe) if fund and fund.roe else None,
+                "debt_equity": float(fund.debt_equity) if fund and fund.debt_equity else None,
+                "peg_ratio": float(fund.peg_ratio) if fund and fund.peg_ratio else None,
+                "operating_margin": float(fund.operating_margin) if fund and fund.operating_margin else None,
+                "market_cap": float(fund.market_cap) if fund and fund.market_cap else None,
+                "pe_ratio": float(fund.pe_ratio) if fund and fund.pe_ratio else None
+            } if fund else None,
             "analyzed_at": datetime.datetime.utcnow().isoformat()
         }
