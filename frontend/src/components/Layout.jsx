@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Activity, BarChart2, Eye, Zap, Brain, Info,
   Sun, Moon, Wifi, WifiOff, Settings, LogOut,
-  Menu, X, ChevronLeft, Users
+  Menu, X, ChevronLeft, Users, PieChart, LayoutDashboard
 } from 'lucide-react';
 import { useStockStore } from '../store/stockStore';
 import { useAuthStore } from '../store/authStore';
@@ -12,8 +12,9 @@ const NAV_ITEMS = [
   { path: '/portfolio',     label: 'Portfolio',     Icon: BarChart2 },
   { path: '/watchlist',     label: 'Watchlist',     Icon: Eye        },
   { path: '/opportunities', label: 'Opportunities', Icon: Zap        },
-  { path: '/ai-logs',       label: 'AI Logs',       Icon: Brain      },
-  { path: '/ml-discovery',  label: 'ML Discovery',  Icon: Zap        },
+  { path: '/ml-discovery',  label: 'ML Discovery',  Icon: Brain      },
+  { path: '/optimizer',     label: 'Optimizer',     Icon: PieChart   },
+  { path: '/ai-logs',       label: 'AI Logs',       Icon: LayoutDashboard },
   { path: '/methodology',   label: 'Methodology',   Icon: Info       },
   { path: '/settings',      label: 'Settings',      Icon: Settings   },
 ];

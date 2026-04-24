@@ -117,8 +117,12 @@ app.add_middleware(
 )
 
 app.include_router(analysis.router)
+
 from backend.features.ml import ml_routes
 app.include_router(ml_routes.router)
+
+from backend.features.portfolio_opt import opt_routes
+app.include_router(opt_routes.router)
 
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 @app.websocket("/ws/market")

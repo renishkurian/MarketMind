@@ -16,6 +16,8 @@ import Settings from './pages/Settings';
 import AILogs from './pages/AILogs';
 import Methodology from './pages/Methodology';
 import MLDiscovery from './pages/MLDiscovery';
+import PortfolioOptimizer from './pages/PortfolioOptimizer';
+import Insights from './pages/Insights';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
