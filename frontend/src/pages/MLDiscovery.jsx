@@ -147,14 +147,18 @@ export default function MLDiscovery() {
             <Brain className="text-accent" size={32} />
             QuantDiscovery <span className="text-xs bg-accent/20 text-accent px-3 py-1 rounded-full uppercase tracking-widest font-black">AI Snapshot</span>
           </h1>
-          <div className="flex items-center gap-3 mt-2">
-            <p className="text-dark-muted text-sm">
-              Snapshot from: <span className="text-dark-text font-bold">{displayDate(currentSnapshot?.created_at)}</span>
+          <div className="flex flex-col gap-1 mt-2">
+            <p className="text-dark-muted text-sm max-w-3xl leading-relaxed">
+              This engine uses <span className="text-accent font-bold">Random Forest Regressors</span> to analyze historical SMA crossovers and volatility clusters. 
+              It predicts the <span className="text-dark-text font-semibold">most probable price movement over the next 5 days</span> based on current technical anomalies.
             </p>
-            <div className="w-1 h-1 bg-dark-border rounded-full" />
-            <button onClick={() => setShowHistory(true)} className="text-accent text-xs font-bold hover:underline flex items-center gap-1">
-              <History size={12} /> View History
-            </button>
+            <p className="text-[10px] text-dark-muted flex items-center gap-3">
+              <span>Snapshot: <span className="text-dark-text font-bold">{displayDate(currentSnapshot?.created_at)}</span></span>
+              <span className="w-1 h-1 bg-dark-border rounded-full" />
+              <button onClick={() => setShowHistory(true)} className="text-accent font-bold hover:underline flex items-center gap-1 uppercase tracking-tighter">
+                <History size={10} /> View Past Cycles
+              </button>
+            </p>
           </div>
         </div>
         
@@ -252,6 +256,40 @@ export default function MLDiscovery() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── Terminologies & Meanings ───────────────────────────────────── */}
+      <div className="pt-12 border-t border-dark-border/40">
+        <h2 className="text-xl font-bold text-dark-text mb-6 flex items-center gap-2">
+          <Info size={20} className="text-accent" />
+          Concept Glossary
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Projected 5D Return</h4>
+            <p className="text-xs text-dark-muted leading-relaxed">
+              The AI's estimated percentage price movement over the next 5 trading days. This represents the "Alpha" target for short-term opportunities.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Confidence Score</h4>
+            <p className="text-xs text-dark-muted leading-relaxed">
+              Measured by the degree of consensus among 50 individual decision trees. A score &gt; 80% suggests strong model agreement on the projected path.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Random Forest</h4>
+            <p className="text-xs text-dark-muted leading-relaxed">
+              An ensemble machine learning method that operates by constructing a multitude of decision trees at training time and outputting the average prediction.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-accent uppercase tracking-widest">Features (sma_20 / vol)</h4>
+            <p className="text-xs text-dark-muted leading-relaxed">
+              The data inputs for the model. <b>SMA Dist</b> identifies mean-reversion potential, while <b>Volatility</b> helps the model price-in recent risk clusters.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
