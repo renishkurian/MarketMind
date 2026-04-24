@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useStockStore } from '../store/stockStore';
 import Loader from '../components/Loader';
-import { Brain, TrendingUp, Shield, BarChart2, Zap, ArrowRight, Target, Clock, History, ChevronRight } from 'lucide-react';
+import { Brain, TrendingUp, Shield, BarChart2, Zap, ArrowRight, Target, Clock, History, ChevronRight, Info } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
