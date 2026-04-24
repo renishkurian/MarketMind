@@ -646,6 +646,87 @@ async def generate_insight(
 
     return parsed  # ← was missing: caused insights to never be saved to AIInsights table
 
+async def generate_pro_research(
+    symbol: str, 
+    messages: list, 
+    system_prompt: str = "You are an elite institutional trader.",
+    trigger_reason: str = "PRO_RESEARCH"
+) -> dict:
+    """
+    High-flexibility entry point for deep AI research.
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    
+    # Check key availability for the selected provider
+    key_map = {
+        "openai": ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai": ai_cfg["xai_key"],
+    }
+    api_key = key_map.get(provider)
+    if not api_key:
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                api_key = k
+                break
+    
+    if not api_key:
+        return {"reply": "Simulation Mode: No API keys configured in System Settings."}
+
+    model = {
+        "openai": ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai": ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+    
+    t0 = time.perf_counter()
+    prompt_tokens = completion_tokens = 0
+    res_dict = {}
+    
+    try:
+        full_messages = messages
+        if system_prompt:
+             if not any(m.get('role') == 'system' for m in messages):
+                 full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        if provider == "openai":
+            res_dict, prompt_tokens, completion_tokens = await _call_openai(full_messages, model, api_key)
+        elif provider == "anthropic":
+            res_dict, prompt_tokens, completion_tokens = await _call_anthropic(full_messages, model, api_key)
+        elif provider == "xai":
+            res_dict, prompt_tokens, completion_tokens = await _call_xai(full_messages, model, api_key)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+
+        status = "SUCCESS"
+        error_msg = None
+    except Exception as e:
+        status = "ERROR"
+        error_msg = str(e)
+        logger.error(f"Pro Research AI Error: {e}")
+        res_dict = {"reply": f"AI Synthesis Error: {e}"}
+
+    duration_ms = int((time.perf_counter() - t0) * 1000)
+    
+    await _write_call_log(
+        symbol=symbol,
+        provider=provider,
+        model=model,
+        trigger_reason=trigger_reason,
+        skill_id="PRO_TIER",
+        messages=messages,
+        response_dict=res_dict,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        duration_ms=duration_ms,
+        status=status,
+        error_message=error_msg
+    )
+    
+    return res_dict
+
 
 import urllib.request
 import urllib.parse

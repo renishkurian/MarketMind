@@ -70,11 +70,11 @@ class WarRoomEngine:
             }}
             """
             
-            ai_raw = await ai_engine.generate_insight(
+            ai_raw = await ai_engine.generate_pro_research(
                 symbol=symbol,
                 trigger_reason="WAR_ROOM_DEEP_RESEARCH",
                 messages=[{"role": "user", "content": prompt}],
-                system_prompt="Return ONLY a raw JSON object. No conversational filler."
+                system_prompt="You are a Pro-Tier Quant+Fundamental Synthesizer. Return ONLY JSON."
             )
             
             content = ai_raw.get('reply', '')
@@ -106,12 +106,14 @@ class WarRoomEngine:
             }
             
         except Exception as e:
-            logger.error(f"War Room Intelligence Error for {symbol}: {e}", exc_info=True)
+            import traceback
+            err_msg = traceback.format_exc()
+            logger.error(f"War Room Intelligence Error for {symbol}: {err_msg}")
             return {
                 "symbol": symbol,
                 "ml_data": {"conviction_score": 0, "projected_30d_return": 0},
                 "ai_intelligence": {
-                    "pro_verdict": "Neural network desynchronized. Manual over-ride suggested.",
+                    "pro_verdict": f"CRITICAL: {str(e)}",
                     "bull_case": ["ML signals offline"],
                     "bear_case": ["Incomplete data stream"],
                     "market_sentiment": "ERROR"
