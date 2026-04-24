@@ -99,7 +99,7 @@ export default function Portfolio() {
 
       // Handle Day P&L Baseline
       // If stock was bought TODAY, its "Yesterday Value" was effectively the amount we paid for it today.
-      const isBoughtToday = stock.added_date === todayStr;
+      const isBoughtToday = stock.buy_date === todayStr;
       
       if (isBoughtToday) {
         yesterdayVal += qty * buy;

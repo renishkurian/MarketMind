@@ -65,7 +65,12 @@ async def intraday_fetch():
         subq = select(
             PriceHistory.symbol, 
             func.max(PriceHistory.date).label("max_date")
-        ).where(PriceHistory.symbol.in_(list(prices.keys()))).group_by(PriceHistory.symbol).subquery()
+        ).where(
+            and_(
+                PriceHistory.symbol.in_(list(prices.keys())),
+                PriceHistory.date < date.today()
+            )
+        ).group_by(PriceHistory.symbol).subquery()
         
         baseline_query = select(PriceHistory.symbol, PriceHistory.close).join(
             subq, and_(PriceHistory.symbol == subq.c.symbol, PriceHistory.date == subq.c.max_date)

@@ -8,19 +8,28 @@ from backend.utils.auth import get_current_user
 from sqlalchemy import select, desc
 from backend.features.ml.alpha_engine import AlphaDiscoveryEngine
 
+from backend.utils.limiter import limiter
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
 router = APIRouter(prefix="/api/ml", tags=["Machine Learning"])
 
 @router.get("/alpha/{isin}")
+@limiter.limit("5/minute")
 async def get_alpha_signals(
     isin: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Runs the Alpha Discovery ML engine for a specific ISIN. (New Feature #ML)
     """
-    # Verify stock exists
-    stmt = select(StockMaster).where(StockMaster.isin == isin)
+    # Verify stock exists and belongs to the user
+    stmt = (
+        select(StockMaster)
+        .where(StockMaster.isin == isin, StockMaster.user_id == current_user.id)
+    )
     res = await db.execute(stmt)
     stock = res.scalars().first()
     if not stock:

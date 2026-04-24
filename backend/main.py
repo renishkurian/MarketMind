@@ -1,5 +1,9 @@
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from backend.utils.limiter import limiter
+
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, Body, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, Body, UploadFile, File, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -103,6 +107,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MarketMind API", version="1.0.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,7 +206,9 @@ async def register(data: dict = Body(...), db: AsyncSession = Depends(get_db)):
         
     hashed = get_password_hash(password)
     res = await db.execute(select(User))
-    role = "ADMIN" if res.scalars().first() is None else "USER"
+    # SECURITY: Disable first-user-auto-admin for institutional stability. 
+    # New users default to USER. Admins must be promoted manually via DB or specialized API.
+    role = "USER"
     
     new_user = User(email=email, hashed_password=hashed, full_name=full_name, role=role)
     db.add(new_user)
@@ -947,9 +955,13 @@ async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db), curren
     ]
 
 
+from backend.utils.limiter import limiter
+
 @app.post("/api/stock/{symbol}/chart_chat")
+@limiter.limit("10/minute")
 async def handle_chart_chat(
     symbol: str,
+    request: Request,
     payload: dict = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1208,8 +1220,10 @@ class FundamentalUpdateRequest(BaseModel):
     yahoo_symbol: Optional[str] = None
 
 @app.post("/api/stock/{symbol}/insight/generate")
+@limiter.limit("5/minute")
 async def trigger_insight_generation(
     symbol: str, 
+    request: Request,
     req: Optional[InsightGenerateRequest] = None,
     db: AsyncSession = Depends(get_db), 
     current_user: User = Depends(get_current_user)
@@ -1227,8 +1241,10 @@ async def trigger_insight_generation(
 
 
 @app.post("/api/stock/{symbol}/fundamentals/research")
+@limiter.limit("3/minute")
 async def trigger_fundamental_research(
     symbol: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     background_tasks: BackgroundTasks = None

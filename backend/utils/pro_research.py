@@ -13,13 +13,14 @@ class ProResearchUtility:
     Simulates real-time search and financial data aggregation.
     """
     @staticmethod
-    async def get_market_pulse(symbol: str) -> dict:
+    async def get_market_pulse(symbol: str, company_name: str = None) -> dict:
         """
         Fetches 'Pro' tier news and trending themes for a symbol.
         """
         try:
             # 1. Fetch News via RSS (existing logic refined)
-            query = urllib.parse.quote(f'{symbol} stock market trends India')
+            search_query = f"{symbol} {company_name}" if company_name else symbol
+            query = urllib.parse.quote(f'{search_query} stock market trends India')
             url = f'https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en'
             
             # Using a custom User-Agent to avoid blocks

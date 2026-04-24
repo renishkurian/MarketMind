@@ -129,6 +129,7 @@ async def load_bhavcopy_to_db(target_date: datetime, sync_type: str = 'MANUAL', 
                     sig_records = [{
                         'symbol': r['internal_symbol'],
                         'prev_close': r['close'],
+                        'current_price': r['close'],
                         'computed_at': r['date'],
                         'market_session': 'EOD'
                     } for r in records]
@@ -136,6 +137,7 @@ async def load_bhavcopy_to_db(target_date: datetime, sync_type: str = 'MANUAL', 
                     sig_stmt = insert(SignalsCache).values(sig_records)
                     sig_update = {
                         'prev_close': sig_stmt.inserted.prev_close,
+                        'current_price': sig_stmt.inserted.current_price,
                         'computed_at': sig_stmt.inserted.computed_at,
                         'market_session': 'EOD'
                     }

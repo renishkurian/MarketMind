@@ -26,28 +26,29 @@ class WarRoomEngine:
         Runs a Multi-Model Deep Research on a stock combining ML and Real-time AI reasoning.
         """
         try:
-            print(f"DEBUG: Starting War Room Research for {symbol}")
+            logger.debug(f"Starting War Room Research for {symbol}")
             # 1. Fetch Basic Data
             stmt = select(StockMaster).where(StockMaster.symbol == symbol)
             res = await self.db.execute(stmt)
             stock = res.scalars().first()
             if not stock:
-                print(f"DEBUG: Symbol {symbol} not found in DB")
+                logger.debug(f"Symbol {symbol} not found in DB")
                 return {"error": "Stock not found"}
 
             # 2. Get the 'Oracle' ML Score
-            print(f"DEBUG: Running Oracle ML for {symbol}...")
+            logger.debug(f"Running Oracle ML for {symbol}...")
             from backend.features.oracle.oracle_engine import OracleEngine
             oracle = OracleEngine(self.db)
             ml_analysis = await oracle.get_conviction_prediction(symbol)
-            print(f"DEBUG: Oracle ML Score for {symbol}: {ml_analysis.get('conviction_score')}%")
+            logger.debug(f"Oracle ML Score for {symbol}: {ml_analysis.get('conviction_score')}%")
             
             # 3. Fetch Latest News (Pro Intel)
-            print(f"DEBUG: Fetching News Intel for {symbol}...")
+            company_name = stock.company_name if stock else symbol
+            logger.debug(f"Fetching News Intel for {company_name} ({symbol})...")
             from backend.utils.pro_research import ProResearchUtility
-            intel = await ProResearchUtility.get_market_pulse(symbol)
+            intel = await ProResearchUtility.get_market_pulse(symbol, company_name=company_name)
             news_headlines = intel.get('headlines', [])
-            print(f"DEBUG: Fetched {len(news_headlines)} headlines for {symbol}")
+            logger.debug(f"Fetched {len(news_headlines)} headlines for {symbol}")
             news_str = "\n".join([f"- {h}" for h in news_headlines]) if news_headlines else "No recent headlines found."
             
             # 4. Synthesize with LLM
@@ -64,6 +65,7 @@ class WarRoomEngine:
 
             prompt = f"""
             TRANSFORM INTO: Elite Indian Institutional Trader.
+            COMPANY: {company_name}
             SYMBOL: {symbol}
             ML SIGNAL: {ml_analysis.get('conviction_score', 50)}% Conviction | {ml_analysis.get('projected_30d_return', 0)}% target.
             
@@ -100,11 +102,11 @@ class WarRoomEngine:
             
             intelligence = {}
             if isinstance(ai_raw, dict) and "pro_verdict" in ai_raw:
-                print(f"DEBUG: AI returned structured JSON for {symbol}")
+                logger.debug(f"AI returned structured JSON for {symbol}")
                 intelligence = ai_raw
             else:
                 content = ai_raw.get('reply', '') if isinstance(ai_raw, dict) else str(ai_raw)
-                print(f"DEBUG: AI Response for {symbol} received (Length: {len(content)})")
+                logger.debug(f"AI Response for {symbol} received (Length: {len(content)})")
                 # Robust JSON extraction for string fallbacks
                 match = re.search(r'\{.*\}', content, re.DOTALL)
                 if match:

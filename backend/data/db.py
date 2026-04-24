@@ -128,7 +128,7 @@ class SignalsCache(Base):
     market_session = Column(Enum('LIVE','EOD','CLOSED'), nullable=False)
     current_price = Column(Numeric(10,2))
     prev_close = Column(Numeric(10,2))
-    change_pct = Column(Numeric(6,2))
+    change_pct = Column(Numeric(8,4))
     st_signal = Column(Enum('BUY','HOLD','SELL'), index=True)
     st_score = Column(Numeric(5,2))
     lt_signal = Column(Enum('BUY','HOLD','SELL'), index=True)
