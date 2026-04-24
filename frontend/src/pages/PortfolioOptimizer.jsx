@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStockStore } from '../store/stockStore';
 import Loader from '../components/Loader';
-import { PieChart, TrendingUp, Shield, BarChart2, Zap, ArrowRight, Target, Info, Sparkles } from 'lucide-react';
+import { PieChart, TrendingUp, Shield, BarChart2, Zap, ArrowRight, Target, Info, Sparkles, Brain } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -112,7 +112,7 @@ export default function PortfolioOptimizer() {
                 What is Sharpe Ratio?
             </h4>
             <p className="text-sm text-dark-muted leading-relaxed">
-                The Sharpe ratio measures the performance of an investment compared to a risk-free asset, after adjusting for its risk. A higher Sharpe ratio (usually {'>'} 2.0) indicates that the portfolio has high returns without excessive volatility.
+                The Sharpe ratio measures the performance of an investment compared to a risk-free asset, after adjusting for its risk. A higher Sharpe ratio (usually &gt; 2.0) indicates that the portfolio has high returns without excessive volatility.
             </p>
         </div>
         <div className="p-6 bg-accent/5 border border-accent/20 rounded-2xl">
