@@ -166,7 +166,7 @@ export default function AILogs() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('mm_token');
+      const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
       const headers = { 'Authorization': `Bearer ${token}` };
       const [insRes, callsRes] = await Promise.allSettled([
         fetch(`${API_URL}/api/ai-logs?limit=100`, { headers }),

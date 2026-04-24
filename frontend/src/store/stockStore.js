@@ -18,7 +18,7 @@ export const useStockStore = create((set, get) => ({
 
   fetchPortfolio: async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('mm_token');
       if (!token) return;
       
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';

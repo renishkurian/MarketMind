@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStockStore } from '../store/stockStore';
 import Loader from '../components/Loader';
-import { ShieldAlert, TrendingUp, Shield, BarChart2, Zap, ArrowRight, Target, Info, Sparkles, Trophy, Radio, Search, Activity, Globe, MessageSquare } from 'lucide-react';
+import { ShieldAlert, TrendingUp, Shield, BarChart2, Zap, ArrowRight, Target, Info, Sparkles, Trophy, Radio, Search, Activity, Globe, MessageSquare, RefreshCcw, Database } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -23,14 +23,19 @@ export default function WarRoom() {
     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg }]);
   };
 
-  const runResearch = async (symbol) => {
+  const runResearch = async (symbol, rebuild = false) => {
     if (!symbol) return;
     setLoading(true);
     setResearch(null);
     setLogs([]);
     setSelectedSymbol(symbol);
 
-    addLog(`INITIATING DEEP RESEARCH FOR ${symbol}...`);
+    if (rebuild) {
+        addLog(`FORCING REBUILD OF INTELLIGENCE...`);
+    } else {
+        addLog(`INITIATING DEEP RESEARCH FOR ${symbol}...`);
+    }
+    
     addLog("FETCHING 10Y PRICE HISTORY...");
     addLog("CALCULATING XGBOOST CONVICTION...");
     
@@ -42,11 +47,15 @@ export default function WarRoom() {
       addLog("CONNECTING TO MARKET NEWS FEED...");
       addLog("EXTRACTING SENTIMENTAL DRIVERS...");
       
-      const res = await axios.get(`${API_URL}/api/war-room/deep-research/${symbol}`, {
+      const res = await axios.get(`${API_URL}/api/war-room/deep-research/${symbol}?rebuild=${rebuild}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      addLog("SYNTHESIZING PRO VERDICT...");
+      if (res.data.from_cache) {
+          addLog("RESTORED RESEARCH FROM SECURE ARCHIVE.");
+      } else {
+          addLog("SYNTHESIZING PRO VERDICT...");
+      }
       setResearch(res.data);
     } catch (err) {
       toast.error(err.response?.data?.detail || "War Room analysis failed");
@@ -56,14 +65,23 @@ export default function WarRoom() {
     }
   };
 
+  if (portfolioArray.length === 0) {
+    return (
+        <div className="h-full flex flex-col items-center justify-center bg-black gap-6">
+            <Loader />
+            <p className="text-dark-muted font-mono text-[10px] uppercase tracking-[0.4em] animate-pulse">Initializing War Room Neural Engine...</p>
+        </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] bg-black overflow-hidden flex-col md:flex-row">
+    <div className="flex h-full bg-black overflow-hidden flex-col md:flex-row">
       
       {/* ── Left Selection Pane ───────────────────────────────────── */}
-      <div className="w-full md:w-64 border-r border-dark-border bg-dark-bg p-4 flex flex-col gap-4 overflow-y-auto">
+      <div className="w-full md:w-72 border-r border-dark-border bg-dark-bg p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
         <div className="flex items-center gap-2 px-2 mb-2">
-            <Radio className="text-accent animate-pulse" size={16} />
-            <h2 className="text-xs font-black text-dark-text uppercase tracking-widest text-white">War Room Assets</h2>
+            <Radio className="text-signal-buy animate-pulse" size={16} />
+            <h2 className="text-[10px] font-black text-dark-text uppercase tracking-[#0.4em] text-white">War Room Assets</h2>
         </div>
         {portfolioArray.map(stock => (
             <button 
@@ -133,13 +151,28 @@ export default function WarRoom() {
                                 }`}>
                                     {research.ai_intelligence.institutional_action || 'DEEP_DIVE'}
                                 </span>
-                                <span className="text-[10px] text-dark-muted font-bold uppercase tracking-widest hidden md:inline">Last Rescan: {new Date().toLocaleTimeString()}</span>
+                                {research.from_cache && (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-black uppercase">
+                                        <Database size={10} /> Archived
+                                    </span>
+                                )}
+                                <span className="text-[10px] text-dark-muted font-bold uppercase tracking-widest hidden md:inline">Last Rescan: {new Date(research.generated_at).toLocaleTimeString()}</span>
                             </div>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Final Intel Score</p>
-                        <p className="text-5xl font-black text-accent">{research.ml_data.conviction_score}%</p>
+                    <div className="flex items-center gap-8">
+                        <button 
+                            onClick={() => runResearch(research.symbol, true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all group"
+                            title="Re-run AI Synthesis (Costs Tokens)"
+                        >
+                            <RefreshCcw size={14} className="text-dark-muted group-hover:text-accent group-hover:rotate-180 transition-all duration-500" />
+                            <span className="text-[10px] font-black text-dark-muted group-hover:text-white uppercase tracking-wider">Rebuild</span>
+                        </button>
+                        <div className="text-right">
+                            <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Final Intel Score</p>
+                            <p className="text-5xl font-black text-accent">{research.ml_data.conviction_score}%</p>
+                        </div>
                     </div>
                 </div>
 

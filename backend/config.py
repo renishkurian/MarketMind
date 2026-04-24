@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "anthropic" # anthropic, openai, xai
 
     APP_ENV: str = "development"
-    SECRET_KEY: str = "supersecretkey"
+    SECRET_KEY: str = "marketmind_secure_vault_key_2026_reloaded_for_institutional_grade_stability"
     ADMIN_PASSWORD: str = "admin"
     LOG_LEVEL: str = "INFO"
 

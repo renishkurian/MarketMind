@@ -30,10 +30,17 @@ export const useWebSocket = (url) => {
       }
     };
 
-    ws.current.onclose = () => {
+    ws.current.onclose = (event) => {
       console.log('WebSocket disconnected. Reconnecting...');
       setConnectionStatus(false);
-      reconnectTimeout.current = setTimeout(connect, 3000); // Exponetial backoff could go here
+      
+      // Stop reconnecting if authentication failed (1008 is Policy Violation / Auth fail)
+      if (event.code === 1008) {
+        console.error("Auth failure on WebSocket. Stopping reconnection.");
+        return;
+      }
+      
+      reconnectTimeout.current = setTimeout(connect, 3000);
     };
 
     ws.current.onerror = (error) => {

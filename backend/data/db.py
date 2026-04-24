@@ -304,6 +304,16 @@ class AllocationLog(Base):
     expected_volatility = Column(Numeric(8,4), nullable=True)
     expected_sharpe = Column(Numeric(6,3), nullable=True)
 
+class WarRoomSnapshot(Base):
+    __tablename__ = "war_room_snapshots"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    symbol = Column(String(20), index=True, nullable=False)
+    intel_score = Column(Numeric(5,1))
+    snapshot_data = Column(JSON, nullable=False) # Stores the full research object
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
 class SystemConfig(Base):
     __tablename__ = "system_config"
     

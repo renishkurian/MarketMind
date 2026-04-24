@@ -219,7 +219,7 @@ export default function DeepDive() {
     setInsightLoading(true);
     setInsightError(false);
 
-    const token = localStorage.getItem('token') || localStorage.getItem('mm_token');
+    const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}` };
 
     // Parallel fetches
@@ -270,7 +270,7 @@ export default function DeepDive() {
     if (stock?.isin) {
       setAnalysisLoading(true);
       try {
-        const token = localStorage.getItem('token') || localStorage.getItem('mm_token');
+        const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
         const aRes = await fetch(`${API_URL}/api/analysis/${stock.isin}/full`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -895,7 +895,7 @@ export default function DeepDive() {
 
                   {/* Right Chat Panel */}
                   {showChartChat && (
-                    <div className="w-1/3 min-w-[300px] border border-dark-border bg-[#0d1117] rounded-xl flex flex-col shadow-2xl" style={{height: '700px'}}>
+                    <div className="w-1/3 min-w-[320px] border border-dark-border bg-[#0d1117] rounded-2xl flex flex-col shadow-2xl h-[800px]">
                       
                       {/* Header */}
                       <div className="p-3 border-b border-dark-border bg-dark-bg flex items-center gap-2 shrink-0">
@@ -956,9 +956,8 @@ export default function DeepDive() {
 
                       {/* Messages */}
                       <div
-                        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+                        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth custom-scrollbar"
                         ref={chatScrollRef}
-                        style={{scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent'}}
                       >
                         {chatMessages.length === 0 && !chatLoading && (
                           <div className="flex flex-col items-center justify-center h-full gap-3 text-dark-muted">
@@ -990,7 +989,7 @@ export default function DeepDive() {
 
                       {/* Quick Prompt Chips */}
                       {!chatLoading && activeChatSessionId && (
-                        <div className="px-3 pb-3 flex gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+                        <div className="px-3 pb-3 flex flex-wrap gap-2">
                           {[
                             "Is this a good entry right now?",
                             "Identify key support and resistance",

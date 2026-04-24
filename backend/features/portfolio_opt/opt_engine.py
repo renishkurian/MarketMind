@@ -45,12 +45,25 @@ class PortfolioOptEngine:
 
         # 2. PyPortfolioOpt Magic
         try:
-            # Expected Returns and Sample Covariance
-            mu = expected_returns.mean_historical_return(prices_df)
-            S = risk_models.sample_cov(prices_df)
+            from pypfopt import objective_functions
+            # Expected Returns (CAPM is more stable than mean historical)
+            mu = expected_returns.capm_return(prices_df)
+            S = risk_models.CovarianceShrinkage(prices_df).ledoit_wolf()
 
-            # Efficient Frontier
-            ef = EfficientFrontier(mu, S)
+            # Efficient Frontier with dynamic weight constraints
+            # For 61 assets, a 2% floor is impossible (61*2% > 100%).
+            # We use a safe floor of (1/N) * 0.5 to ensure feasibility.
+            num_assets = len(prices_df.columns)
+            min_weight = 1.0 / (num_assets * 2) if num_assets > 0 else 0
+            max_weight = max(0.1, 2.0 / num_assets) if num_assets > 0 else 0.25
+            max_weight = min(max_weight, 0.40) # Never more than 40%
+            
+            ef = EfficientFrontier(mu, S, weight_bounds=(min_weight, max_weight))
+            
+            # Add L2 Regularization to favor many non-zero weights
+            # Gamma of 0.1 is strong enough to spread weights
+            ef.add_objective(objective_functions.L2_reg, gamma=0.1)
+            
             weights = ef.max_sharpe()
             cleaned_weights = ef.clean_weights()
             

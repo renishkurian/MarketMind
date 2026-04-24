@@ -1105,7 +1105,7 @@ async def get_ai_logs(
         {
             "id": ins.id,
             "symbol": ins.symbol,
-            "generated_at": str(ins.generated_at),
+            "generated_at": ins.generated_at.isoformat() + "Z" if ins.generated_at else None,
             "trigger_reason": ins.trigger_reason,
             "skill_id": ins.skill_id,
             "verdict": ins.verdict,
@@ -1153,7 +1153,7 @@ async def get_ai_call_logs(
             "error_message": log.error_message,
             "request_payload": log.request_payload,
             "response_raw": log.response_raw,
-            "called_at": str(log.called_at),
+            "called_at": log.called_at.isoformat() + "Z" if log.called_at else None,
         }
         for log in logs
     ]
@@ -1179,7 +1179,7 @@ async def get_stock_insight(
         raise HTTPException(status_code=404, detail="No insight found")
 
     return {
-        "generated_at": str(insight.generated_at),
+        "generated_at": insight.generated_at.isoformat() + "Z" if insight.generated_at else None,
         "trigger_reason": insight.trigger_reason,
         "short_summary": insight.short_summary,
         "long_summary": insight.long_summary,

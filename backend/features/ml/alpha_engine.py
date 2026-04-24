@@ -24,68 +24,73 @@ class AlphaDiscoveryEngine:
         """
         Fetches history, builds features, trains a quick model, and returns prediction.
         """
+        import asyncio
+        logger.info(f"ML Alpha: Starting prediction for {symbol}")
+        
         # 1. Fetch History
         stmt = (
             select(PriceHistory)
-            .where(PriceHistory.isin == isin)
+            .where(PriceHistory.symbol == symbol)  # Use symbol as it's more reliable
             .order_by(PriceHistory.date.desc())
-            .limit(500) # Last 2 years approx
+            .limit(500)
         )
         res = await self.db.execute(stmt)
         history = res.scalars().all()
         
-        if len(history) < 100:
-            return {"error": "Insufficient history for ML (min 100 bars)"}
+        if len(history) < 60:
+            logger.warning(f"ML Alpha: Insufficient history for {symbol} ({len(history)} bars)")
+            return {"error": "Insufficient history (min 60 bars)"}
 
         # 2. Build DataFrame
         df = pd.DataFrame([
-            {"date": h.date, "close": float(h.close), "volume": int(h.volume or 0)} 
+            {"close": float(h.close), "volume": int(h.volume or 0)} 
             for h in reversed(history)
         ])
 
-        # 3. Feature Engineering
-        # Moving Averages
-        df['sma_20'] = df['close'].rolling(window=20).mean()
-        df['sma_50'] = df['close'].rolling(window=50).mean()
-        df['dist_sma_20'] = (df['close'] - df['sma_20']) / df['sma_20']
-        df['dist_sma_50'] = (df['close'] - df['sma_50']) / df['sma_50']
-        
-        # Volatility
-        df['volatility'] = df['close'].rolling(window=20).std() / df['sma_20']
-        
-        # Target: 5-day forward return
-        df['target'] = df['close'].shift(-5) / df['close'] - 1
-        
-        # Clean up
-        df = df.dropna()
-        if df.empty:
-            return {"error": "Cleanup resulted in empty dataset"}
+        # 3. Use ThreadPool for ML to avoid blocking event loop
+        return await asyncio.to_thread(self._train_and_predict, symbol, df)
 
-        # 4. Train Model
-        features = ['dist_sma_20', 'dist_sma_50', 'volatility']
-        X = df[features].values[:-5] # Hide last 5 bars they don't have targets
-        y = df['target'].values[:-5]
-        
-        if len(X) < 50:
-            return {"error": "Insufficient training samples"}
+    def _train_and_predict(self, symbol: str, df: pd.DataFrame) -> Dict:
+        try:
+            # Feature Engineering
+            df['sma_20'] = df['close'].rolling(window=20).mean()
+            df['sma_50'] = df['close'].rolling(window=50).mean()
+            df['dist_sma_20'] = (df['close'] - df['sma_20']) / df['sma_20'].replace(0, np.nan)
+            df['dist_sma_50'] = (df['close'] - df['sma_50']) / df['sma_50'].replace(0, np.nan)
+            df['volatility'] = df['close'].rolling(window=20).std() / df['sma_20'].replace(0, np.nan)
+            
+            # Target: 5-day forward return
+            df['target'] = df['close'].shift(-5) / df['close'] - 1
+            
+            df = df.dropna()
+            if len(df) < 30:
+                return {"error": "Insufficient clean data samples"}
 
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X, y)
+            features = ['dist_sma_20', 'dist_sma_50', 'volatility']
+            X = df[features].values[:-5]
+            y = df['target'].values[:-5]
+            
+            model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42)
+            model.fit(X, y)
 
-        # 5. Predict for TODAY
-        latest_features = df[features].values[-1].reshape(1, -1)
-        prediction = model.predict(latest_features)[0]
+            latest_features = df[features].values[-1].reshape(1, -1)
+            prediction = model.predict(latest_features)[0]
 
-        # 6. Interpret result
-        confidence = float(np.mean([tree.predict(latest_features)[0] for tree in model.estimators_]) / prediction) if prediction != 0 else 0
-        
-        return {
-            "symbol": symbol,
-            "prediction_5d_return": round(prediction * 100, 2),
-            "confidence_score": round(min(1.0, abs(confidence)), 2),
-            "model_type": "RandomForestRegressor",
-            "features_used": features,
-            "train_size": len(X),
-            "last_price": df['close'].iloc[-1],
-            "projected_price": round(df['close'].iloc[-1] * (1 + prediction), 2)
-        }
+            # Better confidence: Std Dev of tree predictions (normalized)
+            tree_preds = [tree.predict(latest_features)[0] for tree in model.estimators_]
+            std_dev = np.std(tree_preds)
+            confidence = 1.0 / (1.0 + std_dev * 10) # Simple inverse mapping
+            
+            return {
+                "symbol": symbol,
+                "prediction_5d_return": round(float(prediction) * 100, 2),
+                "confidence_score": round(float(confidence), 2),
+                "model_type": "RandomForestRegressor",
+                "features_used": features,
+                "train_size": len(X),
+                "last_price": round(float(df['close'].iloc[-1]), 2),
+                "projected_price": round(float(df['close'].iloc[-1] * (1 + prediction)), 2)
+            }
+        except Exception as e:
+            logger.error(f"ML Error for {symbol}: {e}")
+            return {"error": f"Model error: {str(e)}"}

@@ -3,7 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Activity, BarChart2, Eye, Zap, Brain, Info,
   Sun, Moon, Wifi, WifiOff, Settings, LogOut,
-  Menu, X, ChevronLeft, Users, PieChart, LayoutDashboard, Trophy
+  Menu, X, ChevronLeft, Users, PieChart, LayoutDashboard, Trophy,
+  Shield
 } from 'lucide-react';
 import { useStockStore } from '../store/stockStore';
 import { useAuthStore } from '../store/authStore';
@@ -44,7 +45,7 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="flex flex-col min-h-screen bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text font-sans transition-colors duration-500">
+    <div className="flex flex-col h-screen bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text font-sans transition-colors duration-500 overflow-hidden">
 
       {/* ── Top Header ───────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 border-b border-light-border dark:border-dark-border bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl transition-all duration-300">
@@ -94,7 +95,7 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      <div className="flex flex-1 pt-14 h-screen overflow-hidden">
+      <div className="flex flex-1 pt-14 overflow-hidden">
         {/* Sidebar */}
         <aside
           className={`shrink-0 flex flex-col border-r border-light-border dark:border-dark-border bg-white dark:bg-dark-card transition-all duration-300 ease-in-out h-full ${
@@ -170,8 +171,8 @@ export default function Layout({ children }) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 overflow-auto bg-light-bg dark:bg-dark-bg transition-colors">
-          <div className="max-w-[1600px] mx-auto">
+        <main className="flex-1 min-w-0 bg-light-bg dark:bg-dark-bg transition-colors overflow-y-auto custom-scrollbar">
+          <div className="h-full">
             {children}
           </div>
         </main>

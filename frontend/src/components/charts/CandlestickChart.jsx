@@ -83,10 +83,22 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
 
     seriesRef.current.setData(formattedData);
 
-    // Restore the zoom/pan if the user had one set
-    if (visibleRange) {
-      chart.timeScale().setVisibleRange(visibleRange);
+    // Restore the zoom/pan if the user had one set, 
+    // BUT only if the data length is similar (incremental update).
+    // If it's a massive shift (range change), let the chart fit the new data.
+    const isRangeSwitch = !seriesRef.current.previousDataLength || Math.abs(seriesRef.current.previousDataLength - data.length) > 10;
+    
+    if (!isRangeSwitch && visibleRange && visibleRange.from && visibleRange.to) {
+      try {
+        chart.timeScale().setVisibleRange(visibleRange);
+      } catch (e) {
+        chart.timeScale().fitContent();
+      }
+    } else {
+      chart.timeScale().fitContent();
     }
+    
+    seriesRef.current.previousDataLength = data.length;
   }, [data]);
 
   // ── Update trend lines without destroying zoom state ─────────────────────

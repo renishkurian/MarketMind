@@ -55,9 +55,21 @@ export default function PortfolioOptimizer() {
             <PieChart className="text-accent" size={32} />
             Institutional Optimizer
           </h1>
-          <p className="text-dark-muted mt-2 max-w-2xl">
-            Modern Portfolio Theory (MPT) implementation using PyPortfolioOpt. Maximizes your return-per-unit-risk using historical covariance.
+          <p className="text-dark-text/70 mt-2 max-w-4xl leading-relaxed text-sm lg:text-base">
+            MarketMind uses <b>Modern Portfolio Theory (MPT)</b> to solve the complex mathematical problem of how to distribute your money. 
+            We analyze 10 years of historical relationships between your stocks to find the <i>"Optimal Allocation"</i> that gives you the highest profit with the lowest possible stress (volatility).
           </p>
+          <div className="flex flex-wrap gap-4 mt-3">
+             <div className="flex items-center gap-1.5 text-[10px] font-bold text-signal-buy uppercase bg-signal-buy/10 px-2 py-0.5 rounded border border-signal-buy/20">
+                <Shield size={10} /> Fully Diversified
+             </div>
+             <div className="flex items-center gap-1.5 text-[10px] font-bold text-accent uppercase bg-accent/10 px-2 py-0.5 rounded border border-accent/20">
+                <Brain size={10} /> CAPM Model
+             </div>
+             <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-500 uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                <Zap size={10} /> Max efficiency
+             </div>
+          </div>
         </div>
         <button 
           onClick={fetchOptimization}
@@ -81,6 +93,18 @@ export default function PortfolioOptimizer() {
             <p className="text-[10px] font-bold text-dark-muted uppercase tracking-widest mb-1">Annual Volatility</p>
             <p className="text-3xl font-black text-signal-sell">{data.metrics.annual_volatility}%</p>
         </div>
+      </div>
+
+      <div className="p-5 bg-dark-card/50 border border-dark-border/40 rounded-2xl flex items-start gap-4">
+          <div className="p-2 bg-accent/10 rounded-lg text-accent shrink-0">
+             <Target size={20} />
+          </div>
+          <div>
+            <h4 className="text-base font-bold text-dark-text uppercase tracking-wider">The Strategic Goal</h4>
+            <p className="text-sm text-dark-muted mt-1 leading-relaxed opacity-80">
+               This profile assumes we want to <b>Maximize the Sharpe Ratio</b>. This means we are hunting for the highest possible return for <i>every single unit of risk</i> we take. The weights displayed below are the mathematically "Perfect" recipe to achieve this balance across your {data.symbols_analyzed?.length} assets.
+            </p>
+          </div>
       </div>
 
       <div className="bg-dark-card border border-dark-border rounded-2xl overflow-hidden">
