@@ -80,8 +80,8 @@ export default function Portfolio() {
     let currentVal = 0;
     let yesterdayVal = 0;
 
-    // Get local IST date string (YYYY-MM-DD)
-    const todayStr = new Date().toLocaleDateString('sv-SE'); // sv-SE is YYYY-MM-DD reliably
+    // Get IST date string (YYYY-MM-DD) natively
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
     portfolioStocks.forEach(stock => {
       const qty = stock.quantity || 0;
@@ -108,6 +108,7 @@ export default function Portfolio() {
         const derivedPrev = current / (1 + changePct / 100);
         yesterdayVal += qty * derivedPrev;
       } else {
+        // Fallback: If we genuinely have no previous data, assume 0 day change to avoid artificial P&L swings
         yesterdayVal += qty * current;
       }
     });

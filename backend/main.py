@@ -703,6 +703,7 @@ async def get_opportunities(
     query = (
         select(StockMaster, SignalsCache)
         .join(SignalsCache, StockMaster.symbol == SignalsCache.symbol)
+        .where(StockMaster.user_id == current_user.id)
         .where(StockMaster.is_active == True)
         .where(SignalsCache.confidence_pct >= min_confidence)
     )
@@ -750,6 +751,34 @@ async def get_stock_history(
         }
         for h in history
     ]
+    
+    # ── Dynamically append LIVE candles from IntradayTicks ──
+    from sqlalchemy import func
+    from itertools import groupby
+    
+    last_hist_date = history[-1].date if history else None
+    if last_hist_date:
+        intra_res = await db.execute(
+            select(IntradayTicks)
+            .where(IntradayTicks.symbol == symbol.upper())
+            .where(func.date(IntradayTicks.timestamp) > last_hist_date)
+            .order_by(IntradayTicks.timestamp.asc())
+        )
+        intra_ticks = intra_res.scalars().all()
+        
+        if intra_ticks:
+            # Group ticks by day to handle multiple missing days (e.g. over weekend/holidays)
+            for t_date, ticks_iter in groupby(intra_ticks, key=lambda t: t.timestamp.date()):
+                day_ticks = list(ticks_iter)
+                records.append({
+                    "date": str(t_date),
+                    "open": float(day_ticks[0].open) if day_ticks[0].open is not None else float(day_ticks[0].close),
+                    "high": float(max((t.high if t.high is not None else t.close) for t in day_ticks)),
+                    "low": float(min((t.low if t.low is not None else t.close) for t in day_ticks)),
+                    "close": float(day_ticks[-1].close),
+                    "volume": sum((t.volume or 0) for t in day_ticks)
+                })
+
     # Slice to requested days
     return records[-days:] if days < len(records) else records
 
