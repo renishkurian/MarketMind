@@ -71,15 +71,25 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
     // Save current visible range so we can restore it after update
     const visibleRange = chart.timeScale().getVisibleRange();
 
-    const formattedData = data
-      .map(d => ({
-        time: Math.floor(new Date(d.date).getTime() / 1000),
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }))
-      .sort((a, b) => a.time - b.time);
+    const formattedData = [];
+    const seenTimes = new Set();
+    
+    // Sort raw data first to ensure we pick the LATEST entry if there are duplicates
+    const sortedRaw = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    sortedRaw.forEach(d => {
+      const t = Math.floor(new Date(d.date).getTime() / 1000);
+      if (t && !seenTimes.has(t)) {
+        formattedData.push({
+          time: t,
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+        });
+        seenTimes.add(t);
+      }
+    });
 
     seriesRef.current.setData(formattedData);
 
@@ -133,6 +143,10 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
 
       const t1 = Math.floor(new Date(line.start_date).getTime() / 1000);
       const t2 = Math.floor(new Date(line.end_date).getTime() / 1000);
+      
+      // Safety: t1 and t2 must be distinct and valid for lightweight-charts
+      if (!t1 || !t2 || t1 === t2) return;
+
       const p1 = { time: t1, value: line.start_price };
       const p2 = { time: t2, value: line.end_price };
       const lineData = t1 > t2 ? [p2, p1] : [p1, p2];

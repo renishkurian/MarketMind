@@ -1084,7 +1084,7 @@ async def handle_chart_chat(
     }
 
     try:
-        response = await generate_chart_chat(symbol, chat_history, context_data)
+        response = await generate_chart_chat(symbol, chat_history, context_data, user_id=current_user.id)
         return response
     except Exception as e:
         logger.error(f"Chart Chat Error for {symbol}: {e}")

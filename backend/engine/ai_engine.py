@@ -764,7 +764,7 @@ def _fetch_news_sync(symbol: str) -> list[str]:
 async def _fetch_symbol_news(symbol: str) -> list[str]:
     return await asyncio.to_thread(_fetch_news_sync, symbol)
 
-async def generate_chart_chat(symbol: str, user_messages: list, context_data: dict) -> dict:
+async def generate_chart_chat(symbol: str, user_messages: list, context_data: dict, user_id: int = None) -> dict:
     """
     Given a chat history and OHLC/signal context, generate a response containing 
     a markdown 'reply' and an optional array of 'trend_lines'.
@@ -836,6 +836,7 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
             duration_ms=duration_ms,
             status=status,
             error_message=error_message,
+            user_id=user_id,
         )
 
     return parsed

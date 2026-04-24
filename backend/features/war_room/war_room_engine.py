@@ -56,11 +56,11 @@ class WarRoomEngine:
             
             f_raw = ml_analysis.get('fundamentals_raw') or {}
             f_str = f"""
-            - ROE: {f_raw.get('roe', 'N/A')}%
-            - D/E: {f_raw.get('debt_equity', 'N/A')}
-            - PEG: {f_raw.get('peg_ratio', 'N/A')}
-            - Margins: {f_raw.get('operating_margin', 'N/A')}%
-            - P/E: {f_raw.get('pe_ratio', 'N/A')}
+            - ROE: {f_raw.get('roe') if f_raw.get('roe') is not None else 'N/A'}%
+            - D/E: {f_raw.get('debt_equity') if f_raw.get('debt_equity') is not None else 'N/A'}
+            - PEG: {f_raw.get('peg_ratio') if f_raw.get('peg_ratio') is not None else 'N/A'}
+            - Margins: {f_raw.get('operating_margin') if f_raw.get('operating_margin') is not None else 'N/A'}%
+            - P/E: {f_raw.get('pe_ratio') if f_raw.get('pe_ratio') is not None else 'N/A'}
             """ if f_raw else "Fundamental data stream unavailable."
 
             prompt = f"""

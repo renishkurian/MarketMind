@@ -261,6 +261,9 @@ class SkillLoader:
     ) -> dict[str, Any]:
 
         f = m.fmt  # shorthand
+        
+        def safe_round(val: Optional[float], ndigits: int) -> str:
+            return str(round(val, ndigits)) if val is not None else "N/A"
 
         subs: dict[str, Any] = {
             # Stock identity
@@ -273,13 +276,13 @@ class SkillLoader:
             "MARKET_CAP": f(m.market_cap_cr, 0),
 
             # Composite scores
-            "COMPOSITE_SCORE": round(r.composite_score, 1),
-            "FUNDAMENTAL_SCORE": round(r.fundamental_score, 1),
-            "TECHNICAL_SCORE": round(r.technical_score, 1),
-            "MOMENTUM_SCORE": round(r.momentum_score, 1),
-            "SECTOR_RANK_SCORE": round(r.sector_rank_score, 1),
-            "SECTOR_PERCENTILE": round(r.sector_percentile, 1),
-            "DATA_CONFIDENCE": round(r.data_confidence * 100, 0),
+            "COMPOSITE_SCORE": safe_round(r.composite_score, 1),
+            "FUNDAMENTAL_SCORE": safe_round(r.fundamental_score, 1),
+            "TECHNICAL_SCORE": safe_round(r.technical_score, 1),
+            "MOMENTUM_SCORE": safe_round(r.momentum_score, 1),
+            "SECTOR_RANK_SCORE": safe_round(r.sector_rank_score, 1),
+            "SECTOR_PERCENTILE": safe_round(r.sector_percentile, 1),
+            "DATA_CONFIDENCE": safe_round(r.data_confidence * 100 if r.data_confidence is not None else None, 0),
 
             # FA raw values
             "PE_RATIO": f(m.pe_ratio),
@@ -294,12 +297,12 @@ class SkillLoader:
             "PROMOTER_PLEDGE_PCT": f(m.promoter_pledge_pct),
 
             # FA breakdown scores (from scoring engine)
-            "FA_PE_SCORE": round(r.fa_breakdown.get("pe_vs_5yr", 0), 1),
-            "FA_ROE_SCORE": round(r.fa_breakdown.get("roe_quality", 0), 1),
-            "FA_DE_SCORE": round(r.fa_breakdown.get("debt_equity", 0), 1),
-            "FA_REVENUE_SCORE": round(r.fa_breakdown.get("revenue_growth_3yr", 0), 1),
-            "FA_PAT_SCORE": round(r.fa_breakdown.get("pat_growth_3yr", 0), 1),
-            "FA_MARGIN_SCORE": round(r.fa_breakdown.get("operating_margin", 0), 1),
+            "FA_PE_SCORE": safe_round(r.fa_breakdown.get("pe_vs_5yr"), 1),
+            "FA_ROE_SCORE": safe_round(r.fa_breakdown.get("roe_quality"), 1),
+            "FA_DE_SCORE": safe_round(r.fa_breakdown.get("debt_equity"), 1),
+            "FA_REVENUE_SCORE": safe_round(r.fa_breakdown.get("revenue_growth_3yr"), 1),
+            "FA_PAT_SCORE": safe_round(r.fa_breakdown.get("pat_growth_3yr"), 1),
+            "FA_MARGIN_SCORE": safe_round(r.fa_breakdown.get("operating_margin"), 1),
 
             # Momentum raw values
             "ROC_252": f(m.roc_252),
