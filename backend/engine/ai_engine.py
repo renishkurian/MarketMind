@@ -672,41 +672,43 @@ async def generate_pro_research(
                 api_key = k
                 break
     
-    if not api_key:
-        return {"reply": "Simulation Mode: No API keys configured in System Settings."}
-
-    model = {
-        "openai": ai_cfg["openai_model"],
-        "anthropic": ai_cfg["anthropic_model"],
-        "xai": ai_cfg["xai_model"],
-    }.get(provider, "gpt-4o")
-    
     t0 = time.perf_counter()
     prompt_tokens = completion_tokens = 0
     res_dict = {}
-    
-    try:
-        full_messages = messages
-        if system_prompt:
-             if not any(m.get('role') == 'system' for m in messages):
-                 full_messages = [{"role": "system", "content": system_prompt}] + messages
+    status = "SUCCESS"
+    error_msg = None
 
-        if provider == "openai":
-            res_dict, prompt_tokens, completion_tokens = await _call_openai(full_messages, model, api_key)
-        elif provider == "anthropic":
-            res_dict, prompt_tokens, completion_tokens = await _call_anthropic(full_messages, model, api_key)
-        elif provider == "xai":
-            res_dict, prompt_tokens, completion_tokens = await _call_xai(full_messages, model, api_key)
-        else:
-            raise ValueError(f"Unsupported provider: {provider}")
-
-        status = "SUCCESS"
-        error_msg = None
-    except Exception as e:
+    if not api_key:
         status = "ERROR"
-        error_msg = str(e)
-        logger.error(f"Pro Research AI Error: {e}")
-        res_dict = {"reply": f"AI Synthesis Error: {e}"}
+        error_msg = "No API keys configured"
+        res_dict = {"reply": "Simulation Mode: No API keys configured in System Settings."}
+    else:
+        model = {
+            "openai": ai_cfg["openai_model"],
+            "anthropic": ai_cfg["anthropic_model"],
+            "xai": ai_cfg["xai_model"],
+        }.get(provider, "gpt-4o")
+        
+        try:
+            full_messages = messages
+            if system_prompt:
+                 if not any(m.get('role') == 'system' for m in messages):
+                     full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+            if provider == "openai":
+                res_dict, prompt_tokens, completion_tokens = await _call_openai(full_messages, model, api_key)
+            elif provider == "anthropic":
+                res_dict, prompt_tokens, completion_tokens = await _call_anthropic(full_messages, model, api_key)
+            elif provider == "xai":
+                res_dict, prompt_tokens, completion_tokens = await _call_xai(full_messages, model, api_key)
+            else:
+                raise ValueError(f"Unsupported provider: {provider}")
+
+        except Exception as e:
+            status = "ERROR"
+            error_msg = str(e)
+            logger.error(f"Pro Research AI Error: {e}")
+            res_dict = {"reply": f"AI Synthesis Error: {e}"}
 
     duration_ms = int((time.perf_counter() - t0) * 1000)
     

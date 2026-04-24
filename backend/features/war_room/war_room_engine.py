@@ -38,13 +38,10 @@ class WarRoomEngine:
             oracle = OracleEngine(self.db)
             ml_analysis = await oracle.get_conviction_prediction(symbol)
             
-            # 3. Fetch Latest News
-            news_headlines = []
-            try:
-                news_headlines = await ai_engine._fetch_symbol_news(symbol)
-            except Exception as ne:
-                logger.warning(f"News fetch failed for {symbol}: {ne}")
-            
+            # 3. Fetch Latest News (Pro Intel)
+            from backend.utils.pro_research import ProResearchUtility
+            intel = await ProResearchUtility.get_market_pulse(symbol)
+            news_headlines = intel.get('headlines', [])
             news_str = "\n".join([f"- {h}" for h in news_headlines]) if news_headlines else "No recent headlines found."
             
             # 4. Synthesize with LLM
