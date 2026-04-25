@@ -68,3 +68,18 @@ async def get_performance_summary(
 ):
     engine = PerformanceEngine(db)
     return await engine.get_performance_dashboard_summary(current_user.id, force_refresh=refresh)
+
+@router.delete("/cache/bust")
+@limiter.limit("5/minute")
+async def bust_performance_cache(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from sqlalchemy import delete as sql_delete
+    from backend.data.db import PerformanceCache
+    await db.execute(
+        sql_delete(PerformanceCache).where(PerformanceCache.user_id == current_user.id)
+    )
+    await db.commit()
+    return {"status": "cache cleared", "user_id": current_user.id}

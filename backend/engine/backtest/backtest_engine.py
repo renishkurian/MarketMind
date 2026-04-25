@@ -235,6 +235,7 @@ class BacktestEngine:
 
         metrics = self._compute_metrics(
             trades=trades,
+            prices=prices,
             symbol=symbol,
             isin=isin,
             signal_type=signal_type,
@@ -324,66 +325,70 @@ class BacktestEngine:
     def _compute_metrics(
         self,
         trades: list[Trade],
+        prices: list[PriceBar],
         **kwargs,
     ) -> BacktestMetrics:
-        completed = [t for t in trades if t.pnl_pct is not None]
+        import vectorbt as vbt
+        import pandas as pd
         m = BacktestMetrics(**kwargs)
+
+        completed = [t for t in trades if t.pnl_pct is not None]
         m.trades_taken = len(completed)
 
         if not completed:
             return m
 
-        returns = [t.pnl_pct for t in completed]
+        # 1. Rebuild Continuous Series
+        price_df = pd.DataFrame([{"date": pd.to_datetime(p.date), "close": p.effective_close} for p in prices])
+        price_df = price_df.set_index("date").sort_index()
 
-        m.winners = sum(1 for r in returns if r > 0)
-        m.losers = sum(1 for r in returns if r <= 0)
-        m.win_rate = round(m.winners / len(returns) * 100, 1)
-        m.avg_return = round(sum(returns) / len(returns), 2)
-        m.median_return = round(_median(returns), 2)
-        m.best_trade = round(max(returns), 2)
-        m.worst_trade = round(min(returns), 2)
+        # 2. Build explicit entry/exit masks to let vectorbt handle standard metrics
+        entries = pd.Series(False, index=price_df.index)
+        exits = pd.Series(False, index=price_df.index)
+        
+        for t in completed:
+            ed = pd.to_datetime(t.entry_date)
+            xd = pd.to_datetime(t.exit_date)
+            if ed in price_df.index: entries.loc[ed] = True
+            if xd in price_df.index: exits.loc[xd] = True
 
-        # CAGR from equity curve
-        equity = 100.0
-        equity_curve = [equity]
-        for r in returns:
-            equity *= (1 + r / 100)
-            equity_curve.append(equity)
-
-        years = (kwargs["end_date"] - kwargs["start_date"]).days / 365.25
-        if years > 0:
-            m.cagr = round((equity_curve[-1] / equity_curve[0]) ** (1 / years) * 100 - 100, 2)
-
-        # Max drawdown
-        peak = equity_curve[0]
-        max_dd = 0.0
-        for val in equity_curve:
-            if val > peak:
-                peak = val
-            dd = (peak - val) / peak * 100
-            max_dd = max(max_dd, dd)
-        m.max_drawdown = round(max_dd, 2)
-
-        # Sharpe ratio (annualised, using India risk-free 6.5%)
-        if len(returns) > 1:
-            avg_r = sum(returns) / len(returns)
-            std_r = math.sqrt(sum((r - avg_r) ** 2 for r in returns) / (len(returns) - 1))
-            trades_per_year = 252 / kwargs["hold_days"]
-            if std_r > 0:
-                m.sharpe_ratio = round(
-                    (avg_r - m.RISK_FREE_RATE / trades_per_year) / std_r * math.sqrt(trades_per_year), 2
-                )
-
-        # Sortino (downside deviation only)
-        downside = [r for r in returns if r < 0]
-        if len(downside) > 1:
-            avg_r = sum(returns) / len(returns)
-            downside_std = math.sqrt(sum(r ** 2 for r in downside) / len(downside))
-            trades_per_year = 252 / kwargs["hold_days"]
-            if downside_std > 0:
-                m.sortino_ratio = round(
-                    (avg_r - m.RISK_FREE_RATE / trades_per_year) / downside_std * math.sqrt(trades_per_year), 2
-                )
+        try:
+            # 3. VectorBT Portfolio Generation
+            pf = vbt.Portfolio.from_signals(
+                price_df['close'],
+                entries,
+                exits,
+                freq='D',
+                init_cash=100.0,
+                accumulate=False
+            )
+            
+            stats = pf.stats()
+            m.winners = sum(1 for t in completed if t.pnl_pct > 0)
+            m.losers = sum(1 for t in completed if t.pnl_pct <= 0)
+            m.win_rate = round(stats.get('Win Rate [%]', 0.0), 1)
+            
+            # Extract Advanced Metrics seamlessly
+            m.cagr = round(stats.get('Total Return [%]', 0.0) / ((kwargs["end_date"] - kwargs["start_date"]).days / 365.25), 2) if (kwargs["end_date"] - kwargs["start_date"]).days > 0 else 0.0
+            m.max_drawdown = round(abs(stats.get('Max Drawdown [%]', 0.0)), 2)
+            m.sharpe_ratio = round(stats.get('Sharpe Ratio', 0.0), 2)
+            m.sortino_ratio = round(stats.get('Sortino Ratio', 0.0), 2)
+            
+            m.best_trade = round(stats.get('Best Trade [%]', 0.0), 2)
+            m.worst_trade = round(stats.get('Worst Trade [%]', 0.0), 2)
+            returns = [t.pnl_pct for t in completed]
+            m.avg_return = round(sum(returns) / len(returns), 2)
+            m.median_return = round(_median(returns), 2)
+        except Exception as e:
+            # Fallback to simple stats if vbt fails
+            returns = [t.pnl_pct for t in completed]
+            m.winners = sum(1 for r in returns if r > 0)
+            m.losers = sum(1 for r in returns if r <= 0)
+            m.win_rate = round(m.winners / len(returns) * 100, 1)
+            m.avg_return = round(sum(returns) / len(returns), 2)
+            m.median_return = round(_median(returns), 2)
+            m.best_trade = round(max(returns), 2)
+            m.worst_trade = round(min(returns), 2)
 
         return m
 

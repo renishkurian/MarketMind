@@ -506,6 +506,30 @@ class PerformanceEngine:
         if not stocks:
             return {"error": "Portfolio is empty"}
 
+        tx_stmt = select(
+            PortfolioTransaction.symbol,
+            PortfolioTransaction.buy_price,
+            PortfolioTransaction.quantity
+        ).where(
+            and_(
+                PortfolioTransaction.user_id == user_id,
+                PortfolioTransaction.status == "OPEN"
+            )
+        )
+        tx_res = await self.db.execute(tx_stmt)
+        tx_rows = tx_res.all()
+        vwap_map = {}
+        for t in tx_rows:
+            sym = t.symbol
+            if sym not in vwap_map:
+                vwap_map[sym] = {"cost": 0.0, "qty": 0.0}
+            vwap_map[sym]["cost"] += float(t.buy_price) * float(t.quantity)
+            vwap_map[sym]["qty"] += float(t.quantity)
+        vwap_price = {
+            sym: d["cost"] / d["qty"]
+            for sym, d in vwap_map.items() if d["qty"] > 0
+        }
+
         symbols = [s.symbol for s in stocks]
         today = date.today()
         if year:
@@ -539,7 +563,7 @@ class PerformanceEngine:
                 first_price = float(df_pivot[s.symbol].iloc[0])
                 last_price = float(df_pivot[s.symbol].iloc[-1])
                 value = qty * last_price
-                buy_price = float(s.avg_buy_price) if s.avg_buy_price else first_price
+                buy_price = vwap_price.get(s.symbol, float(s.avg_buy_price) if s.avg_buy_price else first_price)
                 ret = ((last_price / buy_price) - 1) * 100 if buy_price > 0 else 0
                 sector_data[sector]["symbols"].append(s.symbol)
                 sector_data[sector]["total_value"] += value
@@ -607,6 +631,23 @@ class PerformanceEngine:
         history['date'] = pd.to_datetime(history['date'])
         history['year'] = history['date'].dt.year
 
+        # Build VWAP from actual transaction lots (split-adjusted, source of truth)
+        tx_stmt = select(
+            PortfolioTransaction.symbol,
+            PortfolioTransaction.buy_price,
+            PortfolioTransaction.quantity
+        ).where(
+            and_(
+                PortfolioTransaction.user_id == user_id,
+                PortfolioTransaction.status == "OPEN"
+            )
+        )
+        tx_res = await self.db.execute(tx_stmt)
+        tx_rows = tx_res.all()
+        vwap_cost = {}  # symbol -> total invested (buy_price * qty summed across lots)
+        for t in tx_rows:
+            vwap_cost[t.symbol] = vwap_cost.get(t.symbol, 0.0) + float(t.buy_price) * float(t.quantity)
+
         yoy_growth = []
         running_total_profit = 0
         initial_investment_base = 0
@@ -621,11 +662,10 @@ class PerformanceEngine:
                 if s_data.empty: continue
                 
                 qty = float(s.quantity or 0)
-                buy_price = float(s.avg_buy_price or 0)
                 buy_yr = s.buy_date.year if s.buy_date else 2021
                 
                 if yr == buy_yr:
-                    total_yr_start += buy_price * qty
+                    total_yr_start += vwap_cost.get(s.symbol, float(s.avg_buy_price or 0) * qty)
                 else:
                     total_yr_start += float(s_data.iloc[0]['close']) * qty
                 
@@ -662,10 +702,9 @@ class PerformanceEngine:
             if not s_history.empty:
                 current_p = float(s_history.iloc[-1]['close'])
                 qty = float(s.quantity or 0)
-                avg_p = float(s.avg_buy_price or 0)
                 
                 total_current_value += current_p * qty
-                total_invested += avg_p * qty
+                total_invested += vwap_cost.get(s.symbol, float(s.avg_buy_price or 0) * qty)
         
         grand_total_profit = round(total_current_value - total_invested, 2)
         grand_total_roi = round((grand_total_profit / total_invested * 100) if total_invested > 0 else 0, 2)
@@ -805,13 +844,23 @@ class PerformanceEngine:
             "year": await get_market_leaders(year_ago)
         }
 
+        analysis_date = today.isoformat()
+        try:
+            l_stmt = select(PriceHistory.date).order_by(PriceHistory.date.desc()).limit(1)
+            l_res = await self.db.execute(l_stmt)
+            _ld = l_res.scalar()
+            if _ld:
+                analysis_date = _ld.isoformat()
+        except:
+            pass
+
         final_data = {
             "yoy_growth": yoy_growth,
             "grand_total_profit": grand_total_profit,
             "grand_total_roi": grand_total_roi,
             "portfolio_performers": portfolio_top,
             "market_leaders": market_leaders,
-            "analysis_date": latest_dt.isoformat() if 'latest_dt' in locals() else today.isoformat()
+            "analysis_date": analysis_date
         }
 
         # Save to Cache

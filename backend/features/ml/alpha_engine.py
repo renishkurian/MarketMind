@@ -43,43 +43,76 @@ class AlphaDiscoveryEngine:
 
         # 2. Build DataFrame
         df = pd.DataFrame([
-            {"close": float(h.close), "volume": int(h.volume or 0)} 
+            {
+                "date": pd.to_datetime(h.date),
+                "open": float(h.open) if h.open is not None else float(h.close),
+                "high": float(h.high) if h.high is not None else float(h.close),
+                "low": float(h.low) if h.low is not None else float(h.close),
+                "close": float(h.close),
+                "volume": int(h.volume or 0)
+            } 
             for h in reversed(history)
         ])
+        df.set_index('date', inplace=True)
 
         # 3. Use ThreadPool for ML to avoid blocking event loop
         return await asyncio.to_thread(self._train_and_predict, symbol, df)
 
     def _train_and_predict(self, symbol: str, df: pd.DataFrame) -> Dict:
         try:
-            # Feature Engineering
-            df['sma_20'] = df['close'].rolling(window=20).mean()
-            df['sma_50'] = df['close'].rolling(window=50).mean()
-            df['dist_sma_20'] = (df['close'] - df['sma_20']) / df['sma_20'].replace(0, np.nan)
-            df['dist_sma_50'] = (df['close'] - df['sma_50']) / df['sma_50'].replace(0, np.nan)
-            df['volatility'] = df['close'].rolling(window=20).std() / df['sma_20'].replace(0, np.nan)
-            
             import pandas_ta as ta
-            df['rsi'] = ta.rsi(df['close'], length=14).fillna(50)
-            df['rsi_norm'] = (df['rsi'] - 50) / 50
-            df['vol_ratio'] = (df['volume'] / df['volume'].rolling(20).mean().replace(0, 1)).fillna(1).clip(0, 5)
-            df['momentum_3d'] = df['close'].pct_change(3).fillna(0)
+            
+            # Use pandas-ta for bulk feature engineering
+            df.ta.ema(length=20, append=True)
+            df.ta.ema(length=50, append=True)
+            
+            df['dist_ema_20'] = (df['close'] - df['EMA_20']) / df['EMA_20'].replace(0, np.nan)
+            df['dist_ema_50'] = (df['close'] - df['EMA_50']) / df['EMA_50'].replace(0, np.nan)
+            
+            df.ta.rsi(length=14, append=True)
+            df['rsi_norm'] = (df['RSI_14'] - 50) / 50
+            
+            df.ta.macd(append=True)
+            df.ta.bbands(append=True)
+            df.ta.adx(append=True)
+            df.ta.atr(length=14, append=True)
+            df.ta.supertrend(append=True)
             
             # Target: 5-day forward return
             df['target'] = df['close'].shift(-5) / df['close'] - 1
             
-            df = df.dropna()
-            if len(df) < 30:
+            features = [
+                'dist_ema_20', 'dist_ema_50', 
+                'rsi_norm', 'vol_ratio', 'momentum_3d', 
+                'MACD_12_26_9', 'ADX_14', 'ATRr_14', 'SUPERT_7_3.0'
+            ]
+            
+            # Fallback zeros incase TA drops columns due to short history
+            for col in features:
+                if col not in df.columns:
+                    df[col] = 0.0
+
+            df['vol_ratio'] = (df['volume'] / df['volume'].rolling(20).mean().replace(0, 1)).fillna(1).clip(0, 5)
+            df['momentum_3d'] = df['close'].pct_change(3).fillna(0)
+            
+            # Forward-fill feature NaNs, then fill 0
+            df[features] = df[features].ffill().fillna(0)
+            
+            # Extract latest BEFORE dropping target NaNs!
+            latest_features = df[features].iloc[-1].values.reshape(1, -1)
+            
+            # Train DF drops rows where target is NaN (the last 5 days)
+            train_df = df.dropna(subset=['target'])
+            
+            if len(train_df) < 30:
                 return {"error": "Insufficient clean data samples"}
 
-            features = ['dist_sma_20', 'dist_sma_50', 'volatility', 'rsi_norm', 'vol_ratio', 'momentum_3d']
-            X = df[features].values
-            y = df['target'].values
+            X = train_df[features].values
+            y = train_df['target'].values
             
             model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42)
             model.fit(X, y)
-
-            latest_features = df[features].values[-1].reshape(1, -1)
+            
             prediction = model.predict(latest_features)[0]
 
             # Better confidence: Std Dev of tree predictions (normalized)
@@ -87,12 +120,24 @@ class AlphaDiscoveryEngine:
             std_dev = np.std(tree_preds)
             confidence = float(np.clip(1.0 - (std_dev / (std_dev + 0.01)), 0.0, 1.0))
             
+            # SHAP Explainability
+            feature_impact = {}
+            try:
+                import shap
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(latest_features)
+                # Map SHAP values to their feature names
+                feature_impact = {features[i]: round(float(shap_values[0][i]), 4) for i in range(len(features))}
+            except Exception as e:
+                logger.warning(f"SHAP Error for {symbol}: {e}")
+
             return {
                 "symbol": symbol,
                 "prediction_5d_return": round(float(prediction) * 100, 2),
                 "confidence_score": round(float(confidence), 2),
                 "model_type": "RandomForestRegressor",
                 "features_used": features,
+                "feature_impact": feature_impact,
                 "train_size": len(X),
                 "last_price": round(float(df['close'].iloc[-1]), 2),
                 "projected_price": round(float(df['close'].iloc[-1] * (1 + prediction)), 2)

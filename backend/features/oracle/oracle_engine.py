@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from arch import arch_model
 from sqlalchemy import select
 from backend.data.db import PriceHistory, StockMaster, FundamentalsCache
 import logging
@@ -44,7 +45,7 @@ class OracleEngine:
         df['close'] = df['close'].astype(float)
         
         # 2. Fetch Fundamentals ( Buffett Style )
-        f_stmt = select(FundamentalsCache).where(FundamentalsCache.symbol == symbol, FundamentalsCache.user_id == user_id)
+        f_stmt = select(FundamentalsCache).where(FundamentalsCache.symbol == symbol)
         f_res = await self.db.execute(f_stmt)
         fund = f_res.scalars().first()
         
@@ -53,7 +54,16 @@ class OracleEngine:
         df['returns'] = df['close'].pct_change()
         df['sma_200'] = df['close'].rolling(200).mean()
         df['dist_sma_200'] = (df['close'] - df['sma_200']) / df['sma_200']
-        df['volatility'] = df['returns'].rolling(30).std()
+        
+        # GARCH(1,1) Volatility Forecasting
+        returns_clean = df['returns'].dropna() * 100 # Arch prefers scaled returns
+        if len(returns_clean) > 100:
+            am = arch_model(returns_clean, vol='Garch', p=1, q=1, rescale=False)
+            res = am.fit(disp='off', show_warning=False)
+            vol = res.conditional_volatility / 100
+            df.loc[df.index[1:], 'volatility'] = vol.values
+        else:
+            df['volatility'] = df['returns'].rolling(30).std()
         
         # Target: Forward 30-day return
         df['target'] = df['close'].shift(-30) / df['close'] - 1
@@ -62,16 +72,22 @@ class OracleEngine:
         if train_df.empty:
             return {"error": "Training set empty"}
 
-        X = train_df[['dist_sma_200', 'volatility']].values
-        y = train_df['target'].values
+        X = train_df[['dist_sma_200', 'volatility']]
+        y = train_df['target']
         
-        # 4. XGBoost Training (Oracle Model)
-        model = XGBRegressor(n_estimators=200, max_depth=3, learning_rate=0.05, random_state=42)
-        await asyncio.to_thread(model.fit, X, y)
+        # 4. LightGBM Training (Oracle Model)
+        model = LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.05, n_jobs=1, verbose=-1, random_state=42)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            await asyncio.to_thread(model.fit, X, y)
         
         # 5. Inference
-        latest_X = df[['dist_sma_200', 'volatility']].tail(1).values
-        prediction = await asyncio.to_thread(model.predict, latest_X)
+        latest_X = df[['dist_sma_200', 'volatility']].tail(1)
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            prediction = await asyncio.to_thread(model.predict, latest_X)
         prediction = prediction[0]
         
         # 6. Fundamental Scoring (Quality Filter)

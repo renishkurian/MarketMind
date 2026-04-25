@@ -31,7 +31,10 @@ async def get_portfolio_conviction(
         async with sem:
             try:
                 return await engine.get_conviction_prediction(stock.symbol, current_user.id)
-            except Exception:
+            except Exception as e:
+                import traceback
+                print(f"Error processing {stock.symbol}: {e}")
+                traceback.print_exc()
                 return None
             
     # Parallel analysis

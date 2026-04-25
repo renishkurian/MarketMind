@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries } from 'lightweight-charts';
 
 const BenchmarkChart = ({ data, theme = 'dark' }) => {
   const chartContainerRef = useRef();
@@ -32,13 +32,13 @@ const BenchmarkChart = ({ data, theme = 'dark' }) => {
       },
     });
 
-    const portfolioSeries = chart.addLineSeries({
+    const portfolioSeries = chart.addSeries(LineSeries, {
       color: '#3B82F6', // Blue
       lineWidth: 3,
       title: 'Your Portfolio (%)',
     });
 
-    const benchmarkSeries = chart.addLineSeries({
+    const benchmarkSeries = chart.addSeries(LineSeries, {
       color: '#EAB308', // Yellow/Gold
       lineWidth: 2,
       lineStyle: 1, // Dotted/dashed
