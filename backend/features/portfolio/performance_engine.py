@@ -137,34 +137,36 @@ class PerformanceEngine:
             return {"error": "System error fetching benchmark"}
 
         # 6. Alignment & Normalization
-        # Reindex nifty onto the portfolio's trading-day index, forward-fill gaps
-        # (handles holidays, yfinance lag, and timezone mismatches cleanly)
-        common_index = portfolio_series.index
-        nifty_aligned = nifty_series.reindex(common_index, method='ffill')
-        
+        # CRITICAL: Normalize each series from its OWN first trading day independently.
+        # Never reindex Nifty onto portfolio's DB index — if start_dt is a holiday
+        # (e.g. Good Friday), portfolio DB starts on the next day (e.g. Apr 28) which
+        # has a DIFFERENT Nifty value, causing the wrong base price and wrong return.
+
+        start_ts = pd.to_datetime(start_dt)
+
+        # Portfolio: drop leading zeros (days before any stock was bought)
+        p_trimmed = portfolio_series[portfolio_series.index >= start_ts]
+        p_trimmed = p_trimmed[p_trimmed > 0]
+        if p_trimmed.empty:
+            return {"error": "Portfolio has zero or negative value at period start"}
+        first_p = float(p_trimmed.iloc[0])
+        p_norm = (p_trimmed / first_p) * 100
+
+        # Nifty: trim independently using its OWN dates — first trading day >= start_dt
+        n_trimmed = nifty_series[nifty_series.index >= start_ts]
+        if n_trimmed.empty:
+            return {"error": "Benchmark data unavailable for selected period"}
+        first_b = float(n_trimmed.iloc[0])
+        n_norm = (n_trimmed / first_b) * 100
+
+        # Merge for chart only (outer join + ffill so both lines render)
         comparison_df = pd.DataFrame({
-            "portfolio": portfolio_series,
-            "benchmark": nifty_aligned
-        })
-        
-        # Trim to the requested start date BEFORE dropna so we don't lose the tail
-        comparison_df = comparison_df[comparison_df.index >= pd.to_datetime(start_dt)]
-        comparison_df = comparison_df.dropna()
+            'portfolio_norm': p_norm,
+            'benchmark_norm': n_norm
+        }).sort_index().ffill().dropna()
 
         if comparison_df.empty:
-             return {"error": "Insufficient overlapping data for comparison"}
-
-        # Normalize to base 100 at the START of the window
-        # This provides a clean point-to-point percentage return comparison
-        first_nonzero = comparison_df['portfolio'][comparison_df['portfolio'] > 0]
-        if first_nonzero.empty:
-             return {"error": "Portfolio has zero or negative value at period start"}
-        comparison_df = comparison_df[comparison_df.index >= first_nonzero.index[0]]
-        first_p = float(comparison_df['portfolio'].iloc[0])
-        first_b = float(comparison_df['benchmark'].iloc[0])
-
-        comparison_df['portfolio_norm'] = (comparison_df['portfolio'] / first_p) * 100
-        comparison_df['benchmark_norm'] = (comparison_df['benchmark'] / first_b) * 100
+            return {"error": "Insufficient overlapping data for comparison"}
         
         # 7. Final Response Object
         chart_data = []
@@ -616,9 +618,10 @@ class PerformanceEngine:
         
         # B. Timing setup
         today = date.today()
-        week_ago = today - timedelta(days=7)
-        month_ago = today - timedelta(days=30)
-        year_ago = today - timedelta(days=365)
+        week_ago   = today - timedelta(days=7)
+        month_ago  = today - timedelta(days=30)
+        year_ago   = today - timedelta(days=365)
+        ytd_start  = date(today.year, 1, 1)   # Jan 1 of current calendar year
         start_2021 = date(2021, 1, 1)
 
         # C. Portfolio YoY Growth calculation
@@ -709,39 +712,53 @@ class PerformanceEngine:
         grand_total_profit = round(total_current_value - total_invested, 2)
         grand_total_roi = round((grand_total_profit / total_invested * 100) if total_invested > 0 else 0, 2)
 
-        # D. Top Performers (Portfolio)
         def get_top_gainers(df, ref_date, limit=3):
-            gainers = []
-            current_date = df['date'].max()
+            results = []
             for sym in df['symbol'].unique():
                 sym_df = df[df['symbol'] == sym].sort_values('date')
-                # Find closest price to ref_date
                 ref_prices = sym_df[sym_df['date'] <= pd.to_datetime(ref_date)]
                 if ref_prices.empty: continue
-                
                 start_p = float(ref_prices.iloc[-1]['close'])
-                end_p = float(sym_df.iloc[-1]['close'])
+                end_p   = float(sym_df.iloc[-1]['close'])
                 if start_p > 0:
                     gain = round(((end_p / start_p) - 1) * 100, 2)
-                    gainers.append({"symbol": sym, "gain": float(gain)})
-            
-            return sorted(gainers, key=lambda x: x['gain'], reverse=True)[:limit]
+                    results.append({"symbol": sym, "gain": float(gain)})
+            return sorted(results, key=lambda x: x['gain'], reverse=True)[:limit]
+
+        def get_top_losers(df, ref_date, limit=3):
+            """Returns the worst performing stocks (sorted ascending by gain)."""
+            results = []
+            for sym in df['symbol'].unique():
+                sym_df = df[df['symbol'] == sym].sort_values('date')
+                ref_prices = sym_df[sym_df['date'] <= pd.to_datetime(ref_date)]
+                if ref_prices.empty: continue
+                start_p = float(ref_prices.iloc[-1]['close'])
+                end_p   = float(sym_df.iloc[-1]['close'])
+                if start_p > 0:
+                    gain = round(((end_p / start_p) - 1) * 100, 2)
+                    results.append({"symbol": sym, "gain": float(gain)})
+            return sorted(results, key=lambda x: x['gain'])[:limit]  # ascending = worst first
 
         portfolio_top = {
-            "week": get_top_gainers(history, week_ago),
+            "week":  get_top_gainers(history, week_ago),
             "month": get_top_gainers(history, month_ago),
-            "year": get_top_gainers(history, year_ago)
+            "year":  get_top_gainers(history, year_ago),
+            "ytd":   get_top_gainers(history, ytd_start),
+        }
+        portfolio_losers = {
+            "week":  get_top_losers(history, week_ago),
+            "month": get_top_losers(history, month_ago),
+            "year":  get_top_losers(history, year_ago),
+            "ytd":   get_top_losers(history, ytd_start),
         }
 
-        # E. Market Leaders (Global) - Fast Query with Name Resolution via Database ONLY
-        async def get_market_leaders(ref_dt, limit=5):
-            # We need prices on exactly today and ref_dt (or closest)
+        async def get_market_leaders(ref_dt, limit=5, ascending=False):
+            """Get top gainers or worst losers in each exchange since ref_dt."""
             l_stmt = select(PriceHistory.date).order_by(PriceHistory.date.desc()).limit(1)
             l_res = await self.db.execute(l_stmt)
             latest_dt = l_res.scalar()
             if not latest_dt: return {"nse": [], "bse": []}
 
-            # Subquery for prices at closest to ref_dt
             s2_sub = select(PriceHistory.date).where(PriceHistory.date <= ref_dt).order_by(PriceHistory.date.desc()).limit(1)
             s2_dt_res = await self.db.execute(s2_sub)
             s2_dt = s2_dt_res.scalar()
@@ -750,42 +767,49 @@ class PerformanceEngine:
             results = {"nse": [], "bse": []}
             
             for exch in ['NSE', 'BSE']:
-                # Subquery for prices at latest_dt for this exchange
                 s1 = select(PriceHistory.symbol, PriceHistory.close).where(
                     and_(PriceHistory.date == latest_dt, PriceHistory.exchange == exch)
                 ).alias('s1')
-                
                 s2 = select(PriceHistory.symbol, PriceHistory.close).where(
                     and_(PriceHistory.date == s2_dt, PriceHistory.exchange == exch)
                 ).alias('s2')
-
                 sm = select(StockMaster.symbol, StockMaster.company_name).alias('sm')
 
-                # Pure SQL join for maximum speed, abandoning yfinance
+                chg_expr = (s1.c.close / s2.c.close) - 1
+                # Gainers: filter out >1000% (splits). Losers: filter out >90% drop (likely data error).
+                if ascending:
+                    where_clause = chg_expr > -0.90
+                    order_clause = chg_expr.asc()
+                else:
+                    where_clause = chg_expr < 10
+                    order_clause = chg_expr.desc()
+
                 final_stmt = select(
                     s1.c.symbol, s1.c.close, s2.c.close, sm.c.company_name
                 ).select_from(
                     s1.join(s2, s1.c.symbol == s2.c.symbol).outerjoin(sm, s1.c.symbol == sm.c.symbol)
-                ).where(
-                    ((s1.c.close/s2.c.close)-1) < 10 # Filter artificial reverse-split anomalies (>1000% gain)
-                ).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit)
+                ).where(where_clause).order_by(order_clause).limit(limit)
                 
                 f_res = await self.db.execute(final_stmt)
-                candidates = f_res.all()
-                if not candidates: continue
-
-                for r in candidates:
+                for r in f_res.all():
                     results[exch.lower()].append({
                         "symbol": r[0],
-                        "name": r[3] if r[3] else r[0],
-                        "gain": round(((float(r[1])/float(r[2])) - 1) * 100, 2)
+                        "name":   r[3] if r[3] else r[0],
+                        "gain":   round(((float(r[1]) / float(r[2])) - 1) * 100, 2)
                     })
             return results
 
         market_leaders = {
-            "week": await get_market_leaders(week_ago),
+            "week":  await get_market_leaders(week_ago),
             "month": await get_market_leaders(month_ago),
-            "year": await get_market_leaders(year_ago)
+            "year":  await get_market_leaders(year_ago),
+            "ytd":   await get_market_leaders(ytd_start),
+        }
+        market_laggards = {
+            "week":  await get_market_leaders(week_ago,  ascending=True),
+            "month": await get_market_leaders(month_ago, ascending=True),
+            "year":  await get_market_leaders(year_ago,  ascending=True),
+            "ytd":   await get_market_leaders(ytd_start, ascending=True),
         }
 
         analysis_date = today.isoformat()
@@ -799,12 +823,14 @@ class PerformanceEngine:
             pass
 
         final_data = {
-            "yoy_growth": yoy_growth,
+            "yoy_growth":        yoy_growth,
             "grand_total_profit": grand_total_profit,
-            "grand_total_roi": grand_total_roi,
+            "grand_total_roi":    grand_total_roi,
             "portfolio_performers": portfolio_top,
-            "market_leaders": market_leaders,
-            "analysis_date": analysis_date
+            "portfolio_losers":     portfolio_losers,
+            "market_leaders":       market_leaders,
+            "market_laggards":      market_laggards,
+            "analysis_date":        analysis_date
         }
 
         # Save to Cache
