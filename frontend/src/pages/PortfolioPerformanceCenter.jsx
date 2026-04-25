@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Trophy, TrendingUp, BarChart2, Calendar, Globe, Star, 
-  ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame
+import { Trophy, TrendingUp, TrendingDown, BarChart2, Calendar, Globe, Star, 
+  ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame, AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../components/Loader';
@@ -81,6 +81,42 @@ const PerformancePage = () => {
                         <div className={`flex items-center gap-1 font-black ${s.gain >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
                             <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
                             {s.gain >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}
+                        </div>
+                    </div>
+                )) : (
+                    <p className="text-xs text-dark-muted italic">No qualifying data in period</p>
+                )}
+            </div>
+        </div>
+    );
+
+    // Red-themed card for worst performers
+    const LoserCard = ({ title, symbols, icon: Icon }) => (
+        <div className="bg-dark-card border border-signal-sell/20 rounded-3xl p-6 transition-all hover:border-signal-sell/40 group">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-signal-sell/10 text-signal-sell">
+                        <Icon size={20} />
+                    </div>
+                    <h4 className="font-black text-dark-text text-sm uppercase tracking-wider">{title}</h4>
+                </div>
+            </div>
+            <div className="space-y-4">
+                {symbols && symbols.length > 0 ? symbols.map((s, i) => (
+                    <div 
+                        key={i} 
+                        onClick={() => navigate(`/stock/${s.symbol}`)}
+                        className="flex items-center justify-between group/row cursor-pointer hover:bg-signal-sell/5 p-2 -mx-2 rounded-xl transition-all"
+                    >
+                        <div className="flex flex-col">
+                            <span className="text-sm font-black text-white group-hover/row:text-signal-sell transition-colors tracking-tight">
+                                {s.name || s.symbol}
+                            </span>
+                            <span className="text-[10px] text-dark-muted font-bold uppercase">{s.symbol}</span>
+                        </div>
+                        <div className="flex items-center gap-1 font-black text-signal-sell">
+                            <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
+                            <ArrowDownRight size={16}/>
                         </div>
                     </div>
                 )) : (
@@ -176,27 +212,41 @@ const PerformancePage = () => {
                 </div>
             </div>
 
-            {/* Portfolio Best Performers */}
+            {/* ── Portfolio Winners ──────────────────────────────── */}
             <div className="space-y-6">
                 <div className="flex items-center gap-3">
                     <Star className="text-accent" size={24} />
                     <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Portfolio Winners</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <PerformerCard title="Top This Week" symbols={data.portfolio_performers.week} icon={Zap} color="text-amber-500" />
-                    <PerformerCard title="Top This Month" symbols={data.portfolio_performers.month} icon={Flame} color="text-orange-500" />
-                    <PerformerCard title="Top 52 Weeks" symbols={data.portfolio_performers.year} icon={Trophy} color="text-accent" />
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <PerformerCard title="Top This Week"  symbols={data.portfolio_performers?.week}  icon={Zap}    color="text-amber-500" />
+                    <PerformerCard title="Top This Month" symbols={data.portfolio_performers?.month} icon={Flame}  color="text-orange-500" />
+                    <PerformerCard title="Top 52 Weeks"   symbols={data.portfolio_performers?.year}  icon={Trophy} color="text-accent" />
+                    <PerformerCard title="Top YTD"        symbols={data.portfolio_performers?.ytd}   icon={TrendingUp} color="text-emerald-500" />
                 </div>
             </div>
 
-            {/* Global Market Leaders */}
+            {/* ── Portfolio Losers ───────────────────────────────── */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <AlertTriangle className="text-signal-sell" size={24} />
+                    <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Portfolio Worst Performers</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <LoserCard title="Worst This Week"  symbols={data.portfolio_losers?.week}  icon={TrendingDown} />
+                    <LoserCard title="Worst This Month" symbols={data.portfolio_losers?.month} icon={TrendingDown} />
+                    <LoserCard title="Worst 52 Weeks"   symbols={data.portfolio_losers?.year}  icon={TrendingDown} />
+                    <LoserCard title="Worst YTD"        symbols={data.portfolio_losers?.ytd}   icon={TrendingDown} />
+                </div>
+            </div>
+
+            {/* ── Global Market Leaders ──────────────────────────── */}
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Globe className="text-accent" size={24} />
                         <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Market Leaders (Global)</h2>
                     </div>
-                    {/* Exchange Toggle */}
                     <div className="flex bg-dark-bg/60 p-1 rounded-xl border border-dark-border">
                         {['nse', 'bse'].map(ex => (
                             <button
@@ -211,22 +261,40 @@ const PerformancePage = () => {
                         ))}
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <PerformerCard 
-                        title={`Top ${exchangeTab.toUpperCase()} (Week)`} 
-                        symbols={data.market_leaders.week[exchangeTab]} 
-                        icon={TrendingUp} color="text-signal-buy" 
-                    />
-                    <PerformerCard 
-                        title={`Top ${exchangeTab.toUpperCase()} (Month)`} 
-                        symbols={data.market_leaders.month[exchangeTab]} 
-                        icon={Zap} color="text-amber-500" 
-                    />
-                    <PerformerCard 
-                        title={`Top ${exchangeTab.toUpperCase()} (52W)`} 
-                        symbols={data.market_leaders.year[exchangeTab]} 
-                        icon={Star} color="text-purple-500" 
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <PerformerCard title={`Top ${exchangeTab.toUpperCase()} (Week)`}  symbols={data.market_leaders?.week?.[exchangeTab]}  icon={TrendingUp} color="text-signal-buy" />
+                    <PerformerCard title={`Top ${exchangeTab.toUpperCase()} (Month)`} symbols={data.market_leaders?.month?.[exchangeTab]} icon={Zap}        color="text-amber-500" />
+                    <PerformerCard title={`Top ${exchangeTab.toUpperCase()} (52W)`}   symbols={data.market_leaders?.year?.[exchangeTab]}  icon={Star}       color="text-purple-500" />
+                    <PerformerCard title={`Top ${exchangeTab.toUpperCase()} (YTD)`}   symbols={data.market_leaders?.ytd?.[exchangeTab]}   icon={Trophy}     color="text-accent" />
+                </div>
+            </div>
+
+            {/* ── Market Laggards ────────────────────────────────── */}
+            <div className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <AlertTriangle className="text-signal-sell" size={24} />
+                        <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Market Laggards (Global)</h2>
+                    </div>
+                    <div className="flex bg-dark-bg/60 p-1 rounded-xl border border-dark-border">
+                        {['nse', 'bse'].map(ex => (
+                            <button
+                                key={ex}
+                                onClick={() => setExchangeTab(ex)}
+                                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    exchangeTab === ex ? 'bg-signal-sell text-white shadow-lg' : 'text-dark-muted hover:text-white'
+                                }`}
+                            >
+                                {ex}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <LoserCard title={`Worst ${exchangeTab.toUpperCase()} (Week)`}  symbols={data.market_laggards?.week?.[exchangeTab]}  icon={TrendingDown} />
+                    <LoserCard title={`Worst ${exchangeTab.toUpperCase()} (Month)`} symbols={data.market_laggards?.month?.[exchangeTab]} icon={TrendingDown} />
+                    <LoserCard title={`Worst ${exchangeTab.toUpperCase()} (52W)`}   symbols={data.market_laggards?.year?.[exchangeTab]}  icon={TrendingDown} />
+                    <LoserCard title={`Worst ${exchangeTab.toUpperCase()} (YTD)`}   symbols={data.market_laggards?.ytd?.[exchangeTab]}   icon={TrendingDown} />
                 </div>
             </div>
         </div>
