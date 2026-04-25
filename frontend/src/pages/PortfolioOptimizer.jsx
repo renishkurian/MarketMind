@@ -17,11 +17,16 @@ export default function PortfolioOptimizer() {
     try {
       const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
       const res = await axios.get(`${API_URL}/api/portfolio-opt/optimize`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        timeout: 60000
       });
       setData(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Optimization failed");
+      if (err.code === 'ECONNABORTED') {
+        toast.error("Optimization timed out — try with fewer stocks or retry later");
+      } else {
+        toast.error(err.response?.data?.detail || "Optimization failed");
+      }
       console.error(err);
     } finally {
       setLoading(false);

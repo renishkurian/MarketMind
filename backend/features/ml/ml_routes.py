@@ -62,7 +62,7 @@ async def get_portfolio_alpha(
     async def safe_predict(stock):
         async with sem:
             try:
-                pred = await engine.get_alpha_prediction(stock.symbol, stock.isin)
+                pred = await engine.get_alpha_prediction(stock.symbol)
                 if "error" not in pred:
                     return pred
             except Exception:
@@ -82,7 +82,7 @@ async def get_portfolio_alpha(
         avg_ret = total_ret / len(results)
         
         # Logging to debug zero average
-        print(f"ML Summary: Total={total_ret}, Count={len(results)}, Avg={avg_ret}")
+        #logger.debug(f"ML Summary: Total={total_ret}, Count={len(results)}, Avg={avg_ret}")
         
         summary = {
             "avg_projected_return": float(avg_ret),

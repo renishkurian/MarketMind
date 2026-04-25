@@ -7,6 +7,10 @@ import logging
 from typing import Dict, List
 import datetime
 import asyncio
+import time
+
+_oracle_model_cache: dict = {}  # {symbol: {'result': dict, 'ts': float}}
+_ORACLE_CACHE_TTL = 3600  # 1 hour
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +23,11 @@ class OracleEngine:
     def __init__(self, db):
         self.db = db
 
-    async def get_conviction_prediction(self, symbol: str) -> Dict:
+    async def get_conviction_prediction(self, symbol: str, user_id: int) -> Dict:
+        cached = _oracle_model_cache.get(symbol)
+        if cached and (time.time() - cached['ts']) < _ORACLE_CACHE_TTL:
+            return cached['result']
+            
         # 1. Fetch 10 years of price history
         stmt = (
             select(PriceHistory.close, PriceHistory.volume, PriceHistory.date)
@@ -36,7 +44,7 @@ class OracleEngine:
         df['close'] = df['close'].astype(float)
         
         # 2. Fetch Fundamentals ( Buffett Style )
-        f_stmt = select(FundamentalsCache).where(FundamentalsCache.symbol == symbol)
+        f_stmt = select(FundamentalsCache).where(FundamentalsCache.symbol == symbol, FundamentalsCache.user_id == user_id)
         f_res = await self.db.execute(f_stmt)
         fund = f_res.scalars().first()
         
@@ -58,7 +66,7 @@ class OracleEngine:
         y = train_df['target'].values
         
         # 4. XGBoost Training (Oracle Model)
-        model = XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.05, random_state=42)
+        model = XGBRegressor(n_estimators=200, max_depth=3, learning_rate=0.05, random_state=42)
         await asyncio.to_thread(model.fit, X, y)
         
         # 5. Inference
@@ -67,7 +75,7 @@ class OracleEngine:
         prediction = prediction[0]
         
         # 6. Fundamental Scoring (Quality Filter)
-        quality_score = 50 # Default
+        quality_score = 0 # Default
         reasons = []
         
         if fund:
@@ -86,11 +94,14 @@ class OracleEngine:
         else:
             reasons.append("Limited fundamental visibility")
 
-        # Conviction = ML Prediction + Fundamental Quality
-        conviction_raw = (prediction * 100) + (quality_score / 2)
+        # Normalize ML prediction: sigmoid-map to 0-100 (50 = flat, 100 = strong positive)
+        import math
+        ml_score = 50 + 50 * math.tanh(prediction * 5)  # tanh maps returns to [-1,1] range
+        # Combine: 60% fundamental quality, 40% ML signal
+        conviction_raw = (quality_score * 0.6) + (ml_score * 0.4)
         conviction = max(0, min(100, conviction_raw))
 
-        return {
+        result = {
             "symbol": symbol,
             "conviction_score": round(float(conviction), 1),
             "projected_30d_return": round(float(prediction) * 100, 2),
@@ -106,3 +117,6 @@ class OracleEngine:
             } if fund else None,
             "analyzed_at": datetime.datetime.utcnow().isoformat()
         }
+
+        _oracle_model_cache[symbol] = {'result': result, 'ts': time.time()}
+        return result

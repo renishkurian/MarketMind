@@ -4,6 +4,8 @@ import json
 import logging
 import asyncio
 from datetime import datetime
+import xml.etree.ElementTree as ET
+import html
 
 logger = logging.getLogger(__name__)
 
@@ -29,26 +31,28 @@ class ProResearchUtility:
             # Use to_thread for blocking urllib
             content = await asyncio.to_thread(ProResearchUtility._fetch_url, req)
             
-            # Simplistic regex to find headlines without full XML parser
-            import re
-            headlines = re.findall(r'<title>(.*?)</title>', content)
-            
-            # Filter out the first title which is the RSS channel title
-            actual_news = headlines[1:10] if len(headlines) > 1 else []
-            
+            root = ET.fromstring(content)
+            actual_news = []
+            for item in root.findall('.//item')[:9]:
+                title_el = item.find('title')
+                if title_el is not None and title_el.text:
+                    actual_news.append(html.unescape(title_el.text))
             return {
                 "headlines": actual_news,
+                "fetch_failed": len(actual_news) == 0,
                 "scanned_at": datetime.utcnow().isoformat(),
                 "status": "PRO_INTEL_READY"
             }
         except Exception as e:
             logger.error(f"Pro Intel Fetch Failed for {symbol}: {e}")
-            return {"headlines": [], "status": "LIMITED_INTEL"}
+            return {"headlines": [], "fetch_failed": True, "status": "LIMITED_INTEL"}
 
     @staticmethod
     def _fetch_url(req):
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.read().decode('utf-8')
-        except:
-            return ""
+        for timeout in (5, 10):
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.read().decode('utf-8')
+            except Exception:
+                continue
+        return ""

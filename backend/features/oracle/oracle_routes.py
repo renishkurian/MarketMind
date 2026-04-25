@@ -25,12 +25,14 @@ async def get_portfolio_conviction(
         raise HTTPException(status_code=400, detail="Portfolio is empty")
         
     engine = OracleEngine(db)
+    sem = asyncio.Semaphore(4)
     
     async def process_one(stock):
-        try:
-            return await engine.get_conviction_prediction(stock.symbol)
-        except Exception:
-            return None
+        async with sem:
+            try:
+                return await engine.get_conviction_prediction(stock.symbol, current_user.id)
+            except Exception:
+                return None
             
     # Parallel analysis
     tasks = [process_one(s) for s in portfolio]

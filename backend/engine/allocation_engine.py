@@ -527,9 +527,10 @@ def _execute_efficient_risk(amount, returns_df, current_prices, sector_map, prev
 
     vol_target = target_volatility if target_volatility else 0.15  # default 15% p.a.
     try:
-        ef.efficient_risk(target_return=vol_target)  # Note: pypfopt param is target_return for efficient_risk
+        ef.efficient_risk(target_volatility=vol_target)  # Note: pypfopt param is target_volatility for efficient_risk
     except Exception:
         # If target is outside feasible frontier, fall back to max_sharpe
+
         logger.warning(f"efficient_risk target {vol_target} infeasible; falling back to max_sharpe.")
         ef = EfficientFrontier(mu, S)
         _add_sector_constraints(ef, returns_df.columns.tolist(), sector_map)

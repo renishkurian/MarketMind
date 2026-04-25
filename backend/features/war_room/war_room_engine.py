@@ -39,7 +39,9 @@ class WarRoomEngine:
             logger.debug(f"Running Oracle ML for {symbol}...")
             from backend.features.oracle.oracle_engine import OracleEngine
             oracle = OracleEngine(self.db)
-            ml_analysis = await oracle.get_conviction_prediction(symbol)
+            ml_analysis = await oracle.get_conviction_prediction(symbol, user_id)
+            if "error" in ml_analysis:
+                return ml_analysis
             logger.debug(f"Oracle ML Score for {symbol}: {ml_analysis.get('conviction_score')}%")
             
             # 3. Fetch Latest News (Pro Intel)
@@ -52,7 +54,11 @@ class WarRoomEngine:
             news_str = "\n".join([f"- {h}" for h in news_headlines]) if news_headlines else "No recent headlines found."
             
             # 4. Synthesize with LLM
-            print(f"DEBUG: Synthesizing with AI for {symbol}...")
+            logger.debug(f"Synthesizing with AI for {symbol}...")
+            
+            from backend.data.db import SignalsCache
+            sig_res = await self.db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
+            sig = sig_res.scalars().first()
             
             f_raw = ml_analysis.get('fundamentals_raw') or {}
             f_str = f"""
@@ -71,6 +77,13 @@ class WarRoomEngine:
             
             FUNDAMENTAL METRICS:
             {f_str}
+            
+            MARKETMIND SIGNAL INTELLIGENCE:
+            - Composite Score: {sig.composite_score if sig else 'N/A'}/100
+            - Sector Percentile: {sig.sector_percentile if sig else 'N/A'}%
+            - Short-Term Signal: {sig.st_signal if sig else 'N/A'}
+            - Long-Term Signal: {sig.lt_signal if sig else 'N/A'}
+
             
             BUFFETT INSIGHTS:
             {", ".join(ml_analysis.get('buffett_insights', ['Neutral visibility']))}
@@ -101,22 +114,30 @@ class WarRoomEngine:
             )
             
             intelligence = {}
+            # Normalize: handle both direct dict (all providers) and error wrapper {'reply': '...'}
             if isinstance(ai_raw, dict) and "pro_verdict" in ai_raw:
-                logger.debug(f"AI returned structured JSON for {symbol}")
                 intelligence = ai_raw
-            else:
-                content = ai_raw.get('reply', '') if isinstance(ai_raw, dict) else str(ai_raw)
-                logger.debug(f"AI Response for {symbol} received (Length: {len(content)})")
-                # Robust JSON extraction for string fallbacks
-                match = re.search(r'\{.*\}', content, re.DOTALL)
+            elif isinstance(ai_raw, dict) and "reply" in ai_raw:
+                # Error wrapper from generate_pro_research exception handler
+                raw_text = ai_raw["reply"]
+                import re
+                import json
+                match = re.search(r'\{.*\}', raw_text, re.DOTALL)
                 if match:
                     try:
                         intelligence = json.loads(match.group())
-                    except Exception as je:
-                        logger.error(f"JSON Parse Error for {symbol}: {je}")
-                        intelligence = {"pro_verdict": content[:500], "market_sentiment": "Analyzing..."}
-                else:
-                    intelligence = {"pro_verdict": content[:500], "market_sentiment": "Analyzing..."}
+                    except Exception:
+                        pass
+                if not intelligence.get("pro_verdict"):
+                    intelligence = {
+                        "pro_verdict": "Analysis temporarily unavailable. Please rebuild.",
+                        "market_sentiment": "Unavailable",
+                        "bull_case": ["Data pipeline error — please retry"],
+                        "bear_case": ["Could not complete synthesis"],
+                        "institutional_action": "HOLD"
+                    }
+            else:
+                intelligence = {"pro_verdict": "Unexpected response format.", "market_sentiment": "Error"}
 
             # Ensure lists exist for UI mapping
             if "bull_case" not in intelligence or not isinstance(intelligence["bull_case"], list):
@@ -175,8 +196,20 @@ class WarRoomEngine:
         res = await self.db.execute(stmt)
         snap = res.scalars().first()
         if snap:
+            from datetime import timedelta
+            import datetime
+            age = datetime.datetime.utcnow() - snap.created_at
+            
+            if age > timedelta(hours=24):
+                snap_dict = snap.snapshot_data.copy()
+                snap_dict["from_cache"] = True
+                snap_dict["created_at"] = snap.created_at.isoformat()
+                snap_dict["cache_stale"] = True   # new field
+                return snap_dict
+                
             data = snap.snapshot_data
             data["from_cache"] = True
             data["created_at"] = snap.created_at.isoformat()
+            data["cache_stale"] = False
             return data
         return None

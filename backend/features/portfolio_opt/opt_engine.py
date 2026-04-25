@@ -4,6 +4,7 @@ from pypfopt import EfficientFrontier, risk_models, expected_returns
 from sqlalchemy import select
 from backend.data.db import PriceHistory, StockMaster
 import logging
+from datetime import date, timedelta
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
@@ -22,9 +23,11 @@ class PortfolioOptEngine:
         # 1. Fetch historical data (Pivot into a price matrix)
         stmt = (
             select(PriceHistory.date, PriceHistory.symbol, PriceHistory.close)
-            .where(PriceHistory.symbol.in_(symbols))
+            .where(
+                PriceHistory.symbol.in_(symbols),
+                PriceHistory.date >= (date.today() - timedelta(days=1095))
+            )
             .order_by(PriceHistory.date.desc())
-            .limit(2000) # Enough for many stocks
         )
         res = await self.db.execute(stmt)
         data = res.all()
@@ -37,7 +40,7 @@ class PortfolioOptEngine:
         
         # Pivot: Dates as index, Symbols as columns
         prices_df = df.pivot(index='date', columns='symbol', values='close').sort_index()
-        prices_df = prices_df.dropna(axis=1, thresh=len(prices_df) * 0.8) # Keep columns with 80% data
+        prices_df = prices_df.dropna(axis=1, thresh=len(prices_df) * 0.5) # Keep columns with 50% data
         prices_df = prices_df.ffill().dropna()
 
         if prices_df.empty or len(prices_df.columns) < 2:

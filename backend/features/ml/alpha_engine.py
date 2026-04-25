@@ -20,7 +20,7 @@ class AlphaDiscoveryEngine:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_alpha_prediction(self, symbol: str, isin: str) -> Dict:
+    async def get_alpha_prediction(self, symbol: str) -> Dict:
         """
         Fetches history, builds features, trains a quick model, and returns prediction.
         """
@@ -59,6 +59,12 @@ class AlphaDiscoveryEngine:
             df['dist_sma_50'] = (df['close'] - df['sma_50']) / df['sma_50'].replace(0, np.nan)
             df['volatility'] = df['close'].rolling(window=20).std() / df['sma_20'].replace(0, np.nan)
             
+            import pandas_ta as ta
+            df['rsi'] = ta.rsi(df['close'], length=14).fillna(50)
+            df['rsi_norm'] = (df['rsi'] - 50) / 50
+            df['vol_ratio'] = (df['volume'] / df['volume'].rolling(20).mean().replace(0, 1)).fillna(1).clip(0, 5)
+            df['momentum_3d'] = df['close'].pct_change(3).fillna(0)
+            
             # Target: 5-day forward return
             df['target'] = df['close'].shift(-5) / df['close'] - 1
             
@@ -66,9 +72,9 @@ class AlphaDiscoveryEngine:
             if len(df) < 30:
                 return {"error": "Insufficient clean data samples"}
 
-            features = ['dist_sma_20', 'dist_sma_50', 'volatility']
-            X = df[features].values[:-5]
-            y = df['target'].values[:-5]
+            features = ['dist_sma_20', 'dist_sma_50', 'volatility', 'rsi_norm', 'vol_ratio', 'momentum_3d']
+            X = df[features].values
+            y = df['target'].values
             
             model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42)
             model.fit(X, y)
@@ -79,7 +85,7 @@ class AlphaDiscoveryEngine:
             # Better confidence: Std Dev of tree predictions (normalized)
             tree_preds = [tree.predict(latest_features)[0] for tree in model.estimators_]
             std_dev = np.std(tree_preds)
-            confidence = 1.0 / (1.0 + std_dev * 10) # Simple inverse mapping
+            confidence = float(np.clip(1.0 - (std_dev / (std_dev + 0.01)), 0.0, 1.0))
             
             return {
                 "symbol": symbol,

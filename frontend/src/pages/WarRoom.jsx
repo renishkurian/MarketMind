@@ -156,6 +156,11 @@ export default function WarRoom() {
                                         <Database size={10} /> Archived
                                     </span>
                                 )}
+                                {research.cache_stale && (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] font-black uppercase">
+                                        <Activity size={10} /> Stale — Rebuild Recommended
+                                    </span>
+                                )}
                                 <span className="text-[10px] text-dark-muted font-bold uppercase tracking-widest hidden md:inline">Last Rescan: {new Date(research.generated_at).toLocaleTimeString()}</span>
                             </div>
                         </div>
@@ -171,7 +176,9 @@ export default function WarRoom() {
                         </button>
                         <div className="text-right">
                             <p className="text-[10px] font-bold text-dark-muted uppercase mb-1">Final Intel Score</p>
-                            <p className="text-5xl font-black text-accent">{research.ml_data.conviction_score}%</p>
+                            <p className="text-5xl font-black text-accent">
+                                {research.ml_data?.conviction_score != null ? `${research.ml_data.conviction_score}%` : '—'}
+                            </p>
                         </div>
                     </div>
                 </div>
