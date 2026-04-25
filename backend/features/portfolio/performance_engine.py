@@ -170,7 +170,7 @@ class PerformanceEngine:
         chart_data = []
         for d, row in comparison_df.iterrows():
             chart_data.append({
-                "time": int(d.timestamp()),
+                "time": d.strftime('%Y-%m-%d'),
                 "portfolio": round(row['portfolio_norm'], 2),
                 "benchmark": round(row['benchmark_norm'], 2)
             })
@@ -279,9 +279,9 @@ class PerformanceEngine:
             if s.symbol in df_pivot.columns:
                 qty = float(s.quantity or 0)
                 entry = pd.to_datetime(s.buy_date) if s.buy_date else df_pivot.index[0]
-                col = df_pivot[s.symbol].astype(float).copy()
-                col[col.index < entry] = 0.0
-                portfolio_series += col * qty
+                col = df_pivot[s.symbol].astype(float)
+                col = col[col.index >= entry]
+                portfolio_series = portfolio_series.add(col * qty, fill_value=0)
 
         min_year = portfolio_series.index.min().year
         max_year = portfolio_series.index.max().year
@@ -373,7 +373,9 @@ class PerformanceEngine:
             c_res = await self.db.execute(c_stmt)
             cache = c_res.scalar_one_or_none()
             if cache:
-                return cache.data
+                age = (datetime.datetime.utcnow() - cache.updated_at).total_seconds()
+                if age < 14400:  # 4 hour TTL same as others
+                    return cache.data
 
         # B. Fetch active portfolio
         stmt = select(StockMaster).where(
@@ -718,32 +720,83 @@ class PerformanceEngine:
                     and_(PriceHistory.date == s2_dt, PriceHistory.exchange == exch)
                 ).alias('s2')
 
-                # Join
+                # Join: fetch limit * 6 to give enough candidates (true gainers + splits)
                 final_stmt = select(
                     s1.c.symbol, s1.c.close, s2.c.close
-                ).join(s2, s1.c.symbol == s2.c.symbol).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit)
+                ).join(s2, s1.c.symbol == s2.c.symbol).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit * 6)
                 
                 f_res = await self.db.execute(final_stmt)
-                for r in f_res.all():
-                    sym = r[0]
-                    gain = round(((float(r[1])/float(r[2])) - 1) * 100, 2)
-                    
-                    # Resolve Name for BSE or numeric tickers
-                    name = sym
-                    if exch == 'BSE' or sym.isdigit():
-                        try:
-                            # Try yfinance for name lookup on top performers only
-                            yf_ticker = f"{sym}.BO" if exch == 'BSE' else f"{sym}.NS"
-                            t = yf.Ticker(yf_ticker)
-                            name = t.info.get('longName', t.info.get('shortName', sym))
-                        except:
-                            pass
+                candidates = f_res.all()
+                if not candidates: continue
 
-                    results[exch.lower()].append({
-                        "symbol": sym, 
-                        "name": name,
-                        "gain": float(gain)
-                    })
+                yf_tickers = []
+                yf_map = {}
+                for r in candidates:
+                    yf_sym = f"{r[0]}.BO" if exch == "BSE" else f"{r[0]}.NS"
+                    yf_tickers.append(yf_sym)
+                    yf_map[yf_sym] = r[0]
+
+                try:
+                    # Download recent data (from ref_dt forward) for these candidates
+                    # yfinance automatically returns Adjusted Close for 'Close' by default
+                    yf_data = await asyncio.to_thread(
+                        yf.download, yf_tickers, start=(ref_dt - timedelta(days=7)).strftime('%Y-%m-%d'), progress=False
+                    )
+                    
+                    if not yf_data.empty:
+                        close_data = yf_data['Close']
+                        if not isinstance(close_data, pd.DataFrame):
+                            close_data = pd.DataFrame({yf_tickers[0]: close_data})
+                        
+                        valid_leaders = []
+                        for yf_sym, sym in yf_map.items():
+                            if yf_sym in close_data.columns:
+                                col = close_data[yf_sym].dropna()
+                                if not col.empty:
+                                    last_p = col.iloc[-1]
+                                    start_p_df = col[col.index >= pd.to_datetime(ref_dt)]
+                                    start_p = start_p_df.iloc[0] if not start_p_df.empty else col.iloc[0]
+                                    
+                                    if start_p > 0:
+                                        yf_gain = ((last_p / start_p) - 1) * 100
+                                        valid_leaders.append({
+                                            "symbol": sym,
+                                            "yf_sym": yf_sym,
+                                            "gain": float(yf_gain)
+                                        })
+                        
+                        # Sort by true adjusted gain and take top
+                        valid_leaders.sort(key=lambda x: x['gain'], reverse=True)
+                        def _get_name(ticker, fallback):
+                            try:
+                                info = yf.Ticker(ticker).info
+                                return info.get('longName', info.get('shortName', fallback))
+                            except:
+                                return fallback
+
+                        for vl in valid_leaders[:limit]:
+                            name = vl["symbol"]
+                            if exch == 'BSE' or name.isdigit():
+                                name = await asyncio.to_thread(_get_name, vl["yf_sym"], name)
+                            results[exch.lower()].append({
+                                "symbol": vl["symbol"],
+                                "name": name,
+                                "gain": round(vl['gain'], 2)
+                            })
+                    else:
+                        raise Exception("Empty yfinance data")
+                except Exception as e:
+                    logger.error(f"Sanity check failed for {exch}: {e}")
+                    # Fallback to pure DB if failed
+                    count = 0
+                    for r in candidates:
+                        if count >= limit: break
+                        results[exch.lower()].append({
+                            "symbol": r[0], 
+                            "name": r[0],
+                            "gain": round(((float(r[1])/float(r[2])) - 1) * 100, 2)
+                        })
+                        count += 1
             return results
 
         market_leaders = {
