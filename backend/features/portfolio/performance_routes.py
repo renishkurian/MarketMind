@@ -20,3 +20,26 @@ async def get_benchmark_comparison(
     """
     engine = PerformanceEngine(db)
     return await engine.get_benchmark_comparison(current_user.id, timeframe)
+
+
+@router.get("/yearly-breakdown")
+@limiter.limit("10/minute")
+async def get_yearly_breakdown(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    engine = PerformanceEngine(db)
+    return await engine.get_yearly_breakdown(current_user.id)
+
+
+@router.get("/sector-performance")
+@limiter.limit("10/minute")  
+async def get_sector_performance(
+    request: Request,
+    year: int = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    engine = PerformanceEngine(db)
+    return await engine.get_sector_performance(current_user.id, year)
