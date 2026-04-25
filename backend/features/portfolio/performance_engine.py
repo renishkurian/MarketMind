@@ -733,7 +733,7 @@ class PerformanceEngine:
             "year": get_top_gainers(history, year_ago)
         }
 
-        # E. Market Leaders (Global) - Fast Query with Name Resolution
+        # E. Market Leaders (Global) - Fast Query with Name Resolution via Database ONLY
         async def get_market_leaders(ref_dt, limit=5):
             # We need prices on exactly today and ref_dt (or closest)
             l_stmt = select(PriceHistory.date).order_by(PriceHistory.date.desc()).limit(1)
@@ -759,83 +759,27 @@ class PerformanceEngine:
                     and_(PriceHistory.date == s2_dt, PriceHistory.exchange == exch)
                 ).alias('s2')
 
-                # Join: fetch limit * 6 to give enough candidates (true gainers + splits)
+                sm = select(StockMaster.symbol, StockMaster.company_name).alias('sm')
+
+                # Pure SQL join for maximum speed, abandoning yfinance
                 final_stmt = select(
-                    s1.c.symbol, s1.c.close, s2.c.close
-                ).join(s2, s1.c.symbol == s2.c.symbol).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit * 6)
+                    s1.c.symbol, s1.c.close, s2.c.close, sm.c.company_name
+                ).select_from(
+                    s1.join(s2, s1.c.symbol == s2.c.symbol).outerjoin(sm, s1.c.symbol == sm.c.symbol)
+                ).where(
+                    ((s1.c.close/s2.c.close)-1) < 10 # Filter artificial reverse-split anomalies (>1000% gain)
+                ).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit)
                 
                 f_res = await self.db.execute(final_stmt)
                 candidates = f_res.all()
                 if not candidates: continue
 
-                yf_tickers = []
-                yf_map = {}
                 for r in candidates:
-                    yf_sym = f"{r[0]}.BO" if exch == "BSE" else f"{r[0]}.NS"
-                    yf_tickers.append(yf_sym)
-                    yf_map[yf_sym] = r[0]
-
-                try:
-                    # Download recent data (from ref_dt forward) for these candidates
-                    # yfinance automatically returns Adjusted Close for 'Close' by default
-                    yf_data = await asyncio.to_thread(
-                        yf.download, yf_tickers, start=(ref_dt - timedelta(days=7)).strftime('%Y-%m-%d'), progress=False
-                    )
-                    
-                    if not yf_data.empty:
-                        close_data = yf_data['Close']
-                        if not isinstance(close_data, pd.DataFrame):
-                            close_data = pd.DataFrame({yf_tickers[0]: close_data})
-                        
-                        valid_leaders = []
-                        for yf_sym, sym in yf_map.items():
-                            if yf_sym in close_data.columns:
-                                col = close_data[yf_sym].dropna()
-                                if not col.empty:
-                                    last_p = col.iloc[-1]
-                                    start_p_df = col[col.index >= pd.to_datetime(ref_dt)]
-                                    start_p = start_p_df.iloc[0] if not start_p_df.empty else col.iloc[0]
-                                    
-                                    if start_p > 0:
-                                        yf_gain = ((last_p / start_p) - 1) * 100
-                                        valid_leaders.append({
-                                            "symbol": sym,
-                                            "yf_sym": yf_sym,
-                                            "gain": float(yf_gain)
-                                        })
-                        
-                        # Sort by true adjusted gain and take top
-                        valid_leaders.sort(key=lambda x: x['gain'], reverse=True)
-                        def _get_name(ticker, fallback):
-                            try:
-                                info = yf.Ticker(ticker).info
-                                return info.get('longName', info.get('shortName', fallback))
-                            except:
-                                return fallback
-
-                        for vl in valid_leaders[:limit]:
-                            name = vl["symbol"]
-                            if exch == 'BSE' or name.isdigit():
-                                name = await asyncio.to_thread(_get_name, vl["yf_sym"], name)
-                            results[exch.lower()].append({
-                                "symbol": vl["symbol"],
-                                "name": name,
-                                "gain": round(vl['gain'], 2)
-                            })
-                    else:
-                        raise Exception("Empty yfinance data")
-                except Exception as e:
-                    logger.error(f"Sanity check failed for {exch}: {e}")
-                    # Fallback to pure DB if failed
-                    count = 0
-                    for r in candidates:
-                        if count >= limit: break
-                        results[exch.lower()].append({
-                            "symbol": r[0], 
-                            "name": r[0],
-                            "gain": round(((float(r[1])/float(r[2])) - 1) * 100, 2)
-                        })
-                        count += 1
+                    results[exch.lower()].append({
+                        "symbol": r[0],
+                        "name": r[3] if r[3] else r[0],
+                        "gain": round(((float(r[1])/float(r[2])) - 1) * 100, 2)
+                    })
             return results
 
         market_leaders = {

@@ -9,8 +9,10 @@ import {
   Edit2, X, ShieldCheck,
   Flame,
   Zap,
-  Star
+  Star,
+  Database
 } from 'lucide-react';
+import HistoricalPricesTable from '../components/HistoricalPricesTable';
 
 const FiftyTwoWeekRange = ({ current, low, high }) => {
   if (!current || !low || !high) return null;
@@ -638,6 +640,7 @@ export default function DeepDive() {
     { id: 'signals', label: 'Signals', Icon: Layers },
     { id: 'fundamentals', label: 'Fundamentals', Icon: BookOpen },
     { id: 'ai', label: 'AI Insight', Icon: Brain },
+    { id: 'historical', label: 'Historical Data', Icon: Database },
   ];
 
   return (
@@ -1512,6 +1515,24 @@ export default function DeepDive() {
                 </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── Historical Data Tab ───────────────────────────────────── */}
+          {activeTab === 'historical' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-black text-dark-text uppercase tracking-widest flex items-center gap-2">
+                    <Database size={16} className="text-accent" />
+                    Historical Price Data
+                  </h3>
+                  <p className="text-xs text-dark-muted mt-1">
+                    {history.length.toLocaleString()} trading sessions · Daily / Monthly / Yearly aggregations
+                  </p>
+                </div>
+              </div>
+              <HistoricalPricesTable history={history} symbol={symbol} />
             </div>
           )}
         </div>

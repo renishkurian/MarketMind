@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Trophy, TrendingUp, BarChart2, Calendar, Globe, Star, 
+import { Trophy, TrendingUp, BarChart2, Calendar, Globe, Star, 
   ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Loader from '../components/Loader';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -14,6 +14,7 @@ const PerformancePage = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const [exchangeTab, setExchangeTab] = useState('nse'); // 'nse' or 'bse'
+    const navigate = useNavigate();
 
     const getToken = () => localStorage.getItem('mm_token') || localStorage.getItem('token');
 
@@ -66,7 +67,11 @@ const PerformancePage = () => {
             </div>
             <div className="space-y-4">
                 {symbols && symbols.length > 0 ? symbols.map((s, i) => (
-                    <div key={i} className="flex items-center justify-between group/row">
+                    <div 
+                        key={i} 
+                        onClick={() => navigate(`/stock/${s.symbol}`)}
+                        className="flex items-center justify-between group/row cursor-pointer hover:bg-dark-bg/40 p-2 -mx-2 rounded-xl transition-all"
+                    >
                         <div className="flex flex-col">
                             <span className="text-sm font-black text-white group-hover/row:text-accent transition-colors tracking-tight">
                                 {s.name || s.symbol}
