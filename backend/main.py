@@ -500,6 +500,7 @@ async def add_to_portfolio(
             sector=sector,
             type="PORTFOLIO",
             added_date=date.today(),
+            buy_date=date.today(),
             is_active=True,
         )
         db.add(stock)

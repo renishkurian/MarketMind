@@ -36,7 +36,7 @@ async def get_alpha_signals(
         raise HTTPException(status_code=404, detail="Stock not found")
 
     engine = AlphaDiscoveryEngine(db)
-    result = await engine.get_alpha_prediction(stock.symbol, stock.isin)
+    result = await engine.get_alpha_prediction(stock.symbol)
     
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -44,7 +44,9 @@ async def get_alpha_signals(
     return result
 
 @router.get("/portfolio-alpha")
+@limiter.limit("3/minute")
 async def get_portfolio_alpha(
+    request: Request,
     save: bool = True,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
