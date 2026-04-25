@@ -152,14 +152,17 @@ class PerformanceEngine:
                 "portfolio": round(row['portfolio_norm'], 2),
                 "benchmark": round(row['benchmark_norm'], 2)
             })
-            
+
         return {
             "timeframe": timeframe,
             "chart_data": chart_data,
             "metrics": {
                 "portfolio_return": round(comparison_df['portfolio_norm'].iloc[-1] - 100, 2),
                 "benchmark_return": round(comparison_df['benchmark_norm'].iloc[-1] - 100, 2),
-                "alpha": round((comparison_df['portfolio_norm'].iloc[-1] - 100) - (comparison_df['benchmark_norm'].iloc[-1] - 100), 2),
+                "alpha": round(
+                    (comparison_df['portfolio_norm'].iloc[-1] - 100) -
+                    (comparison_df['benchmark_norm'].iloc[-1] - 100), 2
+                ),
                 "start_date": comparison_df.index[0].strftime('%Y-%m-%d'),
                 "end_date": comparison_df.index[-1].strftime('%Y-%m-%d')
             }
