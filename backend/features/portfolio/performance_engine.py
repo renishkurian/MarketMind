@@ -547,3 +547,122 @@ class PerformanceEngine:
 
         result.sort(key=lambda x: x["allocation_pct"], reverse=True)
         return {"sector_breakdown": result, "period": {"start": str(start_dt), "end": str(end_dt)}}
+    async def get_performance_dashboard_summary(self, user_id: int):
+        """
+        Comprehensive dashboard stats: 
+        1. Portfolio YoY Growth
+        2. Top Performers (Week/Month/Year) - Portfolio
+        3. Top Performers (Week/Month/Year) - Market
+        """
+        # A. Fetch Portfolio
+        stmt = select(StockMaster).where(
+            and_(StockMaster.user_id == user_id, StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
+        )
+        res = await self.db.execute(stmt)
+        stocks = res.scalars().all()
+        if not stocks:
+            return {"error": "Portfolio is empty"}
+
+        symbols = [s.symbol for s in stocks]
+        
+        # B. Timing setup
+        today = date.today()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+        year_ago = today - timedelta(days=365)
+        start_2021 = date(2021, 1, 1)
+
+        # C. Portfolio YoY Growth calculation
+        # We fetch prices for all years for our symbols
+        p_stmt = select(PriceHistory.symbol, PriceHistory.date, PriceHistory.close).where(
+            and_(PriceHistory.symbol.in_(symbols), PriceHistory.date >= start_2021)
+        ).order_by(PriceHistory.date.asc())
+        p_res = await self.db.execute(p_stmt)
+        history = pd.DataFrame(p_res.all(), columns=['symbol', 'date', 'close'])
+        history['date'] = pd.to_datetime(history['date'])
+        history['year'] = history['date'].dt.year
+
+        yoy_growth = []
+        for yr in sorted(history['year'].unique()):
+            yr_data = history[history['year'] == yr]
+            total_yr_start = 0
+            total_yr_end = 0
+            
+            for s in stocks:
+                s_data = yr_data[yr_data['symbol'] == s.symbol]
+                if s_data.empty: continue
+                # We assume current quantity for simplified historical proxy if transactions aren't mapped
+                qty = float(s.quantity or 0)
+                total_yr_start += float(s_data.iloc[0]['close']) * qty
+                total_yr_end += float(s_data.iloc[-1]['close']) * qty
+            
+            if total_yr_start > 0:
+                growth_pct = round(((total_yr_end / total_yr_start) - 1) * 100, 2)
+                yoy_growth.append({"year": int(yr), "growth": float(growth_pct)})
+
+        # D. Top Performers (Portfolio)
+        def get_top_gainers(df, ref_date, limit=3):
+            gainers = []
+            current_date = df['date'].max()
+            for sym in df['symbol'].unique():
+                sym_df = df[df['symbol'] == sym].sort_values('date')
+                # Find closest price to ref_date
+                ref_prices = sym_df[sym_df['date'] <= pd.to_datetime(ref_date)]
+                if ref_prices.empty: continue
+                
+                start_p = float(ref_prices.iloc[-1]['close'])
+                end_p = float(sym_df.iloc[-1]['close'])
+                if start_p > 0:
+                    gain = round(((end_p / start_p) - 1) * 100, 2)
+                    gainers.append({"symbol": sym, "gain": float(gain)})
+            
+            return sorted(gainers, key=lambda x: x['gain'], reverse=True)[:limit]
+
+        portfolio_top = {
+            "week": get_top_gainers(history, week_ago),
+            "month": get_top_gainers(history, month_ago),
+            "year": get_top_gainers(history, year_ago)
+        }
+
+        # E. Market Leaders (Global) - Fast Query
+        async def get_market_leaders(ref_dt, limit=5):
+            # We need prices on exactly today and ref_dt (or closest)
+            l_stmt = select(PriceHistory.date).order_by(PriceHistory.date.desc()).limit(1)
+            l_res = await self.db.execute(l_stmt)
+            latest_dt = l_res.scalar()
+            if not latest_dt: return []
+
+            # Subquery for prices at latest_dt
+            s1 = select(PriceHistory.symbol, PriceHistory.close, PriceHistory.exchange).where(PriceHistory.date == latest_dt).alias('s1')
+            # Subquery for prices at closest to ref_dt
+            s2_sub = select(PriceHistory.date).where(PriceHistory.date <= ref_dt).order_by(PriceHistory.date.desc()).limit(1)
+            s2_dt_res = await self.db.execute(s2_sub)
+            s2_dt = s2_dt_res.scalar()
+            if not s2_dt: return []
+
+            s2 = select(PriceHistory.symbol, PriceHistory.close).where(PriceHistory.date == s2_dt).alias('s2')
+
+            # Join
+            final_stmt = select(
+                s1.c.symbol, s1.c.exchange, s1.c.close, s2.c.close
+            ).join(s2, s1.c.symbol == s2.c.symbol).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit)
+            
+            f_res = await self.db.execute(final_stmt)
+            winners = []
+            for r in f_res.all():
+                gain = round(((float(r[2])/float(r[3])) - 1) * 100, 2)
+                winners.append({"symbol": r[0], "exchange": r[1], "gain": float(gain)})
+            return winners
+
+        market_leaders = {
+            "week": await get_market_leaders(week_ago),
+            "month": await get_market_leaders(month_ago),
+            "year": await get_market_leaders(year_ago)
+        }
+
+        return {
+            "yoy_growth": yoy_growth,
+            "portfolio_performers": portfolio_top,
+            "market_leaders": market_leaders,
+            "analysis_date": latest_dt.isoformat() if 'latest_dt' in locals() else today.isoformat()
+        }
