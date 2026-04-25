@@ -35,7 +35,9 @@ async def get_optimal_portfolio(
         
     log = AllocationLog(
         user_id=current_user.id,
-        strategy="INSTITUTIONAL_OPT",
+        allocation_type="INSTITUTIONAL_OPT",
+        total_amount=0, # Just a calculation log, not a live buy
+        allocations=result["weights"],
         lookback_days=1095,
         expected_return=result["metrics"]["expected_annual_return"],
         expected_volatility=result["metrics"]["annual_volatility"],

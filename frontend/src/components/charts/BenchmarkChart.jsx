@@ -68,10 +68,16 @@ const BenchmarkChart = ({ data, theme = 'dark' }) => {
     if (!portfolioRef.current || !benchmarkRef.current || !data) return;
 
     portfolioRef.current.setData(
-      data.map(d => ({ time: d.time, value: d.portfolio }))
+      data.map(d => ({ 
+        time: d.time, 
+        value: d.portfolio 
+      }))
     );
     benchmarkRef.current.setData(
-      data.map(d => ({ time: d.time, value: d.benchmark }))
+      data.map(d => ({ 
+        time: d.time, 
+        value: d.benchmark 
+      }))
     );
 
     chartRef.current.timeScale().fitContent();

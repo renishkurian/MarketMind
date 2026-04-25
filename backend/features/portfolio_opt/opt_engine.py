@@ -67,18 +67,25 @@ class PortfolioOptEngine:
             # Gamma of 0.1 is strong enough to spread weights
             ef.add_objective(objective_functions.L2_reg, gamma=0.1)
             
-            weights = ef.max_sharpe()
+            # Use a 0% risk-free rate to ensure the optimization problem is always solvable 
+            # even if market returns have been poor recently.
+            try:
+                weights = ef.max_sharpe(risk_free_rate=0.00)
+            except ValueError:
+                logger.warning("Max Sharpe failed, falling back to Min Volatility")
+                weights = ef.min_volatility()
+
             cleaned_weights = ef.clean_weights()
             
             # Performance metrics
-            perf = ef.portfolio_performance(verbose=False)
+            perf = ef.portfolio_performance(verbose=False, risk_free_rate=0.00)
             
             return {
                 "weights": cleaned_weights,
                 "metrics": {
-                    "expected_annual_return": round(perf[0] * 100, 2),
-                    "annual_volatility": round(perf[1] * 100, 2),
-                    "sharpe_ratio": round(perf[2], 2)
+                    "expected_annual_return": float(round(perf[0] * 100, 2)),
+                    "annual_volatility": float(round(perf[1] * 100, 2)),
+                    "sharpe_ratio": float(round(perf[2], 2))
                 },
                 "symbols_analyzed": list(prices_df.columns)
             }

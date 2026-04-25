@@ -105,6 +105,20 @@ class PriceHistory(Base):
         UniqueConstraint('symbol', 'date', 'exchange', name='uix_symbol_date_exchange'),
     )
 
+class PerformanceCache(Base):
+    __tablename__ = "performance_cache"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    cache_type = Column(String(50), index=True, nullable=False) # 'benchmark' or 'yearly'
+    cache_key = Column(String(100), index=True, nullable=False)
+    data = Column(JSON, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'cache_type', 'cache_key', name='uix_user_type_key'),
+    )
+
 class IntradayTicks(Base):
     __tablename__ = "intraday_ticks"
     

@@ -1,10 +1,13 @@
 import pandas as pd
 import yfinance as yf
+import numpy as np
 from datetime import datetime, timedelta, date
-from sqlalchemy import select, and_
-from backend.data.db import PriceHistory, StockMaster
+from sqlalchemy import select, and_, delete
+from sqlalchemy.dialects.mysql import insert
+from backend.data.db import PriceHistory, StockMaster, PerformanceCache, PortfolioTransaction
 import logging
 import asyncio
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -12,11 +15,28 @@ class PerformanceEngine:
     def __init__(self, db):
         self.db = db
 
-    async def get_benchmark_comparison(self, user_id: int, timeframe: str = "yearly"):
+    async def get_benchmark_comparison(self, user_id: int, timeframe: str = "yearly", benchmark_symbol: str = "^NSEI", force_refresh: bool = False):
         """
-        Calculates the historical portfolio value vs Nifty 50 benchmark.
+        Calculates the historical portfolio value vs a selected benchmark.
         Normalized to 100 at the start of the period.
         """
+        cache_key = f"{timeframe}_{benchmark_symbol}"
+        if not force_refresh:
+            stmt = select(PerformanceCache).where(
+                and_(
+                    PerformanceCache.user_id == user_id,
+                    PerformanceCache.cache_type == "benchmark",
+                    PerformanceCache.cache_key == cache_key
+                )
+            )
+            res = await self.db.execute(stmt)
+            entry = res.scalar_one_or_none()
+            if entry:
+                # 4 hour cache
+                if (datetime.datetime.utcnow() - entry.updated_at).total_seconds() < 14400:
+                    logger.info(f"Returning DB cached performance for {cache_key}")
+                    return entry.data
+
         # 1. Define date range
         end_dt = date.today()
         if timeframe == "weekly":
@@ -28,7 +48,6 @@ class PerformanceEngine:
         else: # yearly
             start_dt = end_dt - timedelta(days=365)
 
-        from backend.data.db import PortfolioTransaction
         tx_stmt = select(
             PortfolioTransaction.symbol,
             PortfolioTransaction.quantity,
@@ -87,8 +106,8 @@ class PerformanceEngine:
                 masked[masked.index < entry_date] = 0.0
                 portfolio_series += masked * qty
 
-        # 5. Fetch Nifty 50 Benchmark (^NSEI)
-        nifty_symbol = "^NSEI"
+        # 5. Fetch Benchmark Index
+        nifty_symbol = benchmark_symbol
         try:
             # Fetch from yfinance. We use start_dt - 7 days to ensure we have a price for the very first alignment day
             yf_data = await asyncio.to_thread(
@@ -148,12 +167,12 @@ class PerformanceEngine:
         chart_data = []
         for d, row in comparison_df.iterrows():
             chart_data.append({
-                "time": d.strftime('%Y-%m-%d'),
+                "time": int(d.timestamp()),
                 "portfolio": round(row['portfolio_norm'], 2),
                 "benchmark": round(row['benchmark_norm'], 2)
             })
 
-        return {
+        result = {
             "timeframe": timeframe,
             "chart_data": chart_data,
             "metrics": {
@@ -167,13 +186,55 @@ class PerformanceEngine:
                 "end_date": comparison_df.index[-1].strftime('%Y-%m-%d')
             }
         }
+        
+        # Save to DB cache (Upsert logic)
+        try:
+            # Delete old entry
+            await self.db.execute(
+                delete(PerformanceCache).where(
+                    and_(
+                        PerformanceCache.user_id == user_id,
+                        PerformanceCache.cache_type == "benchmark",
+                        PerformanceCache.cache_key == cache_key
+                    )
+                )
+            )
+            # Insert new
+            new_cache = PerformanceCache(
+                user_id=user_id,
+                cache_type="benchmark",
+                cache_key=cache_key,
+                data=result,
+                updated_at=datetime.datetime.utcnow()
+            )
+            self.db.add(new_cache)
+            await self.db.commit()
+        except Exception as ce:
+            logger.error(f"Failed to save performance cache: {ce}")
+            await self.db.rollback()
 
-    async def get_yearly_breakdown(self, user_id: int):
+        return result
+
+    async def get_yearly_breakdown(self, user_id: int, force_refresh: bool = False):
         """
         Returns year-by-year portfolio return vs Nifty 50 return.
         Uses available PriceHistory from DB + yfinance for Nifty.
         """
-        from sqlalchemy import select, and_
+        if not force_refresh:
+            stmt = select(PerformanceCache).where(
+                and_(
+                    PerformanceCache.user_id == user_id,
+                    PerformanceCache.cache_type == "yearly",
+                    PerformanceCache.cache_key == "all"
+                )
+            )
+            res = await self.db.execute(stmt)
+            entry = res.scalar_one_or_none()
+            if entry:
+                if (datetime.datetime.utcnow() - entry.updated_at).total_seconds() < 14400:
+                    return entry.data
+        
+
         stmt = select(StockMaster.symbol, StockMaster.quantity, StockMaster.buy_date).where(
             and_(StockMaster.user_id == user_id, StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
         )
@@ -232,10 +293,23 @@ class PerformanceEngine:
         for yr in years:
             p_yr = portfolio_series[portfolio_series.index.year == yr]
             n_yr = nifty_series[nifty_series.index.year == yr]
+            
             if p_yr.empty or n_yr.empty:
                 continue
-            p_return = round(((float(p_yr.iloc[-1]) / float(p_yr.iloc[0])) - 1) * 100, 2) if float(p_yr.iloc[0]) > 0 else 0
-            n_return = round(((float(n_yr.iloc[-1]) / float(n_yr.iloc[0])) - 1) * 100, 2) if float(n_yr.iloc[0]) > 0 else 0
+
+            # Filter zero-value days for the portfolio (prevents inf on first buy)
+            p_yr_active = p_yr[p_yr > 0]
+            if p_yr_active.empty:
+                p_return = 0.0
+            else:
+                p_daily_ret = p_yr_active.pct_change().dropna()
+                # Clean any accidental inf/nan to ensure JSON compliance
+                p_daily_ret = p_daily_ret.replace([np.inf, -np.inf], np.nan).dropna()
+                p_return = round(((1 + p_daily_ret).prod() - 1) * 100, 2) if not p_daily_ret.empty else 0.0
+            
+            n_first = float(n_yr.iloc[0])
+            n_return = round(((float(n_yr.iloc[-1]) / n_first) - 1) * 100, 2) if n_first > 0 else 0
+            
             breakdown.append({
                 "year": yr,
                 "portfolio_return": p_return,
@@ -243,7 +317,167 @@ class PerformanceEngine:
                 "alpha": round(p_return - n_return, 2)
             })
 
-        return {"years": breakdown, "available_years": [b["year"] for b in breakdown]}
+        res = {"years": breakdown, "available_years": [b["year"] for b in breakdown]}
+        
+        # Save to DB cache
+        try:
+            await self.db.execute(
+                delete(PerformanceCache).where(
+                    and_(
+                        PerformanceCache.user_id == user_id,
+                        PerformanceCache.cache_type == "yearly",
+                        PerformanceCache.cache_key == "all"
+                    )
+                )
+            )
+            new_cache = PerformanceCache(
+                user_id=user_id,
+                cache_type="yearly",
+                cache_key="all",
+                data=res,
+                updated_at=datetime.datetime.utcnow()
+            )
+            self.db.add(new_cache)
+            await self.db.commit()
+        except Exception as ce:
+            logger.error(f"Failed to save yearly cache: {ce}")
+            await self.db.rollback()
+
+        return res
+
+    async def get_stock_performance_matrix(self, user_id: int, force_refresh: bool = False):
+        """
+        Calculates a matrix of [Stock] x [Year] performance.
+        Includes OPTIMAL WEIGHTS from PyPortfolioOpt.
+        Caches in DB to avoid hitting yfinance every time.
+        """
+        # A. Check Cache First
+        if not force_refresh:
+            c_stmt = select(PerformanceCache).where(
+                and_(
+                    PerformanceCache.user_id == user_id, 
+                    PerformanceCache.cache_type == "STOCK_MATRIX",
+                    PerformanceCache.cache_key == "ALL_ASSETS"
+                )
+            )
+            c_res = await self.db.execute(c_stmt)
+            cache = c_res.scalar_one_or_none()
+            if cache:
+                return cache.data
+
+        # B. Fetch active portfolio
+        stmt = select(StockMaster).where(
+            and_(StockMaster.user_id == user_id, StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
+        )
+        res = await self.db.execute(stmt)
+        stocks = res.scalars().all()
+        if not stocks:
+            return {"error": "Portfolio is empty"}
+
+        symbols = [s.symbol for s in stocks]
+        yf_symbols = [f"{s}.NS" if "^" not in s and "." not in s else s for s in symbols]
+        
+        # C. Get Optimal Weights (Integration with PyPortfolioOpt)
+        opt_weights = {}
+        try:
+            from backend.features.portfolio_opt.opt_engine import PortfolioOptEngine
+            opt_engine = PortfolioOptEngine(self.db)
+            opt_res = await opt_engine.optimize_portfolio(symbols)
+            if "weights" in opt_res:
+                opt_weights = opt_res["weights"]
+        except Exception as e:
+            logger.warning(f"Heatmap Opt integration failed: {e}")
+
+        # D. Fetch Historical Data (Adjusted)
+        try:
+            start_date = "2021-01-01"
+            data = await asyncio.to_thread(
+                yf.download, 
+                yf_symbols, 
+                start=start_date, 
+                progress=False,
+                auto_adjust=True
+            )
+            if data.empty:
+                return {"error": "Failed to fetch market data for heatmap"}
+
+            close_data = data['Close']
+            if isinstance(close_data, pd.Series):
+                close_data = close_data.to_frame()
+                close_data.columns = [yf_symbols[0]]
+            
+        except Exception as e:
+            logger.error(f"Heatmap YF error: {e}")
+            return {"error": f"Market data sync failed: {str(e)}"}
+
+        close_data.index = pd.to_datetime(close_data.index).tz_localize(None)
+        all_years = sorted([int(yr) for yr in close_data.index.year.unique() if int(yr) >= 2021])
+        
+        matrix = []
+        for stock in stocks:
+            sym = stock.symbol
+            yf_sym = f"{sym}.NS" if "^" not in sym and "." not in sym else sym
+            
+            if yf_sym not in close_data.columns:
+                continue
+
+            sym_series = close_data[yf_sym].dropna()
+            if sym_series.empty:
+                continue
+
+            row = {
+                "symbol": sym, 
+                "company": stock.company_name, 
+                "optimal_weight": float(round(opt_weights.get(sym, 0) * 100, 2)),
+                "years": {}
+            }
+            buy_year = int(stock.buy_date.year) if stock.buy_date else all_years[0]
+
+            for yr in all_years:
+                if yr < buy_year:
+                    row["years"][str(yr)] = "N/A"
+                    continue
+                
+                yr_data = sym_series[sym_series.index.year == yr]
+                if stock.buy_date and yr == buy_year:
+                    yr_data = yr_data[yr_data.index >= pd.to_datetime(stock.buy_date)]
+                
+                if yr_data.empty:
+                    row["years"][str(yr)] = "N/A"
+                    continue
+                
+                first_price = float(yr_data.iloc[0])
+                last_price = float(yr_data.iloc[-1])
+                
+                if first_price > 0:
+                    pct = round(((last_price / first_price) - 1) * 100, 2)
+                    row["years"][str(yr)] = float(pct)
+                else:
+                    row["years"][str(yr)] = 0.0
+
+            matrix.append(row)
+
+        final_data = {
+            "years": all_years,
+            "matrix": matrix,
+            "cached_at": datetime.datetime.now().isoformat()
+        }
+
+        # E. Save to Cache
+        upsert_stmt = insert(PerformanceCache).values(
+            user_id=user_id,
+            cache_type="STOCK_MATRIX",
+            cache_key="ALL_ASSETS",
+            data=final_data,
+            updated_at=datetime.datetime.utcnow()
+        ).on_duplicate_key_update(
+            data=final_data,
+            updated_at=datetime.datetime.utcnow()
+        )
+        await self.db.execute(upsert_stmt)
+        await self.db.commit()
+
+        return final_data
 
     async def get_sector_performance(self, user_id: int, year: int = None):
         """

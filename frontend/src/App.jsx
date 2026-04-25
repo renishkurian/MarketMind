@@ -20,6 +20,7 @@ import PortfolioOptimizer from './pages/PortfolioOptimizer';
 import OracleAI from './pages/OracleAI';
 import WarRoom from './pages/WarRoom';
 import BenchmarkDashboard from './pages/BenchmarkDashboard';
+import StockPerformanceHeatmap from './pages/StockPerformanceHeatmap';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
@@ -94,6 +95,9 @@ function AppInner() {
         } />
         <Route path="/benchmark" element={
           <ProtectedRoute><Layout><BenchmarkDashboard /></Layout></ProtectedRoute>
+        } />
+        <Route path="/performance-heatmap" element={
+          <ProtectedRoute><Layout><StockPerformanceHeatmap /></Layout></ProtectedRoute>
         } />
 
         <Route path="/stock/:symbol" element={

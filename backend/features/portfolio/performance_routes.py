@@ -12,25 +12,28 @@ router = APIRouter(prefix="/api/portfolio-performance", tags=["Portfolio Perform
 async def get_benchmark_comparison(
     request: Request,
     timeframe: str = Query("yearly", enum=["weekly", "monthly", "3month", "yearly"]),
+    benchmark: str = Query("^NSEI"),
+    refresh: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Returns timeseries data comparing portfolio value vs Nifty 50.
+    Returns timeseries data comparing portfolio value vs selected benchmark.
     """
     engine = PerformanceEngine(db)
-    return await engine.get_benchmark_comparison(current_user.id, timeframe)
+    return await engine.get_benchmark_comparison(current_user.id, timeframe, benchmark, force_refresh=refresh)
 
 
 @router.get("/yearly-breakdown")
 @limiter.limit("10/minute")
 async def get_yearly_breakdown(
     request: Request,
+    refresh: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     engine = PerformanceEngine(db)
-    return await engine.get_yearly_breakdown(current_user.id)
+    return await engine.get_yearly_breakdown(current_user.id, force_refresh=refresh)
 
 
 @router.get("/sector-performance")
@@ -43,3 +46,14 @@ async def get_sector_performance(
 ):
     engine = PerformanceEngine(db)
     return await engine.get_sector_performance(current_user.id, year)
+
+@router.get("/stock-performance-matrix")
+@limiter.limit("5/minute")
+async def get_stock_performance_matrix(
+    request: Request,
+    refresh: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    engine = PerformanceEngine(db)
+    return await engine.get_stock_performance_matrix(current_user.id, force_refresh=refresh)
