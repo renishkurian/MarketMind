@@ -19,6 +19,7 @@ import MLDiscovery from './pages/MLDiscovery';
 import PortfolioOptimizer from './pages/PortfolioOptimizer';
 import OracleAI from './pages/OracleAI';
 import WarRoom from './pages/WarRoom';
+import BenchmarkDashboard from './pages/BenchmarkDashboard';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
@@ -90,6 +91,9 @@ function AppInner() {
         } />
         <Route path="/war-room" element={
           <ProtectedRoute><Layout><WarRoom /></Layout></ProtectedRoute>
+        } />
+        <Route path="/benchmark" element={
+          <ProtectedRoute><Layout><BenchmarkDashboard /></Layout></ProtectedRoute>
         } />
 
         <Route path="/stock/:symbol" element={

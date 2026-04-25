@@ -105,7 +105,7 @@ class OracleEngine:
             "symbol": symbol,
             "conviction_score": round(float(conviction), 1),
             "projected_30d_return": round(float(prediction) * 100, 2),
-            "quality_grade": "Strong" if quality_score > 70 else "Neutral",
+            "quality_grade": "Strong" if quality_score >= 40 else "Neutral",
             "buffett_insights": reasons,
             "fundamentals_raw": {
                 "roe": float(fund.roe) if fund and fund.roe else None,

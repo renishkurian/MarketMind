@@ -16,6 +16,7 @@ const NAV_SECTIONS = [
       { path: '/portfolio',     label: 'Portfolio',     Icon: BarChart2 },
       { path: '/watchlist',     label: 'Watchlist',     Icon: Eye        },
       { path: '/opportunities', label: 'Opportunities', Icon: Zap        },
+      { path: '/benchmark',     label: 'Performance',   Icon: BarChart2  },
     ]
   },
   {

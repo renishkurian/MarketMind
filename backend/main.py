@@ -28,6 +28,7 @@ from backend.config import settings
 from backend.api import analysis
 from backend.engine.ai_engine import generate_portfolio_allocation, generate_chart_chat
 from backend.engine.allocation_engine import calculate_allocation
+from backend.features.portfolio import performance_routes
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -135,6 +136,7 @@ app.include_router(oracle_routes.router)
 
 from backend.features.war_room import war_room_routes
 app.include_router(war_room_routes.router)
+app.include_router(performance_routes.router)
 
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
 @app.websocket("/ws/market")
