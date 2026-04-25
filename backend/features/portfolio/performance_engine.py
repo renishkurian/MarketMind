@@ -15,6 +15,16 @@ class PerformanceEngine:
     def __init__(self, db):
         self.db = db
 
+    def _extract_nifty_close(self, yf_data):
+        close = yf_data['Close']
+        if isinstance(close, pd.DataFrame):
+            s = close.iloc[:, 0]
+        else:
+            s = close
+        s = s.squeeze()
+        s.index = pd.to_datetime(s.index).tz_localize(None)
+        return s.sort_index().dropna().rename("benchmark")
+
     async def get_benchmark_comparison(self, user_id: int, timeframe: str = "yearly", benchmark_symbol: str = "^NSEI", force_refresh: bool = False):
         """
         Calculates the historical portfolio value vs a selected benchmark.
@@ -102,9 +112,9 @@ class PerformanceEngine:
             if tx.symbol in df_pivot.columns:
                 qty = float(tx.quantity or 0)
                 entry_date = pd.to_datetime(tx.buy_date) if tx.buy_date else df_pivot.index[0]
-                masked = df_pivot[tx.symbol].astype(float).copy()
-                masked[masked.index < entry_date] = 0.0
-                portfolio_series += masked * qty
+                col = df_pivot[tx.symbol].astype(float)
+                col = col[col.index >= entry_date]
+                portfolio_series = portfolio_series.add(col * qty, fill_value=0)
 
         # 5. Fetch Benchmark Index
         nifty_symbol = benchmark_symbol
@@ -121,15 +131,7 @@ class PerformanceEngine:
             if yf_data.empty:
                 return {"error": "Benchmark data unavailable"}
                 
-            raw_close = yf_data['Close']
-            if isinstance(raw_close, pd.DataFrame):
-                nifty_series = raw_close.iloc[:, 0]
-            else:
-                nifty_series = raw_close
-            nifty_series = nifty_series.squeeze()  # flatten any residual MultiIndex
-            nifty_series.index = pd.to_datetime(nifty_series.index).tz_localize(None)
-            nifty_series = nifty_series.sort_index().dropna()
-            nifty_series = nifty_series.rename("benchmark")
+            nifty_series = self._extract_nifty_close(yf_data)
         except Exception as e:
             logger.error(f"Error fetching benchmark: {e}")
             return {"error": "System error fetching benchmark"}
@@ -154,11 +156,12 @@ class PerformanceEngine:
 
         # Normalize to base 100 at the START of the window
         # This provides a clean point-to-point percentage return comparison
+        first_nonzero = comparison_df['portfolio'][comparison_df['portfolio'] > 0]
+        if first_nonzero.empty:
+             return {"error": "Portfolio has zero or negative value at period start"}
+        comparison_df = comparison_df[comparison_df.index >= first_nonzero.index[0]]
         first_p = float(comparison_df['portfolio'].iloc[0])
         first_b = float(comparison_df['benchmark'].iloc[0])
-        
-        if first_p <= 0:
-             return {"error": "Portfolio has zero or negative value at period start"}
 
         comparison_df['portfolio_norm'] = (comparison_df['portfolio'] / first_p) * 100
         comparison_df['benchmark_norm'] = (comparison_df['benchmark'] / first_b) * 100
@@ -235,13 +238,27 @@ class PerformanceEngine:
                     return entry.data
         
 
-        stmt = select(StockMaster.symbol, StockMaster.quantity, StockMaster.buy_date).where(
-            and_(StockMaster.user_id == user_id, StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
+        tx_stmt = select(
+            PortfolioTransaction.symbol,
+            PortfolioTransaction.quantity,
+            PortfolioTransaction.buy_date
+        ).where(
+            and_(
+                PortfolioTransaction.user_id == user_id,
+                PortfolioTransaction.status == "OPEN"
+            )
         )
-        res = await self.db.execute(stmt)
-        stocks = res.all()
+        tx_res = await self.db.execute(tx_stmt)
+        stocks = tx_res.all()
+
         if not stocks:
-            return {"error": "Portfolio is empty"}
+            stmt = select(StockMaster.symbol, StockMaster.quantity, StockMaster.buy_date).where(
+                and_(StockMaster.user_id == user_id, StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
+            )
+            res = await self.db.execute(stmt)
+            stocks = res.all()
+            if not stocks:
+                return {"error": "Portfolio is empty"}
 
         symbols = [s.symbol for s in stocks]
         p_stmt = select(PriceHistory.symbol, PriceHistory.date, PriceHistory.close).where(
@@ -277,14 +294,7 @@ class PerformanceEngine:
                 end=f"{max_year+1}-01-01",
                 progress=False
             )
-            close_col = yf_data['Close']
-            if hasattr(close_col, 'columns') and isinstance(close_col.columns, pd.MultiIndex):
-                nifty_series = close_col.iloc[:, 0]
-            elif isinstance(close_col, pd.DataFrame):
-                nifty_series = close_col.iloc[:, 0]
-            else:
-                nifty_series = close_col
-            nifty_series.index = pd.to_datetime(nifty_series.index).tz_localize(None)
+            nifty_series = self._extract_nifty_close(yf_data)
         except Exception as e:
             return {"error": f"Benchmark fetch failed: {e}"}
 
@@ -527,7 +537,8 @@ class PerformanceEngine:
                 first_price = float(df_pivot[s.symbol].iloc[0])
                 last_price = float(df_pivot[s.symbol].iloc[-1])
                 value = qty * last_price
-                ret = ((last_price / first_price) - 1) * 100 if first_price > 0 else 0
+                buy_price = float(s.avg_buy_price) if s.avg_buy_price else first_price
+                ret = ((last_price / buy_price) - 1) * 100 if buy_price > 0 else 0
                 sector_data[sector]["symbols"].append(s.symbol)
                 sector_data[sector]["total_value"] += value
                 sector_data[sector]["weighted_return"] += ret * value
