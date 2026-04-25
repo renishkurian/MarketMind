@@ -4,30 +4,38 @@ import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, Download } 
 // ── Aggregation helpers ─────────────────────────────────────────────────────
 
 function groupByMonth(rows) {
+  // rows come in newest-first (descending). So the FIRST row we see for each
+  // month is the LAST trading day, and the LAST row is the FIRST trading day.
   const map = new Map();
   for (const r of rows) {
     const key = r.date.slice(0, 7); // e.g. "2026-04"
     if (!map.has(key)) {
       map.set(key, { ...r, _rows: [r] });
+      // _rows[0] = last trading day → its close IS the month close ✓
     } else {
       const g = map.get(key);
       g._rows.push(r);
+      // high/low are order-independent
       g.high   = Math.max(g.high ?? r.high, r.high ?? 0);
       g.low    = Math.min(g.low  ?? r.low,  r.low  ?? Infinity);
       g.volume = (g.volume ?? 0) + (r.volume ?? 0);
-      g.close  = r.close;               // last close of the period
+      // Do NOT overwrite close — keep the first-inserted (last trading day) close
     }
   }
-  // Fix open to first row value
   for (const [, g] of map) {
-    g.open = g._rows[0].open;
-    g.date = g._rows[0].date.slice(0, 7);
+    // _rows is newest→oldest, so:
+    // _rows[0]              = last trading day  → Close (already set), its open is NOT what we want
+    // _rows[_rows.length-1] = first trading day → Open
+    g.open  = g._rows[g._rows.length - 1].open;
+    // close is already correct from map.set() initial spread
+    g.date  = g._rows[0].date.slice(0, 7);
     delete g._rows;
   }
   return [...map.values()].reverse();
 }
 
 function groupByYear(rows) {
+  // Same newest-first logic as groupByMonth
   const map = new Map();
   for (const r of rows) {
     const key = r.date.slice(0, 4);
@@ -39,12 +47,13 @@ function groupByYear(rows) {
       g.high   = Math.max(g.high ?? r.high, r.high ?? 0);
       g.low    = Math.min(g.low  ?? r.low,  r.low  ?? Infinity);
       g.volume = (g.volume ?? 0) + (r.volume ?? 0);
-      g.close  = r.close;
+      // Do NOT overwrite close
     }
   }
   for (const [, g] of map) {
-    g.open = g._rows[0].open;
-    g.date = g._rows[0].date.slice(0, 4);
+    g.open  = g._rows[g._rows.length - 1].open; // first trading day's open
+    // close already correct (last trading day's close from initial spread)
+    g.date  = g._rows[0].date.slice(0, 4);
     delete g._rows;
   }
   return [...map.values()].reverse();
