@@ -57,3 +57,14 @@ async def get_stock_performance_matrix(
 ):
     engine = PerformanceEngine(db)
     return await engine.get_stock_performance_matrix(current_user.id, force_refresh=refresh)
+
+@router.get("/summary")
+@limiter.limit("5/minute")
+async def get_performance_summary(
+    request: Request,
+    refresh: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    engine = PerformanceEngine(db)
+    return await engine.get_performance_dashboard_summary(current_user.id, force_refresh=refresh)

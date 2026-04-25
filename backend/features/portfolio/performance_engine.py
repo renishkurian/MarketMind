@@ -547,13 +547,25 @@ class PerformanceEngine:
 
         result.sort(key=lambda x: x["allocation_pct"], reverse=True)
         return {"sector_breakdown": result, "period": {"start": str(start_dt), "end": str(end_dt)}}
-    async def get_performance_dashboard_summary(self, user_id: int):
+    async def get_performance_dashboard_summary(self, user_id: int, force_refresh: bool = False):
         """
-        Comprehensive dashboard stats: 
-        1. Portfolio YoY Growth
-        2. Top Performers (Week/Month/Year) - Portfolio
-        3. Top Performers (Week/Month/Year) - Market
+        Comprehensive dashboard stats with DB caching.
         """
+        # 1. Check Cache
+        if not force_refresh:
+            c_stmt = select(PerformanceCache).where(
+                and_(
+                    PerformanceCache.user_id == user_id, 
+                    PerformanceCache.cache_type == "PERFORMANCE_SUMMARY",
+                    PerformanceCache.cache_key == "DASHBOARD"
+                )
+            )
+            c_res = await self.db.execute(c_stmt)
+            cache = c_res.scalar_one_or_none()
+            if cache:
+                return cache.data
+
+        # ... (Rest of calculation starts here)
         # A. Fetch Portfolio
         stmt = select(StockMaster).where(
             and_(StockMaster.user_id == user_id, StockMaster.type == "PORTFOLIO", StockMaster.is_active == True)
@@ -583,7 +595,10 @@ class PerformanceEngine:
         history['year'] = history['date'].dt.year
 
         yoy_growth = []
-        for yr in sorted(history['year'].unique()):
+        running_total_profit = 0
+        initial_investment_base = 0
+        
+        for i, yr in enumerate(sorted(history['year'].unique())):
             yr_data = history[history['year'] == yr]
             total_yr_start = 0
             total_yr_end = 0
@@ -591,14 +606,56 @@ class PerformanceEngine:
             for s in stocks:
                 s_data = yr_data[yr_data['symbol'] == s.symbol]
                 if s_data.empty: continue
-                # We assume current quantity for simplified historical proxy if transactions aren't mapped
+                
                 qty = float(s.quantity or 0)
-                total_yr_start += float(s_data.iloc[0]['close']) * qty
+                buy_price = float(s.avg_buy_price or 0)
+                buy_yr = s.buy_date.year if s.buy_date else 2021
+                
+                if yr == buy_yr:
+                    total_yr_start += buy_price * qty
+                else:
+                    total_yr_start += float(s_data.iloc[0]['close']) * qty
+                
                 total_yr_end += float(s_data.iloc[-1]['close']) * qty
             
             if total_yr_start > 0:
+                # Capture the original investment base for cumulative % calculations
+                if i == 0: initial_investment_base = total_yr_start
+
                 growth_pct = round(((total_yr_end / total_yr_start) - 1) * 100, 2)
-                yoy_growth.append({"year": int(yr), "growth": float(growth_pct)})
+                profit_amt = round(total_yr_end - total_yr_start, 2)
+                running_total_profit += profit_amt
+                
+                # Cumulative ROI relative to starting point
+                cumulative_roi = 0
+                if initial_investment_base > 0:
+                    cumulative_roi = round((running_total_profit / initial_investment_base) * 100, 2)
+
+                yoy_growth.append({
+                    "year": int(yr), 
+                    "growth": float(growth_pct),
+                    "profit": float(profit_amt),
+                    "cumulative_profit": float(round(running_total_profit, 2)),
+                    "cumulative_roi": float(cumulative_roi)
+                })
+
+        # Calculate TOTAL Portfolio Profit accurately (Current Market Value - Total Investment)
+        # This will match the Portfolio page exactly.
+        total_current_value = 0
+        total_invested = 0
+        for s in stocks:
+            # We use the latest price from the history dataframe we already fetched
+            s_history = history[history['symbol'] == s.symbol]
+            if not s_history.empty:
+                current_p = float(s_history.iloc[-1]['close'])
+                qty = float(s.quantity or 0)
+                avg_p = float(s.avg_buy_price or 0)
+                
+                total_current_value += current_p * qty
+                total_invested += avg_p * qty
+        
+        grand_total_profit = round(total_current_value - total_invested, 2)
+        grand_total_roi = round((grand_total_profit / total_invested * 100) if total_invested > 0 else 0, 2)
 
         # D. Top Performers (Portfolio)
         def get_top_gainers(df, ref_date, limit=3):
@@ -624,35 +681,59 @@ class PerformanceEngine:
             "year": get_top_gainers(history, year_ago)
         }
 
-        # E. Market Leaders (Global) - Fast Query
+        # E. Market Leaders (Global) - Fast Query with Name Resolution
         async def get_market_leaders(ref_dt, limit=5):
             # We need prices on exactly today and ref_dt (or closest)
             l_stmt = select(PriceHistory.date).order_by(PriceHistory.date.desc()).limit(1)
             l_res = await self.db.execute(l_stmt)
             latest_dt = l_res.scalar()
-            if not latest_dt: return []
+            if not latest_dt: return {"nse": [], "bse": []}
 
-            # Subquery for prices at latest_dt
-            s1 = select(PriceHistory.symbol, PriceHistory.close, PriceHistory.exchange).where(PriceHistory.date == latest_dt).alias('s1')
             # Subquery for prices at closest to ref_dt
             s2_sub = select(PriceHistory.date).where(PriceHistory.date <= ref_dt).order_by(PriceHistory.date.desc()).limit(1)
             s2_dt_res = await self.db.execute(s2_sub)
             s2_dt = s2_dt_res.scalar()
-            if not s2_dt: return []
+            if not s2_dt: return {"nse": [], "bse": []}
 
-            s2 = select(PriceHistory.symbol, PriceHistory.close).where(PriceHistory.date == s2_dt).alias('s2')
-
-            # Join
-            final_stmt = select(
-                s1.c.symbol, s1.c.exchange, s1.c.close, s2.c.close
-            ).join(s2, s1.c.symbol == s2.c.symbol).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit)
+            results = {"nse": [], "bse": []}
             
-            f_res = await self.db.execute(final_stmt)
-            winners = []
-            for r in f_res.all():
-                gain = round(((float(r[2])/float(r[3])) - 1) * 100, 2)
-                winners.append({"symbol": r[0], "exchange": r[1], "gain": float(gain)})
-            return winners
+            for exch in ['NSE', 'BSE']:
+                # Subquery for prices at latest_dt for this exchange
+                s1 = select(PriceHistory.symbol, PriceHistory.close).where(
+                    and_(PriceHistory.date == latest_dt, PriceHistory.exchange == exch)
+                ).alias('s1')
+                
+                s2 = select(PriceHistory.symbol, PriceHistory.close).where(
+                    and_(PriceHistory.date == s2_dt, PriceHistory.exchange == exch)
+                ).alias('s2')
+
+                # Join
+                final_stmt = select(
+                    s1.c.symbol, s1.c.close, s2.c.close
+                ).join(s2, s1.c.symbol == s2.c.symbol).order_by(((s1.c.close/s2.c.close)-1).desc()).limit(limit)
+                
+                f_res = await self.db.execute(final_stmt)
+                for r in f_res.all():
+                    sym = r[0]
+                    gain = round(((float(r[1])/float(r[2])) - 1) * 100, 2)
+                    
+                    # Resolve Name for BSE or numeric tickers
+                    name = sym
+                    if exch == 'BSE' or sym.isdigit():
+                        try:
+                            # Try yfinance for name lookup on top performers only
+                            yf_ticker = f"{sym}.BO" if exch == 'BSE' else f"{sym}.NS"
+                            t = yf.Ticker(yf_ticker)
+                            name = t.info.get('longName', t.info.get('shortName', sym))
+                        except:
+                            pass
+
+                    results[exch.lower()].append({
+                        "symbol": sym, 
+                        "name": name,
+                        "gain": float(gain)
+                    })
+            return results
 
         market_leaders = {
             "week": await get_market_leaders(week_ago),
@@ -660,9 +741,27 @@ class PerformanceEngine:
             "year": await get_market_leaders(year_ago)
         }
 
-        return {
+        final_data = {
             "yoy_growth": yoy_growth,
+            "grand_total_profit": grand_total_profit,
+            "grand_total_roi": grand_total_roi,
             "portfolio_performers": portfolio_top,
             "market_leaders": market_leaders,
             "analysis_date": latest_dt.isoformat() if 'latest_dt' in locals() else today.isoformat()
         }
+
+        # Save to Cache
+        upsert_stmt = insert(PerformanceCache).values(
+            user_id=user_id,
+            cache_type="PERFORMANCE_SUMMARY",
+            cache_key="DASHBOARD",
+            data=final_data,
+            updated_at=datetime.datetime.utcnow()
+        ).on_duplicate_key_update(
+            data=final_data,
+            updated_at=datetime.datetime.utcnow()
+        )
+        await self.db.execute(upsert_stmt)
+        await self.db.commit()
+
+        return final_data

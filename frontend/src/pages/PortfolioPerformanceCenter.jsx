@@ -11,24 +11,30 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const PerformancePage = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
+    const [exchangeTab, setExchangeTab] = useState('nse'); // 'nse' or 'bse'
 
     const getToken = () => localStorage.getItem('mm_token') || localStorage.getItem('token');
 
+    const fetchData = async (refresh = false) => {
+        if (refresh) setRefreshing(true);
+        else setLoading(true);
+        try {
+            const res = await axios.get(`${API_URL}/api/portfolio-performance/summary?refresh=${refresh}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (res.data.error) setError(res.data.error);
+            else setData(res.data);
+        } catch (err) {
+            setError("Failed to fetch performance summary.");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const res = await axios.get(`${API_URL}/api/portfolio-performance/summary`, {
-                    headers: { 'Authorization': `Bearer ${getToken()}` }
-                });
-                if (res.data.error) setError(res.data.error);
-                else setData(res.data);
-            } catch (err) {
-                setError("Failed to fetch performance summary.");
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
     }, []);
 
@@ -62,8 +68,10 @@ const PerformancePage = () => {
                 {symbols && symbols.length > 0 ? symbols.map((s, i) => (
                     <div key={i} className="flex items-center justify-between group/row">
                         <div className="flex flex-col">
-                            <span className="text-base font-black text-white group-hover/row:text-accent transition-colors tracking-tight">{s.symbol}</span>
-                            {s.exchange && <span className="text-[10px] text-dark-muted font-bold uppercase">{s.exchange}</span>}
+                            <span className="text-sm font-black text-white group-hover/row:text-accent transition-colors tracking-tight">
+                                {s.name || s.symbol}
+                            </span>
+                            <span className="text-[10px] text-dark-muted font-bold uppercase">{s.symbol}</span>
                         </div>
                         <div className={`flex items-center gap-1 font-black ${s.gain >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
                             <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
@@ -91,7 +99,17 @@ const PerformancePage = () => {
                         Analysis as of {data.analysis_date}
                    </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
+                   <button 
+                        onClick={() => fetchData(true)}
+                        disabled={refreshing}
+                        className="px-5 py-2.5 bg-dark-card border border-dark-border rounded-2xl flex items-center gap-2 hover:border-accent/40 transition-all disabled:opacity-50"
+                   >
+                        <Zap size={16} className={refreshing ? "text-accent animate-pulse" : "text-dark-muted"} />
+                        <span className="text-xs font-black text-dark-text uppercase tracking-widest">
+                            {refreshing ? 'Syncing...' : 'Regenerate Analysis'}
+                        </span>
+                   </button>
                    <div className="px-5 py-2.5 bg-accent/10 border border-accent/20 rounded-2xl flex items-center gap-2">
                         <Shield size={16} className="text-accent" />
                         <span className="text-xs font-black text-dark-text uppercase tracking-widest">Portfolio Tracking</span>
@@ -109,16 +127,46 @@ const PerformancePage = () => {
                     <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] bg-accent/10 px-3 py-1 rounded-full border border-accent/20">Unified Returns Since 2021</span>
                 </div>
                 <div className="p-8">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
                         {data.yoy_growth.map((y, i) => (
-                            <div key={i} className="flex flex-col p-6 rounded-[2rem] bg-dark-bg/40 border border-dark-border/50 hover:border-accent/30 transition-all text-center">
+                            <div key={i} className="flex flex-col p-5 rounded-[2rem] bg-dark-bg/40 border border-dark-border/50 hover:border-accent/30 transition-all text-center">
                                 <span className="text-[10px] font-black text-dark-muted uppercase tracking-widest mb-2">{y.year}</span>
-                                <span className={`text-2xl font-black ${y.growth >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                                <span className={`text-xl font-black ${y.growth >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
                                     {y.growth > 0 ? '+' : ''}{y.growth}%
+                                    <span className="text-[8px] font-bold block text-dark-muted mt-0.5 uppercase tracking-widest italic opacity-60">Annual Delta</span>
                                 </span>
+                                <div className="mt-4 flex flex-col gap-1.5 p-3 rounded-2xl bg-dark-bg/60 border border-dark-border/30">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[8px] font-black text-dark-muted uppercase">Gain</span>
+                                        <span className={`text-[10px] font-black ${y.profit >=0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                                            ₹{Math.round(y.profit).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-dark-border/40 pt-1.5">
+                                        <span className="text-[8px] font-black text-accent uppercase italic">Total ROI %</span>
+                                        <span className="text-[10px] font-black text-white">
+                                            {y.cumulative_roi > 0 ? '+' : ''}{y.cumulative_roi}%
+                                        </span>
+                                    </div>
+                                </div>
                                 <div className={`w-8 h-1 mx-auto mt-3 rounded-full ${y.growth >= 0 ? 'bg-signal-buy/30' : 'bg-signal-sell/30'}`} />
                             </div>
                         ))}
+                        
+                        {/* Total Profit Column */}
+                        <div className="flex flex-col p-5 rounded-[2rem] bg-accent/10 border border-accent/30 shadow-lg shadow-accent/5 transition-all text-center min-w-[140px]">
+                            <span className="text-[9px] font-black text-accent uppercase tracking-widest mb-2">Unrealized P&L</span>
+                            <span className="text-xl font-black text-white italic truncate">
+                                ₹{Math.round(data.grand_total_profit).toLocaleString()}
+                            </span>
+                            <span className={`text-[10px] font-black mt-1 ${data.grand_total_roi >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                                {data.grand_total_roi > 0 ? '+' : ''}{data.grand_total_roi}% Total
+                            </span>
+                            <div className="flex items-center justify-center gap-1 mt-3">
+                                <TrendingUp size={12} className="text-accent" />
+                                <span className="text-[9px] font-black text-accent uppercase tracking-widest">Lifetime Pulse</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -138,14 +186,42 @@ const PerformancePage = () => {
 
             {/* Global Market Leaders */}
             <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <Globe className="text-accent" size={24} />
-                    <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Market Leaders (Global)</h2>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Globe className="text-accent" size={24} />
+                        <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Market Leaders (Global)</h2>
+                    </div>
+                    {/* Exchange Toggle */}
+                    <div className="flex bg-dark-bg/60 p-1 rounded-xl border border-dark-border">
+                        {['nse', 'bse'].map(ex => (
+                            <button
+                                key={ex}
+                                onClick={() => setExchangeTab(ex)}
+                                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    exchangeTab === ex ? 'bg-accent text-white shadow-lg' : 'text-dark-muted hover:text-white'
+                                }`}
+                            >
+                                {ex}
+                            </button>
+                        ))}
+                    </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <PerformerCard title="Market Top (Week)" symbols={data.market_leaders.week} icon={TrendingUp} color="text-signal-buy" />
-                    <PerformerCard title="Market Top (Month)" symbols={data.market_leaders.month} icon={Zap} color="text-amber-500" />
-                    <PerformerCard title="Market Top (Year)" symbols={data.market_leaders.year} icon={Star} color="text-purple-500" />
+                    <PerformerCard 
+                        title={`Top ${exchangeTab.toUpperCase()} (Week)`} 
+                        symbols={data.market_leaders.week[exchangeTab]} 
+                        icon={TrendingUp} color="text-signal-buy" 
+                    />
+                    <PerformerCard 
+                        title={`Top ${exchangeTab.toUpperCase()} (Month)`} 
+                        symbols={data.market_leaders.month[exchangeTab]} 
+                        icon={Zap} color="text-amber-500" 
+                    />
+                    <PerformerCard 
+                        title={`Top ${exchangeTab.toUpperCase()} (Year)`} 
+                        symbols={data.market_leaders.year[exchangeTab]} 
+                        icon={Star} color="text-purple-500" 
+                    />
                 </div>
             </div>
         </div>
