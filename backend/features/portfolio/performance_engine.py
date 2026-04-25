@@ -102,31 +102,33 @@ class PerformanceEngine:
             if yf_data.empty:
                 return {"error": "Benchmark data unavailable"}
                 
-            close_col = yf_data['Close']
-            if hasattr(close_col, 'columns') and isinstance(close_col.columns, pd.MultiIndex):
-                nifty_series = close_col.iloc[:, 0]
-            elif isinstance(close_col, pd.DataFrame):
-                nifty_series = close_col.iloc[:, 0]
+            raw_close = yf_data['Close']
+            if isinstance(raw_close, pd.DataFrame):
+                nifty_series = raw_close.iloc[:, 0]
             else:
-                nifty_series = close_col
-                
+                nifty_series = raw_close
+            nifty_series = nifty_series.squeeze()  # flatten any residual MultiIndex
             nifty_series.index = pd.to_datetime(nifty_series.index).tz_localize(None)
+            nifty_series = nifty_series.sort_index().dropna()
             nifty_series = nifty_series.rename("benchmark")
-            # Fill gaps in index to align with portfolio trading days
-            nifty_series = nifty_series.ffill().bfill()
         except Exception as e:
             logger.error(f"Error fetching benchmark: {e}")
             return {"error": "System error fetching benchmark"}
 
         # 6. Alignment & Normalization
-        # Join both series to ensure we only compare dates where both have data
+        # Reindex nifty onto the portfolio's trading-day index, forward-fill gaps
+        # (handles holidays, yfinance lag, and timezone mismatches cleanly)
+        common_index = portfolio_series.index
+        nifty_aligned = nifty_series.reindex(common_index, method='ffill')
+        
         comparison_df = pd.DataFrame({
             "portfolio": portfolio_series,
-            "benchmark": nifty_series
-        }).dropna()
+            "benchmark": nifty_aligned
+        })
         
-        # Trim to the requested start date
+        # Trim to the requested start date BEFORE dropna so we don't lose the tail
         comparison_df = comparison_df[comparison_df.index >= pd.to_datetime(start_dt)]
+        comparison_df = comparison_df.dropna()
 
         if comparison_df.empty:
              return {"error": "Insufficient overlapping data for comparison"}
