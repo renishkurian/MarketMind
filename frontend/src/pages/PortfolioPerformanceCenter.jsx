@@ -185,7 +185,7 @@ const PerformancePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <PerformerCard title="Top This Week" symbols={data.portfolio_performers.week} icon={Zap} color="text-amber-500" />
                     <PerformerCard title="Top This Month" symbols={data.portfolio_performers.month} icon={Flame} color="text-orange-500" />
-                    <PerformerCard title="Top This Year" symbols={data.portfolio_performers.year} icon={Trophy} color="text-accent" />
+                    <PerformerCard title="Top 52 Weeks" symbols={data.portfolio_performers.year} icon={Trophy} color="text-accent" />
                 </div>
             </div>
 
@@ -223,7 +223,7 @@ const PerformancePage = () => {
                         icon={Zap} color="text-amber-500" 
                     />
                     <PerformerCard 
-                        title={`Top ${exchangeTab.toUpperCase()} (Year)`} 
+                        title={`Top ${exchangeTab.toUpperCase()} (52W)`} 
                         symbols={data.market_leaders.year[exchangeTab]} 
                         icon={Star} color="text-purple-500" 
                     />
