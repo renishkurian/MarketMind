@@ -512,6 +512,8 @@ export default function DeepDive() {
   const [activeChatSessionId, setActiveChatSessionId] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [activeSkill, setActiveSkill]     = useState(null); // null = default chart AI
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
   const [activeTrendLines, setActiveTrendLines] = useState([]);
   const [activePriceTarget, setActivePriceTarget] = useState(null);
   const [patterns, setPatterns]               = useState([]);
@@ -632,13 +634,21 @@ export default function DeepDive() {
 
     try {
       const token = localStorage.getItem('mm_token');
-      const res = await fetch(`${API_URL}/api/stock/${symbol}/chart_chat`, {
+      const endpoint = activeSkill
+        ? `${API_URL}/api/stock/${symbol}/skill_chat`
+        : `${API_URL}/api/stock/${symbol}/chart_chat`;
+
+      const body = activeSkill
+        ? JSON.stringify({ skill_id: activeSkill.id, messages: updatedMessages })
+        : JSON.stringify({ messages: updatedMessages });
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ messages: updatedMessages })
+        body
       });
       if (res.ok) {
         const data = await res.json();
