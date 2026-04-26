@@ -1594,6 +1594,135 @@ async def handle_skill_chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/portfolio-performance/yearly-explainer")
+@limiter.limit("6/minute")
+async def handle_yearly_explainer(
+    year: int,
+    portfolio_return: float,
+    nifty_return: float,
+    alpha: float,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generates AI explanation for a specific year's portfolio performance.
+    Pulls top gainers/losers for that year from PriceHistory + StockMaster.
+    Cached in PerformanceCache (cache_type=YEARLY_EXPLAINER, cache_key=str(year)) — 12h TTL.
+    """
+
+    # Cache check — 12h TTL (yearly data changes slowly)
+    cache_key = f"YEARLY_EXPLAINER_{year}_{current_user.id}"
+    c_result = await db.execute(
+        select(PerformanceCache).where(
+            and_(
+                PerformanceCache.user_id   == current_user.id,
+                PerformanceCache.cache_type == "YEARLY_EXPLAINER",
+                PerformanceCache.cache_key  == str(year),
+            )
+        )
+    )
+    cached = c_result.scalar_one_or_none()
+    if cached:
+        age = (datetime.utcnow() - cached.updated_at).total_seconds()
+        if age < 43200:  # 12 hours
+            return cached.data
+
+    # Build holdings context — fetch portfolio symbols
+    stocks_result = await db.execute(
+        select(StockMaster).where(
+            and_(
+                StockMaster.user_id   == current_user.id,
+                StockMaster.type      == "PORTFOLIO",
+                StockMaster.is_active == True,
+            )
+        )
+    )
+    stocks = stocks_result.scalars().all()
+    symbols = [s.symbol for s in stocks]
+
+    # For each holding, get year start/end price to compute that year's return
+    holdings_context = []
+    if symbols:
+        from sqlalchemy import extract
+        for stock in stocks[:15]:  # cap at 15 to keep prompt manageable
+            try:
+                yr_result = await db.execute(
+                    select(PriceHistory.date, PriceHistory.close)
+                    .where(
+                        and_(
+                            PriceHistory.symbol == stock.symbol,
+                            extract("year", PriceHistory.date) == year,
+                        )
+                    )
+                    .order_by(PriceHistory.date.asc())
+                )
+                yr_rows = yr_result.all()
+                if len(yr_rows) >= 2:
+                    yr_start = float(yr_rows[0].close)
+                    yr_end   = float(yr_rows[-1].close)
+                    yr_ret   = round((yr_end - yr_start) / yr_start * 100, 2)
+                    holdings_context.append({
+                        "symbol":  stock.symbol,
+                        "return":  yr_ret,
+                        "sector":  stock.sector or "Unknown",
+                    })
+            except Exception:
+                continue
+
+    # Sort by return descending so AI sees best/worst clearly
+    holdings_context.sort(key=lambda x: x["return"], reverse=True)
+
+    # Sector concentration summary for macro context
+    sector_counts = {}
+    for s in stocks:
+        sec = s.sector or "Unknown"
+        sector_counts[sec] = sector_counts.get(sec, 0) + 1
+
+    macro_context = {
+        "portfolio_size":      len(symbols),
+        "sector_distribution": sector_counts,
+        "top_3_winners":       holdings_context[:3]  if holdings_context else [],
+        "top_3_losers":        holdings_context[-3:] if len(holdings_context) >= 3 else [],
+    }
+
+    try:
+        result = await generate_yearly_risk_explainer(
+            year=year,
+            portfolio_return=portfolio_return,
+            nifty_return=nifty_return,
+            alpha=alpha,
+            holdings_context=holdings_context,
+            macro_context=macro_context,
+            user_id=current_user.id,
+        )
+
+        result["year"]             = year
+        result["portfolio_return"] = portfolio_return
+        result["nifty_return"]     = nifty_return
+        result["alpha"]            = alpha
+
+        # Upsert into PerformanceCache
+        if cached:
+            cached.data       = result
+            cached.updated_at = datetime.utcnow()
+        else:
+            db.add(PerformanceCache(
+                user_id    = current_user.id,
+                cache_type = "YEARLY_EXPLAINER",
+                cache_key  = str(year),
+                data       = result,
+                updated_at = datetime.utcnow(),
+            ))
+        await db.commit()
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Yearly explainer error {year}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/ai-logs")
 async def get_ai_logs(
     limit: int = 100,
