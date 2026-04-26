@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, date, timedelta
 from sqlalchemy import select, delete, and_
 from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Callable, Awaitable, Dict, List
 
 from backend.data.db import (
