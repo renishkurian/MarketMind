@@ -250,6 +250,8 @@ If no news matches the move, say "appears purely technical."
 4. State your buy/hold/sell conviction with a specific reason.
 5. Only include trend_lines that directly answer the question asked.
 6. Format all dates as YYYY-MM-DD matching the data above.
+7. When computing price_target, use backtest CAGR to project forward and win_rate to set band width.
+   A 55% win rate = wider band. A 75% win rate = tighter band. Never fabricate — if data is insufficient return null.
 
 Return this exact structure:
 {{
@@ -263,9 +265,20 @@ Return this exact structure:
       "color": "green",
       "label": "Support"
     }}
-  ]
+  ],
+  "price_target": {{
+    "target_30d": 0.0,
+    "target_90d": 0.0,
+    "confidence_low": 0.0,
+    "confidence_high": 0.0,
+    "horizon": "30d",
+    "basis": "One sentence explaining the target rationale"
+  }}
 }}
 Return trend_lines as [] if none apply.
+Return price_target as null if the question is not about price direction or targets.
+Use backtest CAGR and win_rate from context to calibrate confidence_low/high band width.
+confidence_low and confidence_high are absolute price levels, not percentages.
 """
 
 
