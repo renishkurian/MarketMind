@@ -18,6 +18,8 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
   const sma20Ref  = useRef(null);
   const sma50Ref  = useRef(null);
   const sma200Ref = useRef(null);
+  const bbUpperRef = useRef(null);
+  const bbLowerRef = useRef(null);
 
   // ── Init chart ONCE on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -60,6 +62,8 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     sma20Ref.current  = chart.addSeries(LineSeries, { color: '#F59E0B', lineWidth: 1, title: 'SMA20',  priceLineVisible: false, lastValueVisible: false });
     sma50Ref.current  = chart.addSeries(LineSeries, { color: '#3B82F6', lineWidth: 1, title: 'SMA50',  priceLineVisible: false, lastValueVisible: false });
     sma200Ref.current = chart.addSeries(LineSeries, { color: '#A855F7', lineWidth: 1, title: 'SMA200', priceLineVisible: false, lastValueVisible: false });
+    bbUpperRef.current = chart.addSeries(LineSeries, { color: '#6B7280', lineWidth: 1, lineStyle: 2, title: 'BB Upper', priceLineVisible: false, lastValueVisible: false });
+    bbLowerRef.current = chart.addSeries(LineSeries, { color: '#6B7280', lineWidth: 1, lineStyle: 2, title: 'BB Lower', priceLineVisible: false, lastValueVisible: false });
 
     const handleResize = () => {
       if (chartContainerRef.current) {
@@ -75,6 +79,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
       seriesRef.current = null;
       trendSeriesRef.current = [];
       sma20Ref.current = sma50Ref.current = sma200Ref.current = null;
+      bbUpperRef.current = bbLowerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]); // recreate only if theme changes
