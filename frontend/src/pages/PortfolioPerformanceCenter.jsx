@@ -16,16 +16,16 @@ const PerformancePage = () => {
     const [error, setError] = useState(null);
     const [exchangeTab, setExchangeTab] = useState('nse'); // 'nse' or 'bse'
     const [showAmounts, setShowAmounts] = useState(false);
-    const [aiPanel, setAiPanel] = useState({ open: false, symbol: '' });
+    const [aiPanel, setAiPanel] = useState({ open: false, symbol: '', companyName: '' });
     const [chatMessages, setChatMessages] = useState([]);
     const [chatLoading, setChatLoading] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const navigate = useNavigate();
 
-    const openAI = (symbol, cardTitle, gain) => {
-        const question = `${symbol} is showing ${gain}% in '${cardTitle}'. Why has it moved this much? Is this a good entry/exit? Are there any news catalysts?`;
+    const openAI = (symbol, companyName, cardTitle, gain) => {
+        const question = `I am looking at ${companyName} (NSE: ${symbol}), which is showing ${gain >= 0 ? '+' : ''}${gain}% in the '${cardTitle}' period. Why has it moved this much? Is this a good entry or exit point right now? Are there any known news catalysts?`;
         const initMessages = [{ role: 'user', content: question }];
-        setAiPanel({ open: true, symbol });
+        setAiPanel({ open: true, symbol, companyName: companyName || symbol });
         setChatMessages(initMessages);
         setChatInput('');
         _sendChat(symbol, initMessages);
@@ -124,7 +124,7 @@ const PerformancePage = () => {
                                 {s.gain >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}
                             </div>
                             <button
-                                onClick={(e) => { e.stopPropagation(); openAI(s.symbol, title, s.gain); }}
+                                onClick={(e) => { e.stopPropagation(); openAI(s.symbol, s.name || s.symbol, title, s.gain); }}
                                 className="p-1 rounded-lg text-dark-muted hover:text-accent hover:bg-accent/10 transition-all opacity-0 group-hover/row:opacity-100"
                                 title="Ask AI"
                             >
@@ -169,7 +169,7 @@ const PerformancePage = () => {
                                 <ArrowDownRight size={16}/>
                             </div>
                             <button
-                                onClick={(e) => { e.stopPropagation(); openAI(s.symbol, title, s.gain); }}
+                                onClick={(e) => { e.stopPropagation(); openAI(s.symbol, s.name || s.symbol, title, s.gain); }}
                                 className="p-1 rounded-lg text-dark-muted hover:text-signal-sell hover:bg-signal-sell/10 transition-all opacity-0 group-hover/row:opacity-100"
                                 title="Ask AI"
                             >
@@ -378,8 +378,8 @@ const PerformancePage = () => {
                                 <Sparkles size={16} className="text-accent" />
                             </div>
                             <div>
-                                <p className="text-sm font-black text-white tracking-tight">{aiPanel.symbol}</p>
-                                <p className="text-[10px] text-accent font-bold uppercase tracking-widest">AI Research Assistant</p>
+                                <p className="text-sm font-black text-white tracking-tight">{aiPanel.companyName || aiPanel.symbol}</p>
+                                <p className="text-[10px] text-dark-muted font-bold uppercase tracking-widest font-mono">{aiPanel.symbol} · AI Research Assistant</p>
                             </div>
                         </div>
                         <button
