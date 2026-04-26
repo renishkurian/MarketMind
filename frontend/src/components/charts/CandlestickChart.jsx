@@ -182,7 +182,18 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     });
   }, [trendLines]);
 
-  return <div ref={chartContainerRef} className="w-full h-[400px]" />;
+  return (
+    <div className="relative">
+      <div ref={chartContainerRef} className="w-full h-[400px]" />
+      {showSMAs && (
+        <div className="flex gap-4 mt-1 px-1">
+          <span className="text-[10px] font-bold" style={{color:'#F59E0B'}}>── SMA20</span>
+          <span className="text-[10px] font-bold" style={{color:'#3B82F6'}}>── SMA50</span>
+          <span className="text-[10px] font-bold" style={{color:'#A855F7'}}>── SMA200</span>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default CandlestickChart;
