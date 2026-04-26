@@ -20,7 +20,7 @@ from backend.data.db import (
     get_db, SessionLocal,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
     PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
-    User, MoveExplanation, PriceAlert
+    User, MoveExplanation, PriceAlert, PerformanceCache
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
