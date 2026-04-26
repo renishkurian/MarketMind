@@ -953,6 +953,62 @@ export default function DeepDive() {
                         </div>
                       );
                     })()}
+
+                    {/* Pattern Detail Modal */}
+                    {patternModal && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setPatternModal(null)}>
+                        <div className="bg-dark-card border border-dark-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                                  patternModal.implication === 'Bullish' ? 'bg-signal-buy/20 text-signal-buy' :
+                                  patternModal.implication === 'Bearish' ? 'bg-signal-sell/20 text-signal-sell' :
+                                  'bg-signal-hold/20 text-signal-hold'
+                                }`}>{patternModal.implication}</span>
+                                <span className="text-xs text-dark-muted font-mono">{Math.round(patternModal.confidence * 100)}% confidence</span>
+                              </div>
+                              <h3 className="text-lg font-black text-white">📐 {patternModal.name}</h3>
+                            </div>
+                            <button onClick={() => setPatternModal(null)} className="text-dark-muted hover:text-white p-1"><X size={18}/></button>
+                          </div>
+
+                          <p className="text-sm text-dark-text leading-relaxed mb-4">{patternModal.description}</p>
+
+                          <div className="grid grid-cols-2 gap-3 mb-4">
+                            {patternModal.target_price && (
+                              <div className="bg-signal-buy/5 border border-signal-buy/20 rounded-xl p-3">
+                                <p className="text-[10px] text-dark-muted uppercase font-bold mb-1">Target</p>
+                                <p className="text-signal-buy font-black font-mono">₹{patternModal.target_price?.toFixed(2)}</p>
+                              </div>
+                            )}
+                            {patternModal.stop_loss && (
+                              <div className="bg-signal-sell/5 border border-signal-sell/20 rounded-xl p-3">
+                                <p className="text-[10px] text-dark-muted uppercase font-bold mb-1">Stop Loss</p>
+                                <p className="text-signal-sell font-black font-mono">₹{patternModal.stop_loss?.toFixed(2)}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              setPatternModal(null);
+                              const trendLines = patternModal.trend_lines || [];
+                              if (trendLines.length > 0) setActiveTrendLines(trendLines);
+                              if (!showChartChat) toggleChat();
+                              setTimeout(() => {
+                                setChatInput(`Explain the ${patternModal.name} pattern on this chart and tell me if I should act on it.`);
+                                sendChatMessage(`Explain the ${patternModal.name} pattern on this chart and tell me if I should act on it.`);
+                              }, 300);
+                            }}
+                            className="w-full py-2.5 bg-accent hover:bg-accent/80 text-white rounded-xl text-sm font-black transition-all"
+                          >
+                            <Sparkles size={14} className="inline mr-2" />
+                            Ask AI to Analyse This Pattern
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Chat Panel */}
