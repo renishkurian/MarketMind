@@ -10,7 +10,21 @@ const calcSMA = (data, period) => {
   }, []);
 };
 
-const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = true }) => {
+const calcBB = (data, period = 20, stdDev = 2) => {
+  const upper = [], lower = [];
+  data.forEach((d, i) => {
+    if (i < period - 1) return;
+    const slice = data.slice(i - period + 1, i + 1).map(x => x.close);
+    const mean = slice.reduce((s, v) => s + v, 0) / period;
+    const std = Math.sqrt(slice.reduce((s, v) => s + (v - mean) ** 2, 0) / period);
+    const t = Math.floor(new Date(d.date).getTime() / 1000);
+    upper.push({ time: t, value: mean + stdDev * std });
+    lower.push({ time: t, value: mean - stdDev * std });
+  });
+  return { upper, lower };
+};
+
+const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = true, showBBs = true }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -120,9 +134,18 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     if (showSMAs && sma50Ref.current)  sma50Ref.current.setData(calcSMA(sortedRaw, 50));
     if (showSMAs && sma200Ref.current) sma200Ref.current.setData(calcSMA(sortedRaw, 200));
 
+    // ── Bollinger Bands ───────────────────────────────────────────────────
+    if (showBBs && bbUpperRef.current && bbLowerRef.current && sortedRaw.length >= 20) {
+      const { upper, lower } = calcBB(sortedRaw, 20, 2);
+      bbUpperRef.current.setData(upper);
+      bbLowerRef.current.setData(lower);
+    }
+
     sma20Ref.current?.applyOptions({ visible: showSMAs });
     sma50Ref.current?.applyOptions({ visible: showSMAs });
     sma200Ref.current?.applyOptions({ visible: showSMAs && sortedRaw.length >= 200 });
+    bbUpperRef.current?.applyOptions({ visible: showBBs && sortedRaw.length >= 20 });
+    bbLowerRef.current?.applyOptions({ visible: showBBs && sortedRaw.length >= 20 });
 
     // Restore the zoom/pan if the user had one set, 
     // BUT only if the data length is similar (incremental update).
@@ -140,7 +163,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     }
     
     seriesRef.current.previousDataLength = data.length;
-  }, [data, showSMAs]);
+  }, [data, showSMAs, showBBs]);
 
   // ── Update trend lines without destroying zoom state ─────────────────────
   useEffect(() => {
