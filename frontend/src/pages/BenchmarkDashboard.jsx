@@ -77,7 +77,8 @@ const BenchmarkDashboard = () => {
       });
       if (!res.data.error) setSectorData(res.data);
     } catch (e) { console.error(e); }
-    finally { setSectorLoading(false); }
+      finally { setSectorLoading(false); }
+  };
   const fetchYearlyExplainer = async (year, portfolioReturn, niftyReturn, alpha) => {
     if (explainerLoading === year) return;
     setExplainerLoading(year);
@@ -429,18 +430,33 @@ const BenchmarkDashboard = () => {
             </div>
 
             {selectedYearStats && (
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: "Portfolio", val: selectedYearStats.portfolio_return, color: selectedYearStats.portfolio_return >= 0 ? 'text-signal-buy' : 'text-signal-sell' },
-                  { label: "Benchmark", val: selectedYearStats.nifty_return, color: selectedYearStats.nifty_return >= 0 ? 'text-yellow-400' : 'text-signal-sell' },
-                  { label: "Alpha", val: selectedYearStats.alpha, color: 'text-[#A855F7]' },
-                ].map(c => (
-                  <div key={c.label} className="bg-dark-bg border border-dark-border rounded-2xl p-4 text-center">
-                    <p className="text-xs text-dark-muted font-bold uppercase tracking-wider">{selectedYear} {c.label}</p>
-                    <p className={`text-2xl font-black mt-1 ${c.color}`}>{c.val > 0 ? '+' : ''}{c.val}%</p>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: "Portfolio", val: selectedYearStats.portfolio_return, color: selectedYearStats.portfolio_return >= 0 ? 'text-signal-buy' : 'text-signal-sell' },
+                    { label: "Benchmark", val: selectedYearStats.nifty_return, color: selectedYearStats.nifty_return >= 0 ? 'text-yellow-400' : 'text-signal-sell' },
+                    { label: "Alpha", val: selectedYearStats.alpha, color: 'text-[#A855F7]' },
+                  ].map(c => (
+                    <div key={c.label} className="bg-dark-bg border border-dark-border rounded-2xl p-4 text-center">
+                      <p className="text-xs text-dark-muted font-bold uppercase tracking-wider">{selectedYear} {c.label}</p>
+                      <p className={`text-2xl font-black mt-1 ${c.color}`}>{c.val > 0 ? '+' : ''}{c.val}%</p>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* AI Explainer Trigger */}
+                <button
+                  onClick={() => fetchYearlyExplainer(selectedYear, selectedYearStats.portfolio_return, selectedYearStats.nifty_return, selectedYearStats.alpha)}
+                  disabled={explainerLoading === selectedYear}
+                  className="mt-6 w-full flex items-center justify-center gap-2 py-4 rounded-3xl border border-dark-border hover:border-accent hover:bg-accent/5 transition-all text-xs font-black text-dark-muted hover:text-accent disabled:opacity-50 overflow-hidden relative group/ai"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  {explainerLoading === selectedYear
+                    ? <><Brain size={14} className="animate-pulse text-accent" /> Analysing {selectedYear} Performance...</>
+                    : <><Sparkles size={14} className="group-hover:scale-110 transition-transform" /> Why this year? Get AI Narrative Analysis</>
+                  }
+                </button>
+              </>
             )}
           </>
         ) : (
@@ -499,6 +515,145 @@ const BenchmarkDashboard = () => {
           <p className="text-dark-muted text-center py-8">Analysis pending...</p>
         )}
       </div>
+
+      {/* Yearly Explainer Modal */}
+      {explainerModal && yearlyExplainer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300"
+          onClick={() => setExplainerModal(false)}
+        >
+          <div
+            className="bg-dark-card border border-dark-border rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className={`p-5 border-b border-dark-border flex items-start justify-between ${
+              yearlyExplainer.sentiment === 'Strong' || yearlyExplainer.sentiment === 'Good'
+                ? 'bg-signal-buy/5'
+                : yearlyExplainer.sentiment === 'Tough' || yearlyExplainer.sentiment === 'Difficult'
+                ? 'bg-signal-sell/5'
+                : 'bg-signal-hold/5'
+            }`}>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                    yearlyExplainer.sentiment === 'Strong' || yearlyExplainer.sentiment === 'Good'
+                      ? 'bg-signal-buy/20 text-signal-buy'
+                      : yearlyExplainer.sentiment === 'Tough' || yearlyExplainer.sentiment === 'Difficult'
+                      ? 'bg-signal-sell/20 text-signal-sell'
+                      : 'bg-signal-hold/20 text-signal-hold'
+                  }`}>{yearlyExplainer.sentiment} Year</span>
+                  <span className="text-xs text-dark-muted font-mono">{yearlyExplainer.year}</span>
+                </div>
+                <h2 className="text-lg font-black text-white leading-snug max-w-lg">
+                  {yearlyExplainer.headline}
+                </h2>
+              </div>
+              <button
+                onClick={() => setExplainerModal(false)}
+                className="text-dark-muted hover:text-white p-1 shrink-0 ml-4"
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            {/* Performance Strip */}
+            <div className="grid grid-cols-3 divide-x divide-dark-border border-b border-dark-border">
+              {[
+                { label: 'Portfolio', value: yearlyExplainer.portfolio_return, colored: true },
+                { label: 'Nifty 50',  value: yearlyExplainer.nifty_return,     colored: true },
+                { label: 'Alpha',     value: yearlyExplainer.alpha,             colored: true },
+              ].map(({ label, value, colored }) => (
+                <div key={label} className="p-4 text-center">
+                  <p className="text-[10px] text-dark-muted font-bold uppercase tracking-widest mb-1">{label}</p>
+                  <p className={`text-2xl font-black font-mono ${
+                    !colored ? 'text-white' :
+                    value >= 0 ? 'text-signal-buy' : 'text-signal-sell'
+                  }`}>
+                    {value >= 0 ? '+' : ''}{value?.toFixed(2)}%
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 max-h-[50vh] overflow-y-auto custom-scrollbar">
+
+              {/* What Worked */}
+              <div className="bg-signal-buy/5 border border-signal-buy/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp size={14} className="text-signal-buy" />
+                  <p className="text-xs font-black text-signal-buy uppercase tracking-widest">What Worked</p>
+                </div>
+                <p className="text-sm text-dark-text leading-relaxed">{yearlyExplainer.what_worked}</p>
+              </div>
+
+              {/* What Didn't */}
+              <div className="bg-signal-sell/5 border border-signal-sell/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingDown size={14} className="text-signal-sell" />
+                  <p className="text-xs font-black text-signal-sell uppercase tracking-widest">
+                    {yearlyExplainer.portfolio_return >= 0 ? 'What Could Have Been Better' : "What Didn't Work"}
+                  </p>
+                </div>
+                <p className="text-sm text-dark-text leading-relaxed">{yearlyExplainer.what_didnt}</p>
+              </div>
+
+              {/* Macro Drivers */}
+              <div className="bg-dark-bg border border-dark-border rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain size={14} className="text-accent" />
+                  <p className="text-xs font-black text-accent uppercase tracking-widest">Macro Context</p>
+                </div>
+                <p className="text-sm text-dark-text leading-relaxed">{yearlyExplainer.macro_drivers}</p>
+              </div>
+
+              {/* Risk Flags */}
+              {yearlyExplainer.risk_flags?.length > 0 && (
+                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle size={14} className="text-yellow-500" />
+                    <p className="text-xs font-black text-yellow-500 uppercase tracking-widest">Risk Flags</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {yearlyExplainer.risk_flags.map((flag, i) => (
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-[11px] text-yellow-400 font-medium"
+                      >
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Lesson */}
+              <div className="flex items-start gap-3 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+                <span className="text-xl shrink-0">💡</span>
+                <div>
+                  <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Lesson</p>
+                  <p className="text-sm text-dark-text leading-relaxed font-medium">{yearlyExplainer.lesson}</p>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-dark-border flex items-center justify-between bg-dark-bg">
+              <p className="text-[10px] text-dark-muted">
+                AI analysis · {yearlyExplainer.year} portfolio data
+              </p>
+              <button
+                onClick={() => setExplainerModal(false)}
+                className="px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg text-xs font-black transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
