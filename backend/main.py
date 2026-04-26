@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, Body, UploadFile, File, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from typing import List, Dict, Optional, Any
 import logging
@@ -20,7 +20,7 @@ from backend.data.db import (
     get_db, SessionLocal,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
     PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
-    User
+    User, MoveExplanation
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
@@ -1201,6 +1201,132 @@ async def handle_pattern_recognition(
     except Exception as e:
         logger.error(f"Pattern recognition endpoint error for {symbol}: {e}")
         return {"patterns": [], "summary": "Pattern detection unavailable."}
+
+
+@app.get("/api/stock/{symbol}/move-explanation")
+@limiter.limit("10/minute")
+async def handle_move_explanation(
+    symbol: str,
+    period: str,          # query param: week | month | year | ytd
+    gain_pct: float,      # query param: the actual gain % from frontend
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns a cached AI explanation for why symbol moved gain_pct% in period.
+    Cache TTL: 4 hours. Force-refreshes if gain_pct has changed by >2% from cached value.
+    """
+    symbol = symbol.upper()
+    period = period.lower()
+
+    # Check cache
+    cache_result = await db.execute(
+        select(MoveExplanation).where(
+            and_(MoveExplanation.symbol == symbol, MoveExplanation.period == period)
+        )
+    )
+    cached = cache_result.scalar_one_or_none()
+
+    if cached:
+        age = (datetime.utcnow() - cached.updated_at).total_seconds()
+        gain_drift = abs((cached.gain_pct or 0) - gain_pct)
+        if age < 14400 and gain_drift < 2.0:
+            return {
+                "symbol":      symbol,
+                "period":      period,
+                "gain_pct":    cached.gain_pct,
+                "headline":    cached.headline,
+                "explanation": cached.explanation,
+                "catalysts":   cached.catalysts,
+                "sentiment":   cached.sentiment,
+                "cached":      True,
+            }
+
+    # Build context — reuse same pattern as chart_chat
+    sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
+    sig = sig_result.scalars().first()
+
+    hist_result = await db.execute(
+        select(PriceHistory)
+        .where(PriceHistory.symbol == symbol)
+        .order_by(PriceHistory.date.desc())
+        .limit(90)
+    )
+    history = hist_result.scalars().all()
+    history.reverse()
+
+    closes = [float(h.close) for h in history]
+    highs  = [float(h.high)  for h in history]
+    lows   = [float(h.low)   for h in history]
+
+    def sma(series, n):
+        return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
+
+    from datetime import date as dt_date
+    context_data = {
+        "current_st_signal": sig.st_signal if sig else "HOLD",
+        "current_lt_signal": sig.lt_signal if sig else "HOLD",
+        "composite_score":   float(sig.composite_score) if sig and sig.composite_score else None,
+        "today": {"close": float(sig.current_price) if sig and sig.current_price else (closes[-1] if closes else None)},
+        "price_summary": {
+            "period_change_pct": round((closes[-1] - closes[0]) / closes[0] * 100, 2) if len(closes) >= 2 else None,
+            "90d_high": round(max(highs), 2) if highs else None,
+            "90d_low":  round(min(lows),  2) if lows else None,
+            "sma_20":   sma(closes, 20),
+            "sma_50":   sma(closes, 50),
+            "sma_90":   sma(closes, 90),
+        },
+        "indicators": {
+            "ta": sig.ta_breakdown or {} if sig else {},
+            "fa": sig.fa_breakdown or {} if sig else {},
+        },
+    }
+
+    try:
+        result = await generate_move_explanation(
+            symbol=symbol,
+            period=period,
+            gain_pct=gain_pct,
+            context_data=context_data,
+            user_id=current_user.id
+        )
+
+        # Upsert into cache
+        if cached:
+            cached.gain_pct    = gain_pct
+            cached.headline    = result.get("headline")
+            cached.explanation = result.get("explanation")
+            cached.catalysts   = result.get("catalysts")
+            cached.sentiment   = result.get("sentiment")
+            cached.updated_at  = datetime.utcnow()
+        else:
+            db.add(MoveExplanation(
+                symbol=symbol,
+                period=period,
+                gain_pct=gain_pct,
+                headline=result.get("headline"),
+                explanation=result.get("explanation"),
+                catalysts=result.get("catalysts"),
+                sentiment=result.get("sentiment"),
+            ))
+        await db.commit()
+
+        return {
+            "symbol":      symbol,
+            "period":      period,
+            "gain_pct":    gain_pct,
+            "headline":    result.get("headline"),
+            "explanation": result.get("explanation"),
+            "catalysts":   result.get("catalysts"),
+            "sentiment":   result.get("sentiment"),
+            "should_act":  result.get("should_act"),
+            "cached":      False,
+        }
+
+    except Exception as e:
+        logger.error(f"Move explanation endpoint error {symbol}/{period}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/ai-logs")
