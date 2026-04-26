@@ -359,6 +359,29 @@ class MoveExplanation(Base):
         UniqueConstraint("symbol", "period", name="uq_move_explanation_symbol_period"),
     )
 
+class PriceAlert(Base):
+    """
+    AI-generated or user-confirmed price alerts.
+    Checked EOD by scheduler against PriceHistory latest close.
+    """
+    __tablename__ = "price_alerts"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    user_id        = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    symbol         = Column(String(20), nullable=False, index=True)
+    alert_type     = Column(String(20), nullable=False)   # 'SUPPORT' | 'RESISTANCE' | 'TARGET' | 'STOP_LOSS' | 'CUSTOM'
+    direction      = Column(String(10), nullable=False)   # 'ABOVE' | 'BELOW'
+    price_level    = Column(Float, nullable=False)
+    label          = Column(String(100), nullable=True)   # e.g. "AI Support" "Cup & Handle target"
+    source         = Column(String(20), default="AI")     # 'AI' | 'USER'
+    ai_rationale   = Column(Text, nullable=True)          # why AI set this level
+    is_active      = Column(Boolean, default=True)
+    is_triggered   = Column(Boolean, default=False)
+    triggered_at   = Column(DateTime, nullable=True)
+    triggered_price= Column(Float, nullable=True)
+    created_at     = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at     = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
 # Database Dependency
 async def get_db():
     async with SessionLocal() as session:
