@@ -134,12 +134,9 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     if (showSMAs && sma50Ref.current)  sma50Ref.current.setData(calcSMA(sortedRaw, 50));
     if (showSMAs && sma200Ref.current) sma200Ref.current.setData(calcSMA(sortedRaw, 200));
 
-    // ── Bollinger Bands ───────────────────────────────────────────────────
-    if (showBBs && bbUpperRef.current && bbLowerRef.current && sortedRaw.length >= 20) {
-      const { upper, lower } = calcBB(sortedRaw, 20, 2);
-      bbUpperRef.current.setData(upper);
-      bbLowerRef.current.setData(lower);
-    }
+    const bb = calcBB(sortedRaw);
+    if (bbUpperRef.current) bbUpperRef.current.setData(bb.upper);
+    if (bbLowerRef.current) bbLowerRef.current.setData(bb.lower);
 
     sma20Ref.current?.applyOptions({ visible: showSMAs });
     sma50Ref.current?.applyOptions({ visible: showSMAs });
