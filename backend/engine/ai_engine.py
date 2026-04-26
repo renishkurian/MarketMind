@@ -1129,6 +1129,132 @@ Return this exact structure:
 
     return parsed
 
+
+async def generate_alert_levels(
+    symbol: str,
+    user_message: str,
+    context_data: dict,
+    user_id: int = None
+) -> dict:
+    """
+    Parses the user's natural language request and extracts concrete price alert levels.
+    e.g. "alert me at support" → extracts support price from chart context.
+    Returns: { alerts: [{alert_type, direction, price_level, label, rationale}], reply }
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai":    ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai":       ai_cfg["xai_key"],
+    }
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    if not key_map.get(provider):
+        raise ValueError("No API key configured.")
+
+    model = {
+        "openai":    ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai":       ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    # Fetch live news for context
+    import json
+    summary = context_data.get("price_summary", {})
+    today   = context_data.get("today", {})
+    comp    = context_data.get("composite_score", "N/A")
+    current = today.get("close", "N/A")
+
+    system_prompt = f"""You are MarketMind's alert assistant for NSE/BSE Indian equities.
+The user wants to set a price alert. Extract the exact price level(s) from their request
+using the chart context provided. Be precise — use actual price levels from the data.
+
+═══ STOCK CONTEXT ═══
+Symbol        : {symbol}
+Current Price : ₹{current}
+Composite     : {comp}/100
+90d High/Low  : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
+SMA 20/50/90  : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+BB Upper/Lower: ₹{summary.get('bb_upper', 'N/A')} / ₹{summary.get('bb_lower', 'N/A')}
+
+Recent 5 Bars:
+{json.dumps(summary.get('recent_5_bars', []), indent=2)}
+
+═══ RULES ═══
+1. Reply ONLY as valid JSON — no text outside the object.
+2. Extract 1-3 alert levels from the user message and chart context.
+3. alert_type: one of SUPPORT | RESISTANCE | TARGET | STOP_LOSS | CUSTOM
+4. direction: ABOVE (trigger when price goes above level) | BELOW (trigger when price goes below)
+   - SUPPORT → direction: BELOW (alert if price breaks support)
+   - RESISTANCE / TARGET → direction: ABOVE (alert when price reaches it)
+   - STOP_LOSS → direction: BELOW
+5. price_level must be a real number — never null.
+6. label: short human-readable name e.g. "SMA50 Support", "52W High Breakout"
+7. rationale: one sentence why this is a meaningful level.
+8. reply: friendly confirmation message to show the user.
+
+Return this exact structure:
+{{
+  "reply": "I've set X alert(s) for {symbol}. You'll be notified when price hits these levels.",
+  "alerts": [
+    {{
+      "alert_type": "SUPPORT",
+      "direction": "BELOW",
+      "price_level": 0.0,
+      "label": "SMA50 Support",
+      "rationale": "Price has bounced from SMA50 three times in the last 90 days."
+    }}
+  ]
+}}
+"""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": user_message}
+    ]
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = completion_tokens = 0
+
+    try:
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, key_map[provider])
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, key_map[provider])
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, key_map[provider])
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"Alert generation failed ({provider}): {e}")
+        raise e
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol=symbol,
+            provider=provider,
+            model=model,
+            trigger_reason="ALERT_GENERATION",
+            skill_id=None,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+            user_id=user_id,
+        )
+
+    return parsed
+
 # ── Portfolio AI Allocation ─────────────────────────────────────────────────────
 
 async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> dict:
