@@ -1288,6 +1288,36 @@ export default function DeepDive() {
                         </div>
                       )}
 
+                      {/* Skill-specific quick prompts */}
+                      {activeSkill && !chatLoading && activeChatSessionId && (
+                        <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+                          {(activeSkill.id === 'warren_buffett_quality'
+                            ? ["Is this a wonderful business at a fair price?", "What is the moat here?", "Would you hold this for 10 years?"]
+                            : activeSkill.id === 'sebi_forensic'
+                            ? ["Any accounting red flags?", "Is promoter pledge a concern?", "Cash flow vs profit — any divergence?"]
+                            : activeSkill.id === 'goldman_screener'
+                            ? ["Give me a 12-month price target", "Bull / base / bear scenarios", "Would this pass your institutional screen?"]
+                            : activeSkill.id === 'ark_disruptive'
+                            ? ["What's the disruption thesis here?", "Where is this on the S-curve?", "5-year TAM estimate?"]
+                            : activeSkill.id === 'peter_lynch_simple'
+                            ? ["Is this a fast grower or stalwart?", "What's the PEG ratio?", "Would you buy this at current price?"]
+                            : activeSkill.id === 'rj_india_growth'
+                            ? ["Is this riding India's growth story?", "Any structural tailwind here?", "10-year wealth creator or trap?"]
+                            : activeSkill.id === 'sequoia_moat'
+                            ? ["Describe the moat in one sentence", "Can margins scale with revenue?", "Pricing power — yes or no?"]
+                            : []
+                          ).map(prompt => (
+                            <button
+                              key={prompt}
+                              onClick={() => { setChatInput(prompt); setTimeout(() => sendChatMessage(prompt), 10); }}
+                              className="shrink-0 px-2.5 py-1 bg-accent/5 border border-accent/20 hover:border-accent hover:bg-accent/10 rounded-full text-[10px] font-bold text-accent transition-all whitespace-nowrap"
+                            >
+                              {prompt}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Active Alerts for this stock */}
                       {stockAlerts.length > 0 && (
                         <div className="px-3 pb-2 shrink-0">
