@@ -139,15 +139,36 @@ const PerformancePage = () => {
                             </span>
                             <span className="text-[10px] text-dark-muted font-bold uppercase">{s.symbol}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                             <div className={`flex items-center gap-1 font-black ${s.gain >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
                                 <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
                                 {s.gain >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}
                             </div>
                             <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const periodKey = title.includes('Week') ? 'week' : title.includes('Month') ? 'month' : title.includes('52') ? 'year' : 'ytd';
+                                    const key = `${s.symbol}_${periodKey}`;
+                                    if (explanations[key]) {
+                                        setExplModal(explanations[key]);
+                                    } else {
+                                        fetchMoveExplanation(s.symbol, periodKey, s.gain);
+                                    }
+                                }}
+                                title="Why did this move?"
+                                className="p-1 rounded-lg bg-dark-bg border border-dark-border hover:border-accent hover:bg-accent/10 transition-all flex items-center justify-center"
+                            >
+                                {loadingExpl[`${s.symbol}_${title.includes('Week') ? 'week' : title.includes('Month') ? 'month' : title.includes('52') ? 'year' : 'ytd'}`]
+                                    ? <Brain size={12} className="text-accent animate-pulse" />
+                                    : explanations[`${s.symbol}_${title.includes('Week') ? 'week' : title.includes('Month') ? 'month' : title.includes('52') ? 'year' : 'ytd'}`]
+                                    ? <Sparkles size={12} className="text-accent" />
+                                    : <Brain size={12} className="text-dark-muted" />
+                                }
+                            </button>
+                            <button
                                 onClick={(e) => { e.stopPropagation(); openAI(s.symbol, s.name || s.symbol, title, s.gain); }}
-                                className="p-1 rounded-lg text-dark-muted hover:text-accent hover:bg-accent/10 transition-all opacity-0 group-hover/row:opacity-100"
-                                title="Ask AI"
+                                className="p-1 rounded-lg text-dark-muted hover:text-accent hover:bg-accent/10 transition-all opacity-0 group-hover/row:opacity-100 flex items-center justify-center border border-transparent hover:border-accent/40"
+                                title="Ask AI Chat"
                             >
                                 <Sparkles size={13}/>
                             </button>
@@ -184,15 +205,36 @@ const PerformancePage = () => {
                             </span>
                             <span className="text-[10px] text-dark-muted font-bold uppercase">{s.symbol}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1 font-black text-signal-sell">
                                 <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
                                 <ArrowDownRight size={16}/>
                             </div>
                             <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const periodKey = title.includes('Week') ? 'week' : title.includes('Month') ? 'month' : title.includes('52') ? 'year' : 'ytd';
+                                    const key = `${s.symbol}_${periodKey}`;
+                                    if (explanations[key]) {
+                                        setExplModal(explanations[key]);
+                                    } else {
+                                        fetchMoveExplanation(s.symbol, periodKey, s.gain);
+                                    }
+                                }}
+                                title="Why did this move?"
+                                className="p-1 rounded-lg bg-dark-bg border border-signal-sell/20 hover:border-signal-sell hover:bg-signal-sell/10 transition-all flex items-center justify-center"
+                            >
+                                {loadingExpl[`${s.symbol}_${title.includes('Week') ? 'week' : title.includes('Month') ? 'month' : title.includes('52') ? 'year' : 'ytd'}`]
+                                    ? <Brain size={12} className="text-signal-sell animate-pulse" />
+                                    : explanations[`${s.symbol}_${title.includes('Week') ? 'week' : title.includes('Month') ? 'month' : title.includes('52') ? 'year' : 'ytd'}`]
+                                    ? <Sparkles size={12} className="text-signal-sell" />
+                                    : <Brain size={12} className="text-dark-muted" />
+                                }
+                            </button>
+                            <button
                                 onClick={(e) => { e.stopPropagation(); openAI(s.symbol, s.name || s.symbol, title, s.gain); }}
-                                className="p-1 rounded-lg text-dark-muted hover:text-signal-sell hover:bg-signal-sell/10 transition-all opacity-0 group-hover/row:opacity-100"
-                                title="Ask AI"
+                                className="p-1 rounded-lg text-dark-muted hover:text-signal-sell hover:bg-signal-sell/10 transition-all opacity-0 group-hover/row:opacity-100 flex items-center justify-center border border-transparent hover:border-signal-sell/40"
+                                title="Ask AI Chat"
                             >
                                 <Sparkles size={13}/>
                             </button>
@@ -473,6 +515,61 @@ const PerformancePage = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {explModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setExplModal(null)}>
+                <div className="bg-dark-card border border-dark-border rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                          explModal.sentiment === 'Bullish' ? 'bg-signal-buy/20 text-signal-buy' :
+                          explModal.sentiment === 'Bearish' ? 'bg-signal-sell/20 text-signal-sell' :
+                          'bg-signal-hold/20 text-signal-hold'
+                        }`}>{explModal.sentiment}</span>
+                        <span className="text-xs text-dark-muted font-mono">{explModal.symbol} · {explModal.period}</span>
+                      </div>
+                      <h3 className="text-base font-black text-white leading-snug">{explModal.headline}</h3>
+                    </div>
+                    <button onClick={() => setExplModal(null)} className="text-dark-muted hover:text-white p-1 shrink-0"><X size={18}/></button>
+                  </div>
+
+                  <p className="text-sm text-dark-text leading-relaxed mb-4">{explModal.explanation}</p>
+
+                  {explModal.catalysts?.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-[10px] font-black text-dark-muted uppercase tracking-widest mb-2">Key Catalysts</p>
+                      <div className="flex flex-wrap gap-2">
+                        {explModal.catalysts.map((c, i) => (
+                          <span key={i} className="px-2 py-1 bg-accent/10 border border-accent/20 rounded-full text-[11px] text-accent font-medium">{c}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {explModal.should_act && (
+                    <div className={`flex items-center justify-between p-3 rounded-xl border ${
+                      explModal.should_act.includes('Entry') ? 'bg-signal-buy/5 border-signal-buy/20' :
+                      explModal.should_act.includes('Exit')  ? 'bg-signal-sell/5 border-signal-sell/20' :
+                      'bg-dark-bg border-dark-border'
+                    }`}>
+                      <span className="text-xs text-dark-muted font-bold uppercase">AI Recommendation</span>
+                      <span className={`text-sm font-black ${
+                        explModal.should_act.includes('Entry') ? 'text-signal-buy' :
+                        explModal.should_act.includes('Exit')  ? 'text-signal-sell' : 'text-dark-text'
+                      }`}>{explModal.should_act}</span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => { setExplModal(null); navigate(`/stock/${explModal.symbol}`); }}
+                    className="w-full mt-4 py-2.5 bg-accent hover:bg-accent/80 text-white rounded-xl text-sm font-black transition-all"
+                  >
+                    Open Full Chart & AI Analysis →
+                  </button>
+                </div>
+              </div>
             )}
         </>
     );
