@@ -471,9 +471,10 @@ export default function DeepDive() {
 
   useEffect(() => {
     fetchData();
+    fetchPatterns();
     window.addEventListener('generate-insight', handleGenerateInsight);
     return () => window.removeEventListener('generate-insight', handleGenerateInsight);
-  }, [fetchData, symbol]);
+  }, [fetchData, fetchPatterns, symbol]);
 
   // Chart range filtering
   const [range, setRange] = useState('3M');
