@@ -1193,7 +1193,10 @@ export default function DeepDive() {
                             "Is this a good entry right now?",
                             "Identify key support and resistance",
                             "Explain the recent price move",
-                            `What's the risk/reward for next 3 months?`
+                            `What's the risk/reward for next 3 months?`,
+                            "Set an alert at key support level",
+                            "Set a stop loss alert for me",
+                            "Alert me at the breakout level",
                           ].map(prompt => (
                             <button
                               key={prompt}
