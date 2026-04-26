@@ -20,7 +20,7 @@ from backend.data.db import (
     get_db, SessionLocal,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
     PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
-    User, MoveExplanation
+    User, MoveExplanation, PriceAlert
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
@@ -1327,6 +1327,130 @@ async def handle_move_explanation(
     except Exception as e:
         logger.error(f"Move explanation endpoint error {symbol}/{period}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stock/{symbol}/alerts/ai")
+@limiter.limit("10/minute")
+async def create_ai_alert(
+    symbol: str,
+    request: Request,
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Parses user natural language request and creates AI-generated price alerts.
+    Payload: { message: str, context_data: dict }
+    """
+    symbol  = symbol.upper()
+    message = payload.get("message", "")
+    context = payload.get("context_data", {})
+
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required")
+
+    try:
+        result = await generate_alert_levels(
+            symbol=symbol,
+            user_message=message,
+            context_data=context,
+            user_id=current_user.id
+        )
+
+        created_alerts = []
+        for a in (result.get("alerts") or []):
+            price_level = a.get("price_level")
+            direction   = a.get("direction", "BELOW")
+            if not price_level:
+                continue
+
+            alert = PriceAlert(
+                user_id     = current_user.id,
+                symbol      = symbol,
+                alert_type  = a.get("alert_type", "CUSTOM"),
+                direction   = direction,
+                price_level = float(price_level),
+                label       = a.get("label"),
+                source      = "AI",
+                ai_rationale= a.get("rationale"),
+                is_active   = True,
+                is_triggered= False,
+            )
+            db.add(alert)
+            created_alerts.append({
+                "alert_type":  alert.alert_type,
+                "direction":   alert.direction,
+                "price_level": alert.price_level,
+                "label":       alert.label,
+                "rationale":   alert.ai_rationale,
+            })
+
+        await db.commit()
+
+        return {
+            "reply":   result.get("reply", f"{len(created_alerts)} alert(s) set for {symbol}."),
+            "alerts":  created_alerts,
+            "count":   len(created_alerts),
+        }
+
+    except Exception as e:
+        logger.error(f"AI alert creation error {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/alerts")
+@limiter.limit("20/minute")
+async def get_user_alerts(
+    request: Request,
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Returns all alerts for the current user."""
+    stmt = select(PriceAlert).where(PriceAlert.user_id == current_user.id)
+    if active_only:
+        stmt = stmt.where(PriceAlert.is_active == True)
+    stmt = stmt.order_by(PriceAlert.created_at.desc())
+    result = await db.execute(stmt)
+    alerts = result.scalars().all()
+
+    return [{
+        "id":            a.id,
+        "symbol":        a.symbol,
+        "alert_type":    a.alert_type,
+        "direction":     a.direction,
+        "price_level":   a.price_level,
+        "label":         a.label,
+        "source":        a.source,
+        "ai_rationale":  a.ai_rationale,
+        "is_active":     a.is_active,
+        "is_triggered":  a.is_triggered,
+        "triggered_at":  a.triggered_at.isoformat() if a.triggered_at else None,
+        "triggered_price": a.triggered_price,
+        "created_at":    a.created_at.isoformat(),
+    } for a in alerts]
+
+
+@app.delete("/api/alerts/{alert_id}")
+@limiter.limit("20/minute")
+async def delete_alert(
+    alert_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Deletes (deactivates) an alert. Only owner can delete."""
+    result = await db.execute(
+        select(PriceAlert).where(
+            and_(PriceAlert.id == alert_id, PriceAlert.user_id == current_user.id)
+        )
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.is_active = False
+    await db.commit()
+    return {"deleted": True, "id": alert_id}
 
 
 @app.get("/api/ai-logs")
