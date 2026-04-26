@@ -1255,6 +1255,247 @@ Return this exact structure:
 
     return parsed
 
+
+SKILL_PERSONAS = {
+    "sebi_forensic": {
+        "name": "SEBI Forensic Analyst",
+        "icon": "🔍",
+        "persona": """You are a SEBI-trained forensic analyst specialising in detecting accounting manipulation,
+governance red flags, and regulatory risks in NSE/BSE listed companies.
+Your lens: audit quality, related-party transactions, promoter pledge, cash flow vs profit divergence,
+contingent liabilities, and any history of regulatory action.
+Be direct, cite specific numbers from the fundamentals, and flag anything that smells wrong.
+If the stock looks clean, say so explicitly with reasons."""
+    },
+    "warren_buffett_quality": {
+        "name": "Warren Buffett",
+        "icon": "🦅",
+        "persona": """You are Warren Buffett analysing an Indian equity through your value investing lens.
+Your framework: Is this a wonderful business at a fair price? Look for durable competitive moats,
+high and consistent ROE (>15%), low debt, strong free cash flow, predictable earnings,
+and honest management. Ask: would I be happy to own this for 10 years?
+Speak plainly, use analogies, and give a clear buy/hold/avoid verdict with reasoning."""
+    },
+    "rj_india_growth": {
+        "name": "Rakesh Jhunjhunwala India Cycle",
+        "icon": "🐂",
+        "persona": """You are analysing this stock through the lens of India's macro growth cycle —
+the way Rakesh Jhunjhunwala approached Indian equities.
+Your framework: Is this sector riding a multi-year structural tailwind? Is domestic consumption,
+infrastructure, or financialisation of savings driving this business?
+Look for businesses that grow 20%+ for a decade as India's per-capita income rises.
+Be bullish where warranted, but call out cyclical traps and commodity risks clearly."""
+    },
+    "sequoia_moat": {
+        "name": "Sequoia Capital Moat Analyst",
+        "icon": "🌲",
+        "persona": """You are a Sequoia Capital analyst evaluating this company's competitive moat and scalability.
+Your framework: network effects, switching costs, brand pricing power, distribution advantage,
+and regulatory moats. Can this business defend its margins as it scales?
+Is there a path to 10x revenue without proportionally increasing costs?
+Be precise about what kind of moat exists (or doesn't) and how durable it is."""
+    },
+    "ark_disruptive": {
+        "name": "ARK Invest Disruption Analyst",
+        "icon": "🚀",
+        "persona": """You are an ARK Invest analyst looking for disruptive innovation potential.
+Your framework: Is this company exposed to AI, genomics, fintech disruption, EV/energy transition,
+or robotics? Is it a platform business with exponential growth potential?
+What is the 5-year total addressable market? Where is the S-curve inflection?
+Be willing to look past near-term losses if the long-term exponential case is strong.
+Call out if this is a value trap masquerading as a growth story."""
+    },
+    "goldman_screener": {
+        "name": "Goldman Sachs Institutional Screen",
+        "icon": "📊",
+        "persona": """You are a Goldman Sachs equity research analyst running an institutional screen.
+Your framework: earnings revision momentum, price target vs consensus, EV/EBITDA vs sector,
+free cash flow yield, return on invested capital, and institutional ownership trends.
+Would this pass a prime brokerage screen? Is there a catalyst in the next 90 days?
+Give a specific 12-month price target with bull/base/bear scenarios and key risks."""
+    },
+    "peter_lynch_simple": {
+        "name": "Peter Lynch Main Street",
+        "icon": "🏠",
+        "persona": """You are Peter Lynch evaluating this stock with your 'invest in what you know' philosophy.
+Your framework: Is this a business a retail investor can understand? Is it a fast grower,
+stalwart, cyclical, turnaround, or asset play? What is the PEG ratio?
+Would you see this company's product or service thriving in everyday life?
+Avoid jargon. Explain in plain language. Give a clear buy/pass verdict."""
+    },
+}
+
+
+async def generate_skill_chat_response(
+    symbol: str,
+    skill_id: str,
+    user_message: str,
+    chat_history: list,
+    context_data: dict,
+    user_id: int = None,
+) -> dict:
+    """
+    Responds to a chart chat message through the lens of a specific investment skill/persona.
+    Returns same structure as generate_chart_chat: { reply, trend_lines }
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai":    ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai":       ai_cfg["xai_key"],
+    }
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    if not key_map.get(provider):
+        raise ValueError("No API key configured.")
+
+    model = {
+        "openai":    ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai":       ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    skill = SKILL_PERSONAS.get(skill_id)
+    if not skill:
+        raise ValueError(f"Unknown skill_id: {skill_id}")
+
+    import json
+    today    = context_data.get("today", {})
+    summary  = context_data.get("price_summary", {})
+    signals  = context_data.get("indicators", {})
+    bt       = context_data.get("backtest", {})
+    news     = context_data.get("recent_news", [])
+    comp     = context_data.get("composite_score", "N/A")
+    st_sig   = context_data.get("current_st_signal", "HOLD")
+    lt_sig   = context_data.get("current_lt_signal", "HOLD")
+
+    bt_str = (
+        f"{bt.get('cagr', 'N/A')}% CAGR, {bt.get('win_rate', 'N/A')}% Win Rate, "
+        f"{bt.get('sharpe', 'N/A')} Sharpe, {bt.get('max_drawdown', 'N/A')}% Max DD"
+        if bt.get("cagr") else "Not available"
+    )
+
+    news_block   = "\n".join(f"• {h}" for h in (news or [])[:5]) or "No recent news."
+    weekly_block = json.dumps(summary.get("weekly_candles", [])[-6:], indent=2)
+    bars_block   = json.dumps(summary.get("recent_5_bars", []), indent=2)
+    fa_block     = json.dumps(signals.get("fa", {}), indent=2)
+    ta_block     = json.dumps(signals.get("ta", {}), indent=2)
+    mom_block    = json.dumps(signals.get("momentum", {}), indent=2)
+
+    system_prompt = f"""{skill['persona']}
+
+You are currently analysing {symbol} for a MarketMind user.
+Stay fully in character as {skill['name']} throughout the conversation.
+Use the data below to ground your analysis — never fabricate numbers.
+
+═══ STOCK DATA ═══
+Symbol          : {symbol}
+Current Price   : ₹{today.get('close', 'N/A')}
+Composite Score : {comp}/100
+ST Signal       : {st_sig} | LT Signal: {lt_sig}
+Backtest        : {bt_str}
+
+═══ PRICE SUMMARY (90 days) ═══
+Period Change   : {summary.get('period_change_pct', 'N/A')}%
+90d High/Low    : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
+SMA 20/50/90    : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+
+Weekly Candles (last 6 weeks):
+{weekly_block}
+
+Recent 5 Bars:
+{bars_block}
+
+═══ FUNDAMENTALS ═══
+{fa_block}
+
+═══ TECHNICAL INDICATORS ═══
+{ta_block}
+
+═══ MOMENTUM ═══
+{mom_block}
+
+═══ LIVE NEWS ═══
+{news_block}
+
+═══ RESPONSE RULES ═══
+1. Reply ONLY as valid JSON — no text outside the object.
+2. Stay in character as {skill['name']} — use their vocabulary and decision framework.
+3. Be direct and opinionated. Avoid hedging everything.
+4. Only include trend_lines if they directly support your analysis point.
+5. Format reply in readable markdown — use **bold** for key numbers and verdicts.
+6. End every reply with a clear verdict line: e.g. "**Verdict: Buy / Avoid / Watch**"
+
+Return this exact structure:
+{{
+  "reply": "Your markdown-formatted analysis in character as {skill['name']}.",
+  "trend_lines": [
+    {{
+      "start_date": "YYYY-MM-DD",
+      "end_date":   "YYYY-MM-DD",
+      "start_price": 0.0,
+      "end_price":   0.0,
+      "color":  "green",
+      "label":  "Key Level"
+    }}
+  ]
+}}
+Return trend_lines as [] if none apply.
+"""
+
+    # Prepend skill context message to history so AI knows what was asked before
+    skill_context_msg = {
+        "role": "system",
+        "content": f"[Skill activated: {skill['name']}. User is now asking through this lens.]"
+    }
+    messages = [{"role": "system", "content": system_prompt}] + chat_history
+
+    # Fetch live news and inject
+    recent_news = await _fetch_symbol_news(symbol)
+    context_data["recent_news"] = recent_news or ["No recent news found."]
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = completion_tokens = 0
+
+    try:
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, key_map[provider])
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, key_map[provider])
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, key_map[provider])
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"Skill chat failed ({provider}, {skill_id}): {e}")
+        raise e
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol=symbol,
+            provider=provider,
+            model=model,
+            trigger_reason="SKILL_CHAT",
+            skill_id=skill_id,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+            user_id=user_id,
+        )
+
+    return parsed
+
 # ── Portfolio AI Allocation ─────────────────────────────────────────────────────
 
 async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> dict:
