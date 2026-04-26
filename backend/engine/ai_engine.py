@@ -993,6 +993,142 @@ Return this exact structure:
 
     return parsed
 
+
+async def generate_move_explanation(
+    symbol: str,
+    period: str,
+    gain_pct: float,
+    context_data: dict,
+    user_id: int = None
+) -> dict:
+    """
+    Generates a plain-English explanation for why a stock moved X% in a given period.
+    Returns: { headline, explanation, catalysts, sentiment }
+    Called on-demand from the performance cards — result cached in MoveExplanation table.
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai":    ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai":       ai_cfg["xai_key"],
+    }
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    if not key_map.get(provider):
+        raise ValueError("No API key configured.")
+
+    model = {
+        "openai":    ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai":       ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    # Fetch live news for context
+    recent_news = await _fetch_symbol_news(symbol)
+    news_block  = "\n".join(f"• {h}" for h in (recent_news or [])[:6]) or "No recent news found."
+
+    import json
+    summary  = context_data.get("price_summary", {})
+    signals  = context_data.get("indicators", {})
+    comp     = context_data.get("composite_score", "N/A")
+    st_sig   = context_data.get("current_st_signal", "HOLD")
+    lt_sig   = context_data.get("current_lt_signal", "HOLD")
+
+    period_label = {
+        "week":  "this week",
+        "month": "this month",
+        "year":  "last 52 weeks",
+        "ytd":   "year to date",
+    }.get(period, period)
+
+    direction = "up" if gain_pct >= 0 else "down"
+
+    system_prompt = f"""You are MarketMind's market analyst for NSE/BSE Indian equities.
+Your job is to explain in plain English why a stock has moved significantly.
+Be specific, cite real data, and avoid generic statements.
+
+═══ STOCK ═══
+Symbol        : {symbol}
+Move          : {'+' if gain_pct >= 0 else ''}{gain_pct:.2f}% {direction} {period_label}
+Composite Score: {comp}/100
+ST Signal     : {st_sig} | LT Signal: {lt_sig}
+
+═══ PRICE CONTEXT ═══
+Period change : {summary.get('period_change_pct', 'N/A')}%
+90d High/Low  : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
+SMA 20/50/90  : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+Current Price : ₹{context_data.get('today', {}).get('close', 'N/A')}
+
+═══ LIVE NEWS ═══
+{news_block}
+
+═══ RULES ═══
+1. Reply ONLY as valid JSON — no text outside the object.
+2. headline: one punchy line (max 12 words) explaining the move.
+3. explanation: 2-3 sentences — cite specific catalysts (earnings, FII flows, sector rotation, news).
+   If the move appears purely technical with no news, say so explicitly.
+4. catalysts: array of 2-4 short strings, each a distinct reason.
+5. sentiment: "Bullish", "Bearish", or "Neutral" based on the overall picture.
+6. should_act: one of "Consider Entry", "Consider Exit", "Hold", "Watch" — your honest recommendation.
+7. Never fabricate specific numbers not present in the data.
+
+Return this exact structure:
+{{
+  "headline": "Short punchy explanation of the move",
+  "explanation": "2-3 sentence detailed explanation citing specific catalysts.",
+  "catalysts": ["Catalyst 1", "Catalyst 2", "Catalyst 3"],
+  "sentiment": "Bullish",
+  "should_act": "Consider Entry"
+}}
+"""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": f"Why has {symbol} moved {'+' if gain_pct >= 0 else ''}{gain_pct:.2f}% {period_label}? Give me the real reasons."}
+    ]
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = completion_tokens = 0
+
+    try:
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, key_map[provider])
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, key_map[provider])
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, key_map[provider])
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"Move explanation failed ({provider}): {e}")
+        raise e
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol=symbol,
+            provider=provider,
+            model=model,
+            trigger_reason="MOVE_EXPLANATION",
+            skill_id=None,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+            user_id=user_id,
+        )
+
+    return parsed
+
 # ── Portfolio AI Allocation ─────────────────────────────────────────────────────
 
 async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> dict:
