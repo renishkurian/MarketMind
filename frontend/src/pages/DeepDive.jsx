@@ -10,7 +10,8 @@ import {
   Flame,
   Zap,
   Star,
-  Database
+  Database,
+  Bell, BellRing
 } from 'lucide-react';
 import HistoricalPricesTable from '../components/HistoricalPricesTable';
 
@@ -494,6 +495,8 @@ export default function DeepDive() {
   const [activeChatSessionId, setActiveChatSessionId] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [stockAlerts, setStockAlerts]   = useState([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
   const [activeTrendLines, setActiveTrendLines] = useState([]);
   const [activePriceTarget, setActivePriceTarget] = useState(null);
   const [patterns, setPatterns]               = useState([]);
@@ -634,6 +637,77 @@ export default function DeepDive() {
     } finally {
       setChatLoading(false);
     }
+  };
+
+  const fetchStockAlerts = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/alerts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const all = await res.json();
+        setStockAlerts(all.filter(a => a.symbol === symbol && a.is_active && !a.is_triggered));
+      }
+    } catch (e) { console.warn('Alerts fetch failed:', e); }
+  }, [symbol]);
+
+  const createAIAlert = async (message) => {
+    if (!message.trim()) return;
+    setAlertsLoading(true);
+    try {
+      const token = localStorage.getItem('mm_token');
+      const currentSession = chatSessions.find(s => s.id === activeChatSessionId);
+      const contextData = {
+        composite_score: sig?.composite_score,
+        current_st_signal: sig?.st_signal,
+        current_lt_signal: sig?.lt_signal,
+        today: { close: sig?.current_price },
+        price_summary: {
+          sma_20: sig?.ta_breakdown?.sma20,
+          sma_50: sig?.ta_breakdown?.sma50,
+          "90d_high": Math.max(...(filteredHistory.map(d => d.high) || [0])),
+          "90d_low":  Math.min(...(filteredHistory.map(d => d.low)  || [0])),
+          recent_5_bars: filteredHistory.slice(-5),
+        }
+      };
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/alerts/ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ message, context_data: contextData })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`${data.count} alert(s) set for ${symbol}`);
+        fetchStockAlerts();
+        // Echo the AI reply into the chat
+        if (data.reply && activeChatSessionId) {
+          const currentMsgs = currentSession?.messages || [];
+          updateSession(activeChatSessionId, [
+            ...currentMsgs,
+            { role: 'assistant', content: `🔔 ${data.reply}\n\n${data.alerts?.map(a => `• **${a.label}** — ₹${a.price_level?.toFixed(2)} (${a.direction})`).join('\n')}` }
+          ]);
+        }
+      } else {
+        toast.error('Failed to set alert');
+      }
+    } catch (e) {
+      toast.error('Alert creation failed');
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
+  const deleteAlert = async (alertId) => {
+    try {
+      const token = localStorage.getItem('mm_token');
+      await fetch(`${API_URL}/api/alerts/${alertId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setStockAlerts(prev => prev.filter(a => a.id !== alertId));
+      toast.success('Alert removed');
+    } catch (e) { toast.error('Failed to remove alert'); }
   };
 
   const toggleChat = () => {
