@@ -1496,6 +1496,147 @@ Return trend_lines as [] if none apply.
 
     return parsed
 
+
+async def generate_yearly_risk_explainer(
+    year: int,
+    portfolio_return: float,
+    nifty_return: float,
+    alpha: float,
+    holdings_context: list,
+    macro_context: dict,
+    user_id: int = None,
+) -> dict:
+    """
+    Generates a plain-English explanation of what drove portfolio performance
+    in a specific calendar year — winners, losers, macro context, and lessons.
+    Returns: { headline, what_worked, what_didnt, macro_drivers, lesson, sentiment }
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai":    ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai":       ai_cfg["xai_key"],
+    }
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    if not key_map.get(provider):
+        raise ValueError("No API key configured.")
+
+    model = {
+        "openai":    ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai":       ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    import json
+
+    direction       = "gained" if portfolio_return >= 0 else "lost"
+    vs_nifty        = "outperformed" if alpha >= 0 else "underperformed"
+    alpha_abs       = abs(alpha)
+    holdings_block  = json.dumps(holdings_context, indent=2) if holdings_context else "Not available"
+    macro_block     = json.dumps(macro_context, indent=2)    if macro_context    else "Not available"
+
+    # Build known macro events per year for grounding
+    known_macro = {
+        2020: "COVID-19 crash (Mar), V-shaped recovery (Apr-Dec), RBI emergency rate cuts, FII selling followed by DII buying",
+        2021: "Vaccine rally, Nifty +24%, mid/small-cap euphoria, crypto boom, global liquidity surge",
+        2022: "Russia-Ukraine war, FII outflows of ₹1.2L cr, RBI rate hikes 250bps, Nifty flat, IT sector selloff",
+        2023: "Nifty +20%, domestic flows strong, Adani crisis (Jan-Feb), PSU re-rating, capex theme",
+        2024: "Election rally, FII volatility, rate cut expectations, China stimulus impact on FII allocation",
+        2025: "Global uncertainty, US tariff concerns, Nifty correction from highs, IT headwinds",
+        2026: "Current year — partial data only",
+    }.get(year, "No specific macro context available for this year.")
+
+    system_prompt = f"""You are MarketMind's senior portfolio analyst explaining annual performance to a retail investor.
+Your job is to tell the story of what happened to their portfolio in {year} — clearly, honestly, and specifically.
+Use plain English. Avoid jargon. Be direct about what went right and wrong.
+
+═══ PERFORMANCE DATA ═══
+Year              : {year}
+Portfolio Return  : {'+' if portfolio_return >= 0 else ''}{portfolio_return:.2f}%
+Nifty 50 Return   : {'+' if nifty_return >= 0 else ''}{nifty_return:.2f}%
+Alpha             : {'+' if alpha >= 0 else ''}{alpha:.2f}% ({vs_nifty} Nifty by {alpha_abs:.2f}%)
+
+═══ PORTFOLIO HOLDINGS CONTEXT ═══
+{holdings_block}
+
+═══ MACRO EVENTS ({year}) ═══
+Known events: {known_macro}
+Additional context: {macro_block}
+
+═══ RULES ═══
+1. Reply ONLY as valid JSON — no text outside the object.
+2. headline: one punchy sentence summarising the year (max 15 words).
+3. what_worked: 2-3 sentences on what drove gains — cite specific sectors or holdings if available.
+4. what_didnt: 2-3 sentences on what dragged returns — be honest, cite specific reasons.
+   If portfolio outperformed strongly, this section explains what could have been even better.
+5. macro_drivers: 2-3 sentences on the macro backdrop and how it affected the portfolio.
+   Ground this in the known macro events above — do not fabricate events.
+6. lesson: one actionable takeaway from this year's performance.
+7. sentiment: "Strong" | "Good" | "Mixed" | "Tough" | "Difficult"
+   based on absolute return AND alpha combined.
+8. risk_flags: array of 0-3 short strings flagging concentration/timing risks visible in the data.
+   Empty array if none.
+
+Return this exact structure:
+{{
+  "headline": "One punchy sentence about {year}",
+  "what_worked": "What drove the gains...",
+  "what_didnt": "What dragged returns or could have been better...",
+  "macro_drivers": "The macro backdrop and its effect...",
+  "lesson": "One actionable takeaway.",
+  "sentiment": "Strong",
+  "risk_flags": ["Risk 1", "Risk 2"]
+}}
+"""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": f"Explain my portfolio's {year} performance: {'+' if portfolio_return >= 0 else ''}{portfolio_return:.2f}% vs Nifty {'+' if nifty_return >= 0 else ''}{nifty_return:.2f}%. What happened and what should I learn?"}
+    ]
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = completion_tokens = 0
+
+    try:
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, key_map[provider])
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, key_map[provider])
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, key_map[provider])
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"Yearly explainer failed ({provider}): {e}")
+        raise e
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol="PORTFOLIO",
+            provider=provider,
+            model=model,
+            trigger_reason="YEARLY_EXPLAINER",
+            skill_id=None,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+            user_id=user_id,
+        )
+
+    return parsed
+
 # ── Portfolio AI Allocation ─────────────────────────────────────────────────────
 
 async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> dict:
