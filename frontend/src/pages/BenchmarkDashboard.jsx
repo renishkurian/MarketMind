@@ -78,6 +78,33 @@ const BenchmarkDashboard = () => {
       if (!res.data.error) setSectorData(res.data);
     } catch (e) { console.error(e); }
     finally { setSectorLoading(false); }
+  const fetchYearlyExplainer = async (year, portfolioReturn, niftyReturn, alpha) => {
+    if (explainerLoading === year) return;
+    setExplainerLoading(year);
+    try {
+      const token = localStorage.getItem('mm_token');
+      const params = new URLSearchParams({
+        year,
+        portfolio_return: portfolioReturn,
+        nifty_return:     niftyReturn,
+        alpha,
+      });
+      const res = await fetch(
+        `${API_URL}/api/portfolio-performance/yearly-explainer?${params}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setYearlyExplainer(data);
+        setExplainerModal(true);
+      } else {
+        toast.error('Failed to load year analysis');
+      }
+    } catch (e) {
+      toast.error('Connection error');
+    } finally {
+      setExplainerLoading(null);
+    }
   };
 
   const handleRegenerate = () => {
