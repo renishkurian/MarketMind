@@ -602,7 +602,9 @@ class PerformanceEngine:
             c_res = await self.db.execute(c_stmt)
             cache = c_res.scalar_one_or_none()
             if cache:
-                return cache.data
+                age = (dt.datetime.utcnow() - cache.updated_at).total_seconds()
+                if age < 14400:  # 4 hour TTL
+                    return cache.data
 
         # ... (Rest of calculation starts here)
         # A. Fetch Portfolio
