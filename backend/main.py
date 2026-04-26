@@ -26,7 +26,7 @@ from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
 from backend.config import settings
 from backend.api import analysis
-from backend.engine.ai_engine import generate_portfolio_allocation, generate_chart_chat, generate_pattern_recognition, generate_move_explanation, generate_alert_levels, generate_skill_chat_response
+from backend.engine.ai_engine import generate_portfolio_allocation, generate_chart_chat, generate_pattern_recognition, generate_move_explanation, generate_alert_levels, generate_skill_chat_response, generate_yearly_risk_explainer
 from backend.engine.allocation_engine import calculate_allocation
 from backend.features.portfolio import performance_routes
 
