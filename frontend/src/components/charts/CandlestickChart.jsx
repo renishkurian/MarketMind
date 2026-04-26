@@ -16,8 +16,8 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const trendSeriesRef = useRef([]);
-  const sma20Ref = useRef(null);
-  const sma50Ref = useRef(null);
+  const sma20Ref  = useRef(null);
+  const sma50Ref  = useRef(null);
   const sma200Ref = useRef(null);
 
   // ── Init chart ONCE on mount ──────────────────────────────────────────────
