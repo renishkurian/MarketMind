@@ -1118,9 +1118,9 @@ export default function DeepDive() {
                       
                       {/* Header */}
                       <div className="p-3 border-b border-dark-border bg-dark-bg flex items-center gap-2 shrink-0">
-                        <Brain size={15} className="text-accent" />
+                        <span className="text-sm">{activeSkill ? activeSkill.icon : '🧠'}</span>
                         <span className="font-bold text-accent text-sm flex-1 truncate">
-                          {activeSession?.title || 'Chart Intelligence'}
+                          {activeSkill ? activeSkill.name : (activeSession?.title || 'Chart Intelligence')}
                         </span>
                         <div className="flex items-center gap-1">
                           {/* New Chat */}
