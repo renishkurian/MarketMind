@@ -34,6 +34,7 @@ const NAV_SECTIONS = [
     label: 'System',
     items: [
       { path: '/ai-logs',       label: 'AI Logs',       Icon: LayoutDashboard },
+      { path: '/marketmind_user_guide.html', label: 'User Doc', Icon: Info, external: true },
       { path: '/methodology',   label: 'Methodology',   Icon: Info       },
       { path: '/settings',      label: 'Settings',      Icon: Settings   },
     ]
@@ -124,21 +125,34 @@ export default function Layout({ children }) {
                 <p className="px-4 mb-3 text-[10px] font-black text-dark-muted/50 uppercase tracking-[0.2em]">
                    {section.label}
                 </p>
-                {section.items.map(({ path, label, Icon }) => (
-                  <NavLink
-                    key={path}
-                    to={path}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
-                        isActive
-                          ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                          : 'text-dark-muted hover:bg-accent/10 hover:text-accent'
-                      }`
-                    }
-                  >
-                    <Icon size={18} className="shrink-0 transition-transform group-hover:scale-110" />
-                    <span>{label}</span>
-                  </NavLink>
+                {section.items.map(({ path, label, Icon, external }) => (
+                  external ? (
+                    <a
+                      key={path}
+                      href={path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group text-dark-muted hover:bg-accent/10 hover:text-accent"
+                    >
+                      <Icon size={18} className="shrink-0 transition-transform group-hover:scale-110" />
+                      <span>{label}</span>
+                    </a>
+                  ) : (
+                    <NavLink
+                      key={path}
+                      to={path}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
+                          isActive
+                            ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                            : 'text-dark-muted hover:bg-accent/10 hover:text-accent'
+                        }`
+                      }
+                    >
+                      <Icon size={18} className="shrink-0 transition-transform group-hover:scale-110" />
+                      <span>{label}</span>
+                    </NavLink>
+                  )
                 ))}
               </div>
             ))}

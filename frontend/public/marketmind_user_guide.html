@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketMind AI Features</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0A0E1A;
+            --card: #111827;
+            --border: #1F2937;
+            --text: #F9FAFB;
+            --muted: #6B7280;
+            --accent: #3B82F6;
+            --buy: #10B981;
+            --hold: #F59E0B;
+            --sell: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 800;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background-color: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 50;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-weight: 700;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 16px;
+            height: 16px;
+            background-color: var(--accent);
+            border-radius: 4px;
+        }
+
+        .nav-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .nav-pill {
+            background-color: transparent;
+            border: none;
+            color: var(--muted);
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .nav-pill:hover {
+            color: var(--text);
+            background-color: var(--card);
+        }
+
+        /* Hero */
+        .hero {
+            margin-top: 56px;
+            padding: 80px 24px;
+            text-align: center;
+            background-color: var(--bg);
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-style: italic;
+            margin-bottom: 16px;
+            line-height: 1.2;
+            color: var(--text);
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--muted);
+            margin-bottom: 32px;
+        }
+
+        .hero-tags {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .hero-tag {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            padding: 4px 16px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--muted);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 24px 80px;
+        }
+
+        /* Table */
+        .overview-table-wrapper {
+            margin-bottom: 80px;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            background-color: var(--card);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--muted);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        td {
+            font-size: 15px;
+            color: var(--text);
+        }
+
+        .td-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: var(--accent);
+            width: 50px;
+        }
+
+        .td-feature {
+            font-weight: 600;
+        }
+
+        .td-where {
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        /* Feature Section */
+        .feature-section {
+            margin-bottom: 80px;
+            position: relative;
+            scroll-margin-top: 80px;
+        }
+
+        .section-accent-bar {
+            width: 40px;
+            height: 4px;
+            border-radius: 9999px;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 28px;
+            margin-bottom: 24px;
+        }
+
+        /* Where Box */
+        .where-box {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 24px;
+            margin-bottom: 24px;
+            font-size: 15px;
+        }
+
+        .where-line {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+        .where-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .label {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            width: 60px;
+            flex-shrink: 0;
+        }
+
+        .where-content {
+            color: var(--text);
+        }
+
+        /* Steps Box */
+        .steps-box {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .steps-box ol {
+            padding-left: 20px;
+            color: var(--text);
+            font-size: 15px;
+        }
+
+        .steps-box li {
+            margin-bottom: 8px;
+            padding-left: 8px;
+        }
+        
+        .steps-box li:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Chips */
+        .chips-section {
+            margin-bottom: 32px;
+        }
+
+        .chips-label, .prompts-label {
+            font-weight: 700;
+            margin-bottom: 16px;
+            font-size: 16px;
+            color: var(--text);
+        }
+
+        .chip-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 13px;
+        }
+
+        /* Prompts */
+        .prompts-section {
+            margin-bottom: 32px;
+        }
+
+        .prompt-card {
+            background-color: #172033; /* Slightly lighter/different dark for code cards */
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 20px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .prompt-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .prompt-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .prompt-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text);
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding-right: 80px;
+            line-height: 1.6;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 0.5rem;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--muted);
+        }
+
+        /* Warning Box */
+        .warning-box {
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 1rem;
+            padding: 20px;
+            margin-bottom: 24px;
+            color: #fbbf24;
+            display: flex;
+            gap: 12px;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+
+        .warning-box strong {
+            color: #fbbf24;
+            font-weight: 800;
+        }
+
+        /* Persona Tabs */
+        .persona-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .persona-tab {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .persona-tab:hover {
+            border-color: var(--muted);
+            color: var(--text);
+        }
+
+        .persona-tab.active {
+            background-color: rgba(168, 85, 247, 0.1);
+            border-color: rgba(168, 85, 247, 0.3);
+            color: #A855F7;
+        }
+
+        .persona-content {
+            display: none;
+        }
+
+        .persona-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        .list-section {
+            margin-bottom: 32px;
+        }
+        
+        .list-section h4 {
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .list-section ul {
+            padding-left: 20px;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.8;
+        }
+        
+        .list-section ul li span {
+            color: var(--text);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Back to top */
+        #back-to-top {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            z-index: 100;
+        }
+
+        #back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #back-to-top svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                height: auto;
+                padding: 16px;
+                gap: 16px;
+                align-items: flex-start;
+            }
+            .hero {
+                margin-top: 100px;
+                padding: 40px 16px;
+            }
+            .hero h1 {
+                font-size: 32px;
+            }
+            td, th {
+                white-space: nowrap;
+            }
+            .prompt-text {
+                padding-right: 0;
+                margin-bottom: 40px;
+            }
+            .copy-btn {
+                top: auto;
+                bottom: 20px;
+                right: 20px;
+            }
+            .where-line {
+                flex-direction: column;
+                margin-bottom: 12px;
+            }
+            .label {
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="logo">
+            <div class="logo-icon"></div>
+            MarketMind
+        </a>
+        <div class="nav-pills">
+            <button class="nav-pill" data-target="f1">F1</button>
+            <button class="nav-pill" data-target="f2">F2</button>
+            <button class="nav-pill" data-target="f3">F3</button>
+            <button class="nav-pill" data-target="f4">F4</button>
+            <button class="nav-pill" data-target="f5">F5</button>
+            <button class="nav-pill" data-target="f6">F6</button>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>MarketMind AI Features</h1>
+        <p>6 AI-powered tools for serious Indian equity investors</p>
+        <div class="hero-tags">
+            <span class="hero-tag">FastAPI</span>
+            <span class="hero-tag">React</span>
+            <span class="hero-tag">NSE/BSE</span>
+            <span class="hero-tag">Raspberry Pi</span>
+        </div>
+    </section>
+
+    <div class="container">
+        
+        <div class="overview-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="td-id">#</th>
+                        <th class="td-feature">Feature</th>
+                        <th class="td-where">Where to find it</th>
+                        <th>What it does</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="td-id">F1</td>
+                        <td class="td-feature">AI Price Target</td>
+                        <td class="td-where">Stock DeepDive → Chat panel</td>
+                        <td>AI plots a confidence-band target range directly on the candlestick chart</td>
+                    </tr>
+                    <tr>
+                        <td class="td-id">F2</td>
+                        <td class="td-feature">Pattern Recognition</td>
+                        <td class="td-where">Stock DeepDive → Chart header badges</td>
+                        <td>Auto-detects 18 classical chart patterns on every page load</td>
+                    </tr>
+                    <tr>
+                        <td class="td-id">F3</td>
+                        <td class="td-feature">Move Explanation</td>
+                        <td class="td-where">Portfolio Performance Center → ⚡ button</td>
+                        <td>Explains why a stock moved X% with live news + catalyst chips</td>
+                    </tr>
+                    <tr>
+                        <td class="td-id">F4</td>
+                        <td class="td-feature">AI Price Alerts</td>
+                        <td class="td-where">Stock DeepDive → Chat panel</td>
+                        <td>Set price alerts in plain English — AI picks the exact price level</td>
+                    </tr>
+                    <tr>
+                        <td class="td-id">F5</td>
+                        <td class="td-feature">Expert Skill Chat</td>
+                        <td class="td-where">Stock DeepDive → Chat header 🎭 icon</td>
+                        <td>Analyses the stock through 7 legendary investor lenses</td>
+                    </tr>
+                    <tr>
+                        <td class="td-id">F6</td>
+                        <td class="td-feature">Yearly Risk Explainer</td>
+                        <td class="td-where">Benchmark Dashboard → "Why this year?" button</td>
+                        <td>Explains what drove your portfolio return each calendar year</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- F1 -->
+        <section id="f1" class="feature-section">
+            <div class="section-accent-bar" style="background-color: var(--accent);"></div>
+            <h2 class="section-title">F1 — AI Price Target with Confidence Band</h2>
+            
+            <div class="where-box">
+                <div class="where-line">
+                    <span class="label">WHERE</span>
+                    <span class="where-content">Stock DeepDive → Chat panel (right side of chart)</span>
+                </div>
+                <div class="where-line">
+                    <span class="label">HOW</span>
+                    <span class="where-content">AI responds with analysis AND auto-plots a shaded confidence band on the candlestick chart. No extra clicks. Band shows Confidence Low (green) and Confidence High (red) as separate series. Look for "AI Target" in the chart legend.</span>
+                </div>
+            </div>
+
+            <div class="steps-box">
+                <ol>
+                    <li>Open any stock page — e.g. navigate to <code>/stock/RELIANCE</code></li>
+                    <li>Find the chat panel on the right side of the chart</li>
+                    <li>Click "New Chat" if no session is active</li>
+                    <li>Type any message asking for a price target or chart analysis</li>
+                    <li>AI replies with analysis AND automatically plots a shaded band on the chart</li>
+                    <li>The target band shows Confidence Low (green) and Confidence High (red) price levels</li>
+                    <li>Ask follow-up questions — the band updates with each new target suggestion</li>
+                </ol>
+            </div>
+
+            <div class="chips-section">
+                <p class="chips-label">Chips already in the UI:</p>
+                <div class="chip-row">
+                    <span class="chip">Is this a good entry right now?</span>
+                    <span class="chip">Identify key support and resistance</span>
+                    <span class="chip">Explain the recent price move</span>
+                    <span class="chip">What's the risk/reward for next 3 months?</span>
+                    <span class="chip">Set an alert at key support level</span>
+                    <span class="chip">Set a stop loss alert for me</span>
+                    <span class="chip">Alert me at the breakout level</span>
+                </div>
+            </div>
+
+            <div class="prompts-section">
+                <p class="prompts-label">Anti-Gravity prompts — paste into chat:</p>
+                <div class="prompt-card">
+                    <div class="prompt-label">Basic price target</div>
+                    <div class="prompt-text">Based on the current chart and indicators, what is your price target for this stock over the next 3 months? Give me a confidence range.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Entry + upside target</div>
+                    <div class="prompt-text">What is a realistic buy target and a 6-month upside target for this stock? Plot the range on the chart.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Bull vs bear target</div>
+                    <div class="prompt-text">Give me a bull-case target and a bear-case support level based on the technicals. I want to see both on the chart.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Institutional target</div>
+                    <div class="prompt-text">What would an institutional analyst set as a 12-month price target here? Give me a base case, bull case, and stop-loss level.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- F2 -->
+        <section id="f2" class="feature-section">
+            <div class="section-accent-bar" style="background-color: var(--buy);"></div>
+            <h2 class="section-title">F2 — Pattern Recognition Auto-Detect</h2>
+            
+            <div class="where-box">
+                <div class="where-line">
+                    <span class="label">WHERE</span>
+                    <span class="where-content">Stock DeepDive → Coloured badges near the top of the chart area</span>
+                </div>
+                <div class="where-line">
+                    <span class="label">HOW</span>
+                    <span class="where-content">Loads silently on every page open — no action needed. Detects patterns with ≥60% confidence. Click any badge to open the Pattern Detail Modal showing target price, stop-loss, and confidence. Press "Ask AI to Analyse This Pattern" to pre-load the chat.</span>
+                </div>
+            </div>
+
+            <div class="steps-box">
+                <ol>
+                    <li>Open any stock page — patterns load automatically, no action required</li>
+                    <li>Look for coloured badges near the top of the chart (e.g. "Cup & Handle 82%")</li>
+                    <li>Click any badge to open the Pattern Detail Modal</li>
+                    <li>Modal shows: pattern description, target price, stop-loss level, confidence score</li>
+                    <li>Press "Ask AI to Analyse This Pattern" — opens chat with full pattern context pre-loaded</li>
+                    <li>Patterns above 60% confidence are shown; below 60% are silently discarded</li>
+                </ol>
+            </div>
+
+            <div class="list-section">
+                <h4>Patterns detected:</h4>
+                <ul>
+                    <li><span>Bullish:</span> Cup & Handle, Inverse Head & Shoulders, Double Bottom, Ascending Triangle, Bull Flag, Falling Wedge, Morning Star, Golden Cross</li>
+                    <li><span>Bearish:</span> Head & Shoulders, Double Top, Descending Triangle, Bear Flag, Rising Wedge, Evening Star, Death Cross, Rounding Top</li>
+                    <li><span>Neutral:</span> Symmetrical Triangle, Rectangle, Doji Cluster, Inside Bar</li>
+                </ul>
+            </div>
+
+            <div class="prompts-section">
+                <p class="prompts-label">Auto-injected prompt (already wired — fires when pressing "Ask AI" in the modal):</p>
+                <div class="prompt-card">
+                    <div class="prompt-text">Explain the [PATTERN NAME] pattern on this chart and tell me if I should act on it.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                
+                <p class="prompts-label" style="margin-top: 32px;">Anti-Gravity Prompts:</p>
+                <div class="prompt-card">
+                    <div class="prompt-label">Measured move + stop-loss</div>
+                    <div class="prompt-text">What is the measured move target for this pattern and where should I place my stop-loss to keep risk under 5%?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Pattern + fundamentals check</div>
+                    <div class="prompt-text">The chart shows a [PATTERN NAME] forming. Do the fundamentals support this setup or is there a reason to be cautious?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Historical reliability</div>
+                    <div class="prompt-text">How historically reliable is this pattern on Indian mid-cap stocks? What is the typical success rate and time to target?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Failure / invalidation scenario</div>
+                    <div class="prompt-text">What would invalidate this pattern? At what price level does this setup fail and what should I do if it breaks down?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- F3 -->
+        <section id="f3" class="feature-section">
+            <div class="section-accent-bar" style="background-color: var(--hold);"></div>
+            <h2 class="section-title">F3 — Move Explanation Cache</h2>
+            
+            <div class="where-box">
+                <div class="where-line">
+                    <span class="label">WHERE</span>
+                    <span class="where-content">Portfolio → Performance Center → Winners or Losers table → ⚡ button on any row</span>
+                </div>
+                <div class="where-line">
+                    <span class="label">HOW</span>
+                    <span class="where-content">Modal shows headline, explanation, catalyst chips, sentiment pill, and "AI Recommendation". Cached 4 hours. If the stock moves >2% the cache auto-invalidates. "Open Full Chart" button navigates to the stock's DeepDive page.</span>
+                </div>
+            </div>
+
+            <div class="steps-box">
+                <ol>
+                    <li>Navigate to Portfolio → Performance Center</li>
+                    <li>Select a time period — week, month, year, or YTD</li>
+                    <li>Find the Winners or Losers table</li>
+                    <li>Click the ⚡ button on any row to trigger the AI explanation</li>
+                    <li>Modal opens with: headline, explanation, catalyst chips, sentiment, AI recommendation</li>
+                    <li>Click any stock name in the modal to navigate to its DeepDive page</li>
+                    <li>Results cached 4 hours — re-clicking shows instantly</li>
+                </ol>
+            </div>
+
+            <div class="chips-section">
+                <p class="chips-label">Existing chips in the modal's chat panel:</p>
+                <div class="chip-row">
+                    <span class="chip">Should I take profit?</span>
+                    <span class="chip">Is this overbought?</span>
+                    <span class="chip">Key support/resistance?</span>
+                    <span class="chip">Any news catalyst?</span>
+                </div>
+            </div>
+
+            <div class="prompts-section">
+                <p class="prompts-label">Anti-Gravity Prompts (use in DeepDive chat after navigating from the modal):</p>
+                <div class="prompt-card">
+                    <div class="prompt-label">Sustainability check</div>
+                    <div class="prompt-text">The stock just moved [X]% this [week/month]. Based on the catalysts and current chart, is this move sustainable or is it a dead-cat bounce?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Momentum continuation</div>
+                    <div class="prompt-text">What is the next resistance level after this move? Is there enough momentum to reach it or is a consolidation phase more likely?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Exit strategy after big gain</div>
+                    <div class="prompt-text">I'm sitting on a [X]% gain on this stock. What is a sensible trailing stop or exit strategy to lock in profits without exiting too early?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Re-entry after a drop</div>
+                    <div class="prompt-text">The stock fell [X]% this [week/month]. Is this a buying opportunity or a sign of deeper trouble? Where would you re-enter?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- F4 -->
+        <section id="f4" class="feature-section">
+            <div class="section-accent-bar" style="background-color: var(--sell);"></div>
+            <h2 class="section-title">F4 — AI-Generated Entry/Exit Alerts</h2>
+            
+            <div class="where-box">
+                <div class="where-line">
+                    <span class="label">WHERE</span>
+                    <span class="where-content">Stock DeepDive → Chat panel</span>
+                </div>
+                <div class="where-line">
+                    <span class="label">HOW</span>
+                    <span class="where-content">Type a natural-language alert request. The chat engine intercepts alert keywords (<code>set an alert</code>, <code>set alert</code>, <code>alert me</code>, <code>notify me</code>, <code>set a stop</code>, <code>alert at</code>) and routes to the alerts API. AI extracts the exact price from the chart context (SMA, BB, 52w high/low, support/resistance) and confirms in its reply. Alerts appear in the "Active Alerts" list below the chips. Checked end-of-day against latest close.</span>
+                </div>
+            </div>
+
+            <div class="steps-box">
+                <ol>
+                    <li>Open any stock page and go to the chat panel</li>
+                    <li>Click "New Chat" if no session is active</li>
+                    <li>Type a natural language alert request (see prompts below)</li>
+                    <li>AI extracts the exact price level from the chart context and confirms in its reply</li>
+                    <li>Alert appears in the "Active Alerts" section below the chat chips</li>
+                    <li>A bell badge on the page header shows how many active alerts exist</li>
+                    <li>Alerts are checked end-of-day against the latest closing price</li>
+                    <li>To delete: click the × button next to any alert in the Active Alerts list</li>
+                </ol>
+            </div>
+
+            <div class="list-section">
+                <p style="color: var(--text); font-weight: 500; font-size: 15px; margin-bottom: 24px;">Alert types supported: <strong>ENTRY, EXIT, SUPPORT, RESISTANCE</strong> — direction <strong>ABOVE</strong> or <strong>BELOW</strong></p>
+            </div>
+
+            <div class="chips-section">
+                <p class="chips-label">Existing chips in the UI:</p>
+                <div class="chip-row">
+                    <span class="chip">Set an alert at key support level</span>
+                    <span class="chip">Set a stop loss alert for me</span>
+                    <span class="chip">Alert me at the breakout level</span>
+                </div>
+            </div>
+
+            <div class="prompts-section">
+                <p class="prompts-label">Anti-Gravity Prompts:</p>
+                <div class="prompt-card">
+                    <div class="prompt-label">Support alert</div>
+                    <div class="prompt-text">Set an alert if this stock falls to the key support level below the current price.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">52-week high breakout</div>
+                    <div class="prompt-text">Alert me if the stock breaks above the 52-week high. I want to buy on breakout confirmation.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">SMA stop-loss</div>
+                    <div class="prompt-text">Set a stop-loss alert just below the 50-day SMA. Notify me if the close crosses below that level.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Bollinger Band dual alert</div>
+                    <div class="prompt-text">Set two alerts: one if price touches the upper Bollinger Band and one if it touches the lower band.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Golden cross alert</div>
+                    <div class="prompt-text">Notify me when the 20-day SMA crosses above the 50-day SMA on this stock.</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- F5 -->
+        <section id="f5" class="feature-section">
+            <div class="section-accent-bar" style="background-color: #A855F7;"></div>
+            <h2 class="section-title">F5 — Expert Skill Chat</h2>
+            
+            <div class="where-box">
+                <div class="where-line">
+                    <span class="label">WHERE</span>
+                    <span class="where-content">Stock DeepDive → Chat header → click the 🎭 icon → select a persona</span>
+                </div>
+                <div class="where-line">
+                    <span class="label">HOW</span>
+                    <span class="where-content">Switching persona starts a fresh chat session automatically. Each persona has its own quick chips. Messages route to <code>/api/stock/{symbol}/skill_chat</code> instead of the default <code>/chart_chat</code>. The active persona name and icon show in the chat header.</span>
+                </div>
+            </div>
+
+            <div class="steps-box">
+                <ol>
+                    <li>Open any stock page and find the 🎭 icon in the chat panel header</li>
+                    <li>Click it to open the Expert Skill Picker dropdown</li>
+                    <li>Select a persona — the chat header updates with the expert's name and icon</li>
+                    <li>Skill-specific quick chips appear below the chat</li>
+                    <li>Every message is now analysed through that expert's lens</li>
+                    <li>Switching persona starts a fresh session — previous messages are not carried over</li>
+                    <li>To return to the default AI, select "Default" from the picker</li>
+                </ol>
+            </div>
+
+            <div class="list-section">
+                <h4>7 Personas and their existing quick chips:</h4>
+                <ul style="list-style-type: none; padding-left: 0; margin-top: 16px;">
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">🦅 Warren Buffett Quality:</span><br>
+                        Is this a wonderful business at a fair price? • What is the moat here? • Would you hold this for 10 years?
+                    </li>
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">🔍 SEBI Forensic Analyst:</span><br>
+                        Any accounting red flags? • Is promoter pledge a concern? • Cash flow vs profit — any divergence?
+                    </li>
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">📊 Goldman Sachs Institutional Screen:</span><br>
+                        Give me a 12-month price target • Bull / base / bear scenarios • Would this pass your institutional screen?
+                    </li>
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">🚀 ARK Invest Disruption Analyst:</span><br>
+                        What's the disruption thesis here? • Where is this on the S-curve? • 5-year TAM estimate?
+                    </li>
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">🏠 Peter Lynch Main Street:</span><br>
+                        Is this a fast grower or stalwart? • What's the PEG ratio? • Would you buy this at current price?
+                    </li>
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">🐂 Rakesh Jhunjhunwala India Cycle:</span><br>
+                        Is this riding India's growth story? • Any structural tailwind here? • 10-year wealth creator or trap?
+                    </li>
+                    <li style="margin-bottom: 16px;">
+                        <span style="font-weight: 600;">🌲 Sequoia Capital Moat Analyst:</span><br>
+                        Describe the moat in one sentence • Can margins scale with revenue? • Pricing power — yes or no?
+                    </li>
+                </ul>
+            </div>
+
+            <div class="prompts-section">
+                <p class="prompts-label">Anti-Gravity Prompts (one set per persona):</p>
+                
+                <div class="persona-tabs">
+                    <button class="persona-tab active" data-persona="buffett">🦅 Buffett</button>
+                    <button class="persona-tab" data-persona="sebi">🔍 SEBI Forensic</button>
+                    <button class="persona-tab" data-persona="goldman">📊 Goldman Sachs</button>
+                    <button class="persona-tab" data-persona="ark">🚀 ARK Disruptive</button>
+                    <button class="persona-tab" data-persona="peter">🏠 Peter Lynch</button>
+                    <button class="persona-tab" data-persona="rj">🐂 RJ India Cycle</button>
+                    <button class="persona-tab" data-persona="sequoia">🌲 Sequoia Moat</button>
+                </div>
+
+                <!-- Tabs Content -->
+                <div id="tab-buffett" class="persona-content active">
+                    <div class="prompt-card">
+                        <div class="prompt-label">Moat + verdict</div>
+                        <div class="prompt-text">Does this business have a durable economic moat? What is your buy/hold/avoid verdict and why? Speak plainly.</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">Owner earnings</div>
+                        <div class="prompt-text">What are the owner earnings of this business and is the stock cheap relative to them?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+
+                <div id="tab-sebi" class="persona-content">
+                    <div class="prompt-card">
+                        <div class="prompt-label">Full forensic scan</div>
+                        <div class="prompt-text">Scan this company for accounting red flags — check cash flow vs profit divergence, promoter pledge levels, and related-party transactions.</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">Audit quality check</div>
+                        <div class="prompt-text">Who is the auditor and have they flagged anything? Any history of qualified opinions or regulatory action by SEBI?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+
+                <div id="tab-goldman" class="persona-content">
+                    <div class="prompt-card">
+                        <div class="prompt-label">12-month target with scenarios</div>
+                        <div class="prompt-text">Run an institutional screen. Give me a 12-month price target with bull, base, and bear scenarios. What is the next 90-day catalyst?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">EV/EBITDA vs peers</div>
+                        <div class="prompt-text">How does this stock's EV/EBITDA compare to its sector peers? Is there a valuation gap worth exploiting?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+
+                <div id="tab-ark" class="persona-content">
+                    <div class="prompt-card">
+                        <div class="prompt-label">Disruption TAM</div>
+                        <div class="prompt-text">What is the 5-year TAM for this business? Is it riding an S-curve inflection or is this a value trap masquerading as a growth story?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">Platform potential</div>
+                        <div class="prompt-text">Does this company have platform economics? Could it become a winner-take-most business in its category?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+
+                <div id="tab-peter" class="persona-content">
+                    <div class="prompt-card">
+                        <div class="prompt-label">Category + PEG</div>
+                        <div class="prompt-text">What category is this stock — fast grower, stalwart, cyclical, turnaround, or asset play? What is the PEG ratio and is it reasonable?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">Plain English verdict</div>
+                        <div class="prompt-text">Explain this business in two sentences like you're talking to a neighbour. Would you buy it today?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+
+                <div id="tab-rj" class="persona-content">
+                    <div class="prompt-card">
+                        <div class="prompt-label">India macro tailwind</div>
+                        <div class="prompt-text">Is this sector riding a multi-year structural tailwind in India? What macro driver — consumption, infrastructure, financialisation — is powering it?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">10-year wealth creator check</div>
+                        <div class="prompt-text">Could this business grow at 20%+ for a decade as India's per-capita income rises? What could derail that story?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+
+                <div id="tab-sequoia" class="persona-content">
+                    <div class="prompt-card">
+                        <div class="prompt-label">Moat type + durability</div>
+                        <div class="prompt-text">What specific type of moat does this business have — network effects, switching costs, brand pricing power, or regulatory? How durable is it?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                    <div class="prompt-card">
+                        <div class="prompt-label">Margin scalability</div>
+                        <div class="prompt-text">Can this business defend or expand its margins as it scales? What happens to unit economics at 3x the current revenue?</div>
+                        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- F6 -->
+        <section id="f6" class="feature-section">
+            <div class="section-accent-bar" style="background-color: #A855F7;"></div>
+            <h2 class="section-title">F6 — Portfolio Yearly Risk Explainer</h2>
+            
+            <div class="warning-box">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                <div>
+                    <strong>Gap in current code:</strong> <code>fetchYearlyExplainer()</code> is implemented but the "Why this year?" button and its result modal are <strong>not yet rendered</strong> in <code>BenchmarkDashboard.jsx</code>. The function exists at line 81 and sets <code>explainerModal = true</code> at line 99, but neither the trigger button nor the modal JSX have been added to the render tree. This feature needs the UI wiring completed.
+                </div>
+            </div>
+
+            <div class="where-box">
+                <div class="where-line">
+                    <span class="label">WHERE</span>
+                    <span class="where-content">Benchmark Dashboard → Yearly Performance section → "Why this year?" button</span>
+                </div>
+                <div class="where-line">
+                    <span class="label">HOW</span>
+                    <span class="where-content">Calls <code>/api/portfolio-performance/yearly-explainer</code>. Returns headline, what_worked, what_didnt, macro_drivers, lesson, risk_flags. Cached 12 hours. Built-in macro context for 2020–2026.</span>
+                </div>
+            </div>
+
+            <div class="steps-box">
+                <ol>
+                    <li>Navigate to Benchmark Dashboard from the sidebar (Performance)</li>
+                    <li>Find the Yearly Performance section — each year is a card with your return vs Nifty</li>
+                    <li>Click "Why this year?" on any year card <em>(button needs UI wiring — see gap note above)</em></li>
+                    <li>A full explainer modal opens</li>
+                    <li>Results cached 12 hours — re-clicking shows instantly</li>
+                    <li>Works for years 2020–2026 (partial data for current year)</li>
+                </ol>
+            </div>
+
+            <div class="list-section">
+                <h4>What the modal contains:</h4>
+                <ul>
+                    <li><span>Headline</span> — one-line summary of the portfolio's year</li>
+                    <li><span>Performance strip</span> — your return % vs Nifty % and alpha</li>
+                    <li><span>What Worked</span> — stocks/themes that outperformed with specific reasons</li>
+                    <li><span>What Didn't Work</span> — underperformers, honest assessment</li>
+                    <li><span>Macro Drivers</span> — Indian macro context (RBI moves, FII/DII flows, global events)</li>
+                    <li><span>Risk Flag Chips</span> — e.g. "High FII Outflow", "Rate Hike Cycle"</li>
+                    <li><span>Lesson Card</span> — one actionable takeaway</li>
+                </ul>
+            </div>
+
+            <div class="list-section">
+                <h4>Built-in macro context (no internet needed):</h4>
+                <ul>
+                    <li><span>2020:</span> COVID crash, V-shape recovery, emergency RBI cuts</li>
+                    <li><span>2021:</span> Vaccine rally, Nifty +24%, mid/small-cap euphoria</li>
+                    <li><span>2022:</span> Russia-Ukraine, FII outflows ₹1.2L cr, RBI +250bps</li>
+                    <li><span>2023:</span> Nifty +20%, Adani crisis, PSU re-rating, capex theme</li>
+                    <li><span>2024:</span> Election rally, FII volatility, rate cut expectations</li>
+                    <li><span>2025:</span> Global uncertainty, US tariff concerns, IT headwinds</li>
+                    <li><span>2026:</span> Current year, partial data only</li>
+                </ul>
+            </div>
+
+            <div class="prompts-section">
+                <p class="prompts-label">Anti-Gravity Prompts (use in DeepDive chat after reviewing a year):</p>
+                <div class="prompt-card">
+                    <div class="prompt-label">Year repeat risk</div>
+                    <div class="prompt-text">My portfolio [gained/lost] [X]% in [YEAR] vs Nifty's [Y]%. What should I change in my holdings to be better positioned if a similar macro environment repeats?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Risk flag exposure</div>
+                    <div class="prompt-text">Based on the macro risk flags from [YEAR], which of my current holdings are most exposed to the same risks today?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                <div class="prompt-card">
+                    <div class="prompt-label">Alpha explanation</div>
+                    <div class="prompt-text">I outperformed/underperformed Nifty by [X]% in [YEAR]. Was this alpha from stock selection, sector allocation, or timing? How do I repeat or fix this?</div>
+                    <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Back to top button -->
+    <button id="back-to-top" aria-label="Back to top">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+
+    <script>
+        // Smooth scrolling for navigation pills
+        document.querySelectorAll('[data-target]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                const element = document.getElementById(targetId);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Copy prompt functionality
+        function copyPrompt(btn) {
+            const promptText = btn.previousElementSibling.textContent;
+            navigator.clipboard.writeText(promptText).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied ✓';
+                btn.style.color = '#10B981';
+                btn.style.borderColor = '#10B981';
+                setTimeout(() => { 
+                    btn.textContent = originalText; 
+                    btn.style.color = ''; 
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        // Persona Tabs Functionality
+        const personaTabs = document.querySelectorAll('.persona-tab');
+        const personaContents = document.querySelectorAll('.persona-content');
+
+        personaTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                personaTabs.forEach(t => t.classList.remove('active'));
+                personaContents.forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding content
+                tab.classList.add('active');
+                const targetId = 'tab-' + tab.getAttribute('data-persona');
+                const targetContent = document.getElementById(targetId);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+            });
+        });
+
+        // Back to top functionality
+        const backToTopBtn = document.getElementById('back-to-top');
+        
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                backToTopBtn.classList.add('visible');
+            } else {
+                backToTopBtn.classList.remove('visible');
+            }
+        });
+
+        backToTopBtn.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    </script>
+</body>
+</html>
