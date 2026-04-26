@@ -1195,7 +1195,10 @@ async def handle_pattern_recognition(
         # Store in SignalsCache.pattern_data
         if sig:
             sig.pattern_data = json.dumps(result)
-            await db.commit()
+        # If no sig row yet, log but don't crash — cache miss is acceptable
+        else:
+            logger.warning(f"Pattern cache: no SignalsCache row for {symbol}, result not persisted")
+        await db.commit()
 
         return result
     except Exception as e:
