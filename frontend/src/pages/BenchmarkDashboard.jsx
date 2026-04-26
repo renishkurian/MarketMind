@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useStockStore } from '../store/stockStore';
-import { BarChart3, TrendingUp, TrendingDown, Clock, Activity, Target, Sparkles, PieChart as PieChartIcon } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, Clock, Activity, Target, Sparkles, Brain, X, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react';
 import BenchmarkChart from '../components/charts/BenchmarkChart';
 import Loader from '../components/Loader';
 import MetricCard from '../components/MetricCard';
@@ -30,6 +30,10 @@ const BenchmarkDashboard = () => {
   const [selectedYear, setSelectedYear] = useState(null);
   const [sectorData, setSectorData] = useState(null);
   const [sectorLoading, setSectorLoading] = useState(false);
+
+  const [yearlyExplainer, setYearlyExplainer]     = useState(null);  // holds full explainer object
+  const [explainerLoading, setExplainerLoading]   = useState(null);  // holds year number being loaded
+  const [explainerModal, setExplainerModal]       = useState(false);
 
   const { theme } = useStockStore();
 
