@@ -3,7 +3,7 @@ import sys
 import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger, ForeignKey, Float, Text
 from sqlalchemy.orm import relationship
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -336,6 +336,28 @@ class SystemConfig(Base):
     value = Column(String(500), nullable=False)
     description = Column(String(200))
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class MoveExplanation(Base):
+    """
+    Caches AI-generated plain-English explanation for why a stock moved.
+    Keyed by symbol + period (week / month / year / ytd).
+    TTL: 4 hours — refreshed on demand or by scheduler.
+    """
+    __tablename__ = "move_explanations"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    symbol     = Column(String(20), nullable=False, index=True)
+    period     = Column(String(10), nullable=False)          # 'week' | 'month' | 'year' | 'ytd'
+    gain_pct   = Column(Float, nullable=True)                # e.g. 49.82
+    headline   = Column(String(200), nullable=True)          # one-line summary
+    explanation= Column(Text, nullable=True)                 # 2-3 sentence explanation
+    catalysts  = Column(JSON, nullable=True)                 # ["Q3 earnings beat", "FII buying"]
+    sentiment  = Column(String(10), nullable=True)           # 'Bullish' | 'Bearish' | 'Neutral'
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "period", name="uq_move_explanation_symbol_period"),
+    )
 
 # Database Dependency
 async def get_db():
