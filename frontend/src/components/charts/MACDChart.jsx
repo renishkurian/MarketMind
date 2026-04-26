@@ -89,7 +89,11 @@ const MACDChart = ({ data, visibleRange = 63, theme = 'dark' }) => {
     signalRef.current.setData(signalLine.slice(-visibleRange));
     histRef.current.setData(histogram.slice(-visibleRange));
 
-    if (vRange) chartRef.current.timeScale().setVisibleRange(vRange);
+    if (visibleRange && visibleRange < data.length) {
+      const lastTime = formattedData[formattedData.length - 1]?.time;
+      const fromTime = formattedData[Math.max(0, formattedData.length - visibleRange)]?.time;
+      if (lastTime && fromTime) chartRef.current.timeScale().setVisibleRange({ from: fromTime, to: lastTime });
+    }
   }, [data, visibleRange]);
 
   return (

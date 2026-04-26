@@ -85,7 +85,11 @@ const RSIChart = ({ data, visibleRange = 63, theme = 'dark', length = 14 }) => {
     const rsiData = calculateRSI(formattedPrices, length);
     seriesRef.current.setData(rsiData.slice(-visibleRange).map(d => ({ time: d.time, value: d.value })));
 
-    if (vRange) chartRef.current.timeScale().setVisibleRange(vRange);
+    if (visibleRange && visibleRange < data.length) {
+      const lastTime = formattedPrices[formattedPrices.length - 1]?.time;
+      const fromTime = formattedPrices[Math.max(0, formattedPrices.length - visibleRange)]?.time;
+      if (lastTime && fromTime) chartRef.current.timeScale().setVisibleRange({ from: fromTime, to: lastTime });
+    }
   }, [data, length, visibleRange]);
 
   return (
