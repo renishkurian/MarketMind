@@ -854,6 +854,145 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
 
     return parsed
 
+
+async def generate_pattern_recognition(symbol: str, context_data: dict, user_id: int = None) -> dict:
+    """
+    Silently analyses the last 90 bars and returns any active chart patterns.
+    Called automatically on stock page load — no user interaction required.
+    Returns: { patterns: [{name, confidence, description, trend_lines}], summary: str }
+    """
+    ai_cfg = await _get_ai_settings()
+    provider = ai_cfg["provider"]
+    key_map = {
+        "openai":    ai_cfg["openai_key"],
+        "anthropic": ai_cfg["anthropic_key"],
+        "xai":       ai_cfg["xai_key"],
+    }
+    if not key_map.get(provider):
+        for p, k in key_map.items():
+            if k:
+                provider = p
+                break
+    if not key_map.get(provider):
+        raise ValueError("No API key configured for AI features.")
+
+    model = {
+        "openai":    ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai":       ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
+    import json
+    summary   = context_data.get("price_summary", {})
+    today     = context_data.get("today", {})
+    comp      = context_data.get("composite_score", "N/A")
+    st_sig    = context_data.get("current_st_signal", "HOLD")
+    lt_sig    = context_data.get("current_lt_signal", "HOLD")
+
+    weekly_block = json.dumps(summary.get("weekly_candles", []), indent=2)
+    recent_block = json.dumps(summary.get("recent_5_bars", []), indent=2)
+
+    system_prompt = f"""You are an expert technical analyst specialising in NSE/BSE chart pattern detection.
+Analyse the provided OHLCV data and identify any ACTIVE chart patterns forming or recently completed.
+
+═══ STOCK DATA ═══
+Symbol          : {symbol}
+Composite Score : {comp}/100
+ST Signal: {st_sig} | LT Signal: {lt_sig}
+Current Price   : ₹{today.get('close', 'N/A')}
+90d High/Low    : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
+SMA 20/50/90    : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+
+Weekly Candles (last 18 weeks):
+{weekly_block}
+
+Recent 5 Daily Bars:
+{recent_block}
+
+═══ PATTERNS TO DETECT ═══
+Bullish: Cup & Handle, Inverse Head & Shoulders, Double Bottom, Ascending Triangle,
+         Bull Flag, Falling Wedge, Morning Star, Golden Cross
+Bearish: Head & Shoulders, Double Top, Descending Triangle, Bear Flag,
+         Rising Wedge, Evening Star, Death Cross, Rounding Top
+Neutral: Symmetrical Triangle, Rectangle, Doji Cluster, Inside Bar
+
+═══ RULES ═══
+1. Only report patterns with >= 60% confidence. Return empty array if none qualify.
+2. For each pattern provide the key price levels (neckline, target, stop) as trend_lines.
+3. confidence is 0.0 to 1.0.
+4. implication must be one of: "Bullish", "Bearish", "Neutral".
+5. target_price is the measured move target — null if not applicable.
+6. Reply ONLY as valid JSON. No text outside the JSON object.
+
+Return this exact structure:
+{{
+  "patterns": [
+    {{
+      "name": "Pattern name e.g. Cup & Handle",
+      "confidence": 0.75,
+      "implication": "Bullish",
+      "description": "2-3 sentence plain English explanation of what this pattern means for the stock right now.",
+      "target_price": 0.0,
+      "stop_loss": 0.0,
+      "trend_lines": [
+        {{
+          "start_date": "YYYY-MM-DD",
+          "end_date": "YYYY-MM-DD",
+          "start_price": 0.0,
+          "end_price": 0.0,
+          "color": "green",
+          "label": "Neckline"
+        }}
+      ]
+    }}
+  ],
+  "summary": "One sentence overall pattern read e.g. 'Bullish continuation setup with Cup & Handle forming near 52w high.'"
+}}
+"""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": f"Detect all active chart patterns for {symbol}. Be strict — only high confidence patterns."}
+    ]
+
+    t0 = time.perf_counter()
+    status = "SUCCESS"
+    error_message = None
+    parsed = {}
+    prompt_tokens = completion_tokens = 0
+
+    try:
+        if provider == "openai":
+            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, key_map[provider])
+        elif provider == "anthropic":
+            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, key_map[provider])
+        elif provider == "xai":
+            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, key_map[provider])
+    except Exception as e:
+        status = "ERROR"
+        error_message = str(e)
+        logger.error(f"Pattern recognition failed ({provider}): {e}")
+        raise e
+    finally:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await _write_call_log(
+            symbol=symbol,
+            provider=provider,
+            model=model,
+            trigger_reason="PATTERN_RECOGNITION",
+            skill_id=None,
+            messages=messages,
+            response_dict=parsed,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_ms=duration_ms,
+            status=status,
+            error_message=error_message,
+            user_id=user_id,
+        )
+
+    return parsed
+
 # ── Portfolio AI Allocation ─────────────────────────────────────────────────────
 
 async def generate_portfolio_allocation(amount: float, portfolio_data: list) -> dict:
