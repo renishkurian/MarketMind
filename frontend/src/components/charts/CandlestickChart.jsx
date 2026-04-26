@@ -1,14 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { createChart, ColorType, CandlestickSeries, LineSeries } from 'lightweight-charts';
 
-const calculateSMA = (data, period) => {
-  if (data.length < period) return [];
-  const sma = [];
-  for (let i = period - 1; i < data.length; i++) {
-    const sum = data.slice(i - period + 1, i + 1).reduce((acc, d) => acc + d.close, 0);
-    sma.push({ time: data[i].time, value: sum / period });
-  }
-  return sma;
+const calcSMA = (data, period) => {
+  return data.reduce((acc, d, i) => {
+    if (i < period - 1) return acc;
+    const avg = data.slice(i - period + 1, i + 1).reduce((s, x) => s + x.close, 0) / period;
+    acc.push({ time: Math.floor(new Date(d.date).getTime() / 1000), value: avg });
+    return acc;
+  }, []);
 };
 
 const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = true }) => {
@@ -112,16 +111,16 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     seriesRef.current.setData(formattedData);
 
     // ── SMA Overlays ──────────────────────────────────────────────────────
-    if (formattedData.length >= 20) {
-      sma20Ref.current.setData(calculateSMA(formattedData, 20));
+    if (sortedRaw.length >= 20) {
+      sma20Ref.current.setData(calcSMA(sortedRaw, 20));
       sma20Ref.current.applyOptions({ visible: showSMAs });
     }
-    if (formattedData.length >= 50) {
-      sma50Ref.current.setData(calculateSMA(formattedData, 50));
+    if (sortedRaw.length >= 50) {
+      sma50Ref.current.setData(calcSMA(sortedRaw, 50));
       sma50Ref.current.applyOptions({ visible: showSMAs });
     }
-    if (formattedData.length >= 200) {
-      sma200Ref.current.setData(calculateSMA(formattedData, 200));
+    if (sortedRaw.length >= 200) {
+      sma200Ref.current.setData(calcSMA(sortedRaw, 200));
       sma200Ref.current.applyOptions({ visible: showSMAs });
     } else {
       // If we don't have enough data for SMA200, hide it
