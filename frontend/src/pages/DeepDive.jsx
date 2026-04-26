@@ -475,6 +475,10 @@ export default function DeepDive() {
   const [chatLoading, setChatLoading] = useState(false);
   const [activeTrendLines, setActiveTrendLines] = useState([]);
   const [activePriceTarget, setActivePriceTarget] = useState(null);
+  const [patterns, setPatterns]               = useState([]);
+  const [patternSummary, setPatternSummary]   = useState('');
+  const [patternLoading, setPatternLoading]   = useState(false);
+  const [patternModal, setPatternModal]       = useState(null); // holds one pattern object
   const chatScrollRef = useRef(null);
 
   // Derived: active session messages
