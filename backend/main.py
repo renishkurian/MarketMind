@@ -1094,6 +1094,114 @@ async def handle_chart_chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/stock/{symbol}/patterns")
+@limiter.limit("6/minute")
+async def handle_pattern_recognition(
+    symbol: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Silently called on stock page load.
+    Returns active chart patterns detected by AI from last 90 bars.
+    Results are cached in SignalsCache.pattern_data (JSON) for 4 hours.
+    """
+    symbol = symbol.upper()
+
+    # 4-hour cache check via SignalsCache.pattern_data
+    sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
+    sig = sig_result.scalars().first()
+
+    if sig and sig.pattern_data:
+        try:
+            cached = json.loads(sig.pattern_data) if isinstance(sig.pattern_data, str) else sig.pattern_data
+            cached_at = cached.get("cached_at")
+            if cached_at:
+                age = (datetime.utcnow() - datetime.fromisoformat(cached_at)).total_seconds()
+                if age < 14400:
+                    return cached
+        except Exception:
+            pass
+
+    # Build same context as chart_chat
+    hist_result = await db.execute(
+        select(PriceHistory)
+        .where(PriceHistory.symbol == symbol)
+        .order_by(PriceHistory.date.desc())
+        .limit(90)
+    )
+    history = hist_result.scalars().all()
+    history.reverse()
+
+    if len(history) < 20:
+        return {"patterns": [], "summary": "Insufficient data for pattern detection."}
+
+    closes = [float(h.close) for h in history]
+    highs  = [float(h.high)  for h in history]
+    lows   = [float(h.low)   for h in history]
+
+    def sma(series, n):
+        return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
+
+    def weekly_aggregates(hist):
+        buckets = []
+        for i in range(0, len(hist), 5):
+            chunk = hist[i:i+5]
+            if not chunk: continue
+            buckets.append({
+                "week_start": str(chunk[0].date),
+                "open":  round(float(chunk[0].open), 2),
+                "high":  round(max(float(h.high) for h in chunk), 2),
+                "low":   round(min(float(h.low)  for h in chunk), 2),
+                "close": round(float(chunk[-1].close), 2),
+                "avg_vol": round(sum(int(h.volume) for h in chunk) / len(chunk)),
+            })
+        return buckets
+
+    from datetime import date as dt_date
+    today_date = dt_date.today()
+
+    context_data = {
+        "current_st_signal": sig.st_signal if sig else "HOLD",
+        "current_lt_signal": sig.lt_signal if sig else "HOLD",
+        "composite_score":   float(sig.composite_score) if sig and sig.composite_score else None,
+        "today": {
+            "date":  str(today_date),
+            "close": float(sig.current_price) if sig and sig.current_price else closes[-1],
+        },
+        "price_summary": {
+            "period_change_pct": round((closes[-1] - closes[0]) / closes[0] * 100, 2) if closes else None,
+            "90d_high": round(max(highs), 2),
+            "90d_low":  round(min(lows),  2),
+            "sma_20":   sma(closes, 20),
+            "sma_50":   sma(closes, 50),
+            "sma_90":   sma(closes, 90),
+            "weekly_candles":  weekly_aggregates(history),
+            "recent_5_bars": [
+                {
+                    "date": str(h.date), "open": round(float(h.open), 2),
+                    "high": round(float(h.high), 2), "low": round(float(h.low), 2),
+                    "close": round(float(h.close), 2), "volume": int(h.volume)
+                } for h in history[-5:]
+            ],
+        },
+    }
+
+    try:
+        result = await generate_pattern_recognition(symbol, context_data, user_id=current_user.id)
+        result["cached_at"] = datetime.utcnow().isoformat()
+
+        # Store in SignalsCache.pattern_data
+        if sig:
+            sig.pattern_data = json.dumps(result)
+            await db.commit()
+
+        return result
+    except Exception as e:
+        logger.error(f"Pattern recognition endpoint error for {symbol}: {e}")
+        return {"patterns": [], "summary": "Pattern detection unavailable."}
+
 
 @app.get("/api/ai-logs")
 async def get_ai_logs(
