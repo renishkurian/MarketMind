@@ -213,6 +213,35 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     });
   }, [trendLines]);
 
+  // ── Update AI Price Targets ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!chartRef.current || !priceTarget || !data || data.length === 0) return;
+    
+    const sortedRaw = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const lastBar = sortedRaw[sortedRaw.length - 1];
+    const lastTime = Math.floor(new Date(lastBar.date).getTime() / 1000);
+    const days = priceTarget.horizon === '90d' ? 90 : 30;
+    const futureTime = lastTime + (days * 86400);
+
+    // Update Target High
+    if (ptHighRef.current) {
+      ptHighRef.current.setData([
+        { time: lastTime, value: priceTarget.confidence_high },
+        { time: futureTime, value: priceTarget.confidence_high },
+      ]);
+      ptHighRef.current.applyOptions({ visible: true });
+    }
+
+    // Update Target Low
+    if (ptLowRef.current) {
+      ptLowRef.current.setData([
+        { time: lastTime, value: priceTarget.confidence_low },
+        { time: futureTime, value: priceTarget.confidence_low },
+      ]);
+      ptLowRef.current.applyOptions({ visible: true });
+    }
+  }, [priceTarget, data]);
+
   return (
     <div className="relative">
       <div ref={chartContainerRef} className="w-full h-[400px]" />
@@ -222,6 +251,16 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
           <span className="text-[10px] font-bold" style={{color:'#3B82F6'}}>── SMA50</span>
           <span className="text-[10px] font-bold" style={{color:'#A855F7'}}>── SMA200</span>
           <span className="text-[10px] font-bold text-gray-500">╌╌ BB(20,2)</span>
+        </div>
+      )}
+
+      {priceTarget && (
+        <div className="flex gap-3 mt-1 px-1 py-1 bg-dark-card border border-dark-border rounded-lg w-fit">
+          <span className="text-[10px] font-bold text-signal-buy">▲ Target High ₹{priceTarget.confidence_high?.toFixed(1)}</span>
+          <span className="text-[10px] text-dark-muted">|</span>
+          <span className="text-[10px] font-bold text-signal-sell">▼ Target Low ₹{priceTarget.confidence_low?.toFixed(1)}</span>
+          <span className="text-[10px] text-dark-muted">|</span>
+          <span className="text-[10px] text-dark-muted italic">{priceTarget.basis}</span>
         </div>
       )}
     </div>
