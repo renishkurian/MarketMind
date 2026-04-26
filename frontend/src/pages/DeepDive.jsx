@@ -474,6 +474,7 @@ export default function DeepDive() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [activeTrendLines, setActiveTrendLines] = useState([]);
+  const [activePriceTarget, setActivePriceTarget] = useState(null);
   const chatScrollRef = useRef(null);
 
   // Derived: active session messages
@@ -594,6 +595,10 @@ export default function DeepDive() {
         updateSession(targetSessionId, finalMessages, newTrendLines);
         setActiveTrendLines(newTrendLines);
         if (data.trend_lines?.length > 0) toast.success(`AI plotted ${data.trend_lines.length} trendlines`);
+        if (data.price_target) {
+          setActivePriceTarget(data.price_target);
+          toast.success(`AI target: ₹${data.price_target.confidence_low?.toFixed(0)}–₹${data.price_target.confidence_high?.toFixed(0)}`);
+        }
       } else {
         toast.error('AI chat failed');
         updateSession(targetSessionId, prevMessages);
@@ -876,7 +881,7 @@ export default function DeepDive() {
                   {/* Left Chart Area */}
                   <div className={`flex-1 overflow-hidden transition-all duration-300 ${showChartChat ? 'w-2/3' : 'w-full'}`}>
                     <div className="space-y-4">
-                      <CandlestickChart data={filteredHistory} theme={theme} trendLines={activeTrendLines} />
+                      <CandlestickChart data={filteredHistory} theme={theme} trendLines={activeTrendLines} priceTarget={activePriceTarget} />
                       <VolumeChart data={filteredHistory} theme={theme} />
                       <RSIChart data={fullHistoryForIndicators} visibleRange={rangeMap[range]} theme={theme} />
                       <MACDChart data={fullHistoryForIndicators} visibleRange={rangeMap[range]} theme={theme} />
