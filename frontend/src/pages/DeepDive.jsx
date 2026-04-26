@@ -1153,6 +1153,41 @@ export default function DeepDive() {
                         </div>
                       </div>
 
+                      {/* Skill Picker Dropdown */}
+                      {showSkillPicker && (
+                        <div className="border-b border-dark-border bg-gray-950 shrink-0">
+                          <div className="p-2">
+                            <p className="text-[9px] font-black text-dark-muted uppercase tracking-widest px-2 mb-2">Analyse Through Lens Of</p>
+                            {/* Default option */}
+                            <button
+                              onClick={() => { setActiveSkill(null); setShowSkillPicker(false); }}
+                              className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left hover:bg-dark-card transition-colors mb-1 ${!activeSkill ? 'bg-accent/10 border border-accent/20' : ''}`}
+                            >
+                              <span className="text-base">🧠</span>
+                              <div>
+                                <p className="text-[11px] font-black text-white">Default Chart AI</p>
+                                <p className="text-[9px] text-dark-muted">Technical analysis & signals</p>
+                              </div>
+                              {!activeSkill && <span className="ml-auto text-accent text-[9px] font-black">ACTIVE</span>}
+                            </button>
+                            {SKILLS.map(skill => (
+                              <button
+                                key={skill.id}
+                                onClick={() => { setActiveSkill(skill); setShowSkillPicker(false); createNewSession(); }}
+                                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left hover:bg-dark-card transition-colors ${activeSkill?.id === skill.id ? 'bg-accent/10 border border-accent/20' : ''}`}
+                              >
+                                <span className="text-base">{skill.icon}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11px] font-black text-white truncate">{skill.name}</p>
+                                  <p className="text-[9px] text-dark-muted truncate">{skill.desc}</p>
+                                </div>
+                                {activeSkill?.id === skill.id && <span className="ml-auto text-accent text-[9px] font-black shrink-0">ACTIVE</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Session List Dropdown */}
                       {showSessionList && (
                         <div className="border-b border-dark-border bg-gray-950 shrink-0 max-h-48 overflow-y-auto">
