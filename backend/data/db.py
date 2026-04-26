@@ -353,6 +353,7 @@ class MoveExplanation(Base):
     explanation= Column(Text, nullable=True)                 # 2-3 sentence explanation
     catalysts  = Column(JSON, nullable=True)                 # ["Q3 earnings beat", "FII buying"]
     sentiment  = Column(String(10), nullable=True)           # 'Bullish' | 'Bearish' | 'Neutral'
+    should_act = Column(String(30), nullable=True)           # 'Consider Entry' | 'Consider Exit' | 'Hold' | 'Watch'
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     __table_args__ = (

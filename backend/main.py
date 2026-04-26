@@ -1240,6 +1240,7 @@ async def handle_move_explanation(
                 "explanation": cached.explanation,
                 "catalysts":   cached.catalysts,
                 "sentiment":   cached.sentiment,
+                "should_act":  cached.should_act,
                 "cached":      True,
             }
 
@@ -1299,6 +1300,7 @@ async def handle_move_explanation(
             cached.explanation = result.get("explanation")
             cached.catalysts   = result.get("catalysts")
             cached.sentiment   = result.get("sentiment")
+            cached.should_act  = result.get("should_act")
             cached.updated_at  = datetime.utcnow()
         else:
             db.add(MoveExplanation(
@@ -1309,6 +1311,7 @@ async def handle_move_explanation(
                 explanation=result.get("explanation"),
                 catalysts=result.get("catalysts"),
                 sentiment=result.get("sentiment"),
+                should_act=result.get("should_act"),
             ))
         await db.commit()
 
