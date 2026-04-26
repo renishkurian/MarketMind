@@ -470,6 +470,22 @@ export default function DeepDive() {
     }
   };
 
+  const [stockAlerts, setStockAlerts]   = useState([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+
+  const fetchStockAlerts = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/alerts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const all = await res.json();
+        setStockAlerts(all.filter(a => a.symbol === symbol && a.is_active && !a.is_triggered));
+      }
+    } catch (e) { console.warn('Alerts fetch failed:', e); }
+  }, [symbol]);
+
   useEffect(() => {
     fetchData();
     fetchPatterns();
@@ -496,8 +512,6 @@ export default function DeepDive() {
   const [activeChatSessionId, setActiveChatSessionId] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [stockAlerts, setStockAlerts]   = useState([]);
-  const [alertsLoading, setAlertsLoading] = useState(false);
   const [activeTrendLines, setActiveTrendLines] = useState([]);
   const [activePriceTarget, setActivePriceTarget] = useState(null);
   const [patterns, setPatterns]               = useState([]);
@@ -649,18 +663,17 @@ export default function DeepDive() {
     }
   };
 
-  const fetchStockAlerts = useCallback(async () => {
+  const deleteAlert = async (alertId) => {
     try {
       const token = localStorage.getItem('mm_token');
-      const res = await fetch(`${API_URL}/api/alerts`, {
+      await fetch(`${API_URL}/api/alerts/${alertId}`, {
+        method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const all = await res.json();
-        setStockAlerts(all.filter(a => a.symbol === symbol && a.is_active && !a.is_triggered));
-      }
-    } catch (e) { console.warn('Alerts fetch failed:', e); }
-  }, [symbol]);
+      setStockAlerts(prev => prev.filter(a => a.id !== alertId));
+      toast.success('Alert removed');
+    } catch (e) { toast.error('Failed to remove alert'); }
+  };
 
   const createAIAlert = async (message) => {
     if (!message.trim()) return;
@@ -706,18 +719,6 @@ export default function DeepDive() {
     } finally {
       setAlertsLoading(false);
     }
-  };
-
-  const deleteAlert = async (alertId) => {
-    try {
-      const token = localStorage.getItem('mm_token');
-      await fetch(`${API_URL}/api/alerts/${alertId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      setStockAlerts(prev => prev.filter(a => a.id !== alertId));
-      toast.success('Alert removed');
-    } catch (e) { toast.error('Failed to remove alert'); }
   };
 
   const toggleChat = () => {
