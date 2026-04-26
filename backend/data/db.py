@@ -171,6 +171,7 @@ class SignalsCache(Base):
     fa_breakdown = Column(JSON)
     ta_breakdown = Column(JSON)
     momentum_breakdown = Column(JSON)
+    pattern_data = Column(JSON, nullable=True) # AI Pattern Auto-detection Cache
     
     # ── Scoring engine v2.1 columns ──────────────
     score_version = Column(String(10), nullable=True)
