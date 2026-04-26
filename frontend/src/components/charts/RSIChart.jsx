@@ -26,8 +26,7 @@ const calculateRSI = (prices, period) => {
   return rsi;
 };
 
-const RSIChart = ({ data, range = '3M', theme = 'dark', length = 14 }) => {
-  const rangeMap = { '1W': 7, '1M': 21, '3M': 63, '6M': 126, '1Y': 252, 'ALL': 9999 };
+const RSIChart = ({ data, visibleRange = 63, theme = 'dark', length = 14 }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -77,18 +76,17 @@ const RSIChart = ({ data, range = '3M', theme = 'dark', length = 14 }) => {
   useEffect(() => {
     if (!seriesRef.current || !data || data.length < length) return;
 
-    const visibleRange = chartRef.current.timeScale().getVisibleRange();
+    const vRange = chartRef.current.timeScale().getVisibleRange();
 
     const formattedPrices = data
       .map(d => ({ time: Math.floor(new Date(d.date).getTime() / 1000), close: d.close }))
       .sort((a, b) => a.time - b.time);
 
     const rsiData = calculateRSI(formattedPrices, length);
-    const limit = rangeMap[range] ?? 63;
-    seriesRef.current.setData(rsiData.slice(-limit).map(d => ({ time: d.time, value: d.value })));
+    seriesRef.current.setData(rsiData.slice(-visibleRange).map(d => ({ time: d.time, value: d.value })));
 
-    if (visibleRange) chartRef.current.timeScale().setVisibleRange(visibleRange);
-  }, [data, length, range]);
+    if (vRange) chartRef.current.timeScale().setVisibleRange(vRange);
+  }, [data, length, visibleRange]);
 
   return (
     <div className="relative">

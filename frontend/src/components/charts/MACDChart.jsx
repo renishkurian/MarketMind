@@ -13,8 +13,7 @@ const calculateEMA = (data, period) => {
   });
 };
 
-const MACDChart = ({ data, range = '3M', theme = 'dark' }) => {
-  const rangeMap = { '1W': 7, '1M': 21, '3M': 63, '6M': 126, '1Y': 252, 'ALL': 9999 };
+const MACDChart = ({ data, visibleRange = 63, theme = 'dark' }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef(null);
   const macdRef = useRef(null);
@@ -63,7 +62,7 @@ const MACDChart = ({ data, range = '3M', theme = 'dark' }) => {
   useEffect(() => {
     if (!macdRef.current || !data || data.length < 26) return;
 
-    const visibleRange = chartRef.current.timeScale().getVisibleRange();
+    const vRange = chartRef.current.timeScale().getVisibleRange();
 
     const formattedData = data
       .map(d => ({ time: Math.floor(new Date(d.date).getTime() / 1000), value: d.close }))
@@ -86,13 +85,12 @@ const MACDChart = ({ data, range = '3M', theme = 'dark' }) => {
       return { time: ml.time, value: val, color: val >= 0 ? '#10B981' : '#EF4444' };
     }).filter(Boolean);
 
-    const limit = rangeMap[range] ?? 63;
-    macdRef.current.setData(macdLine.slice(-limit));
-    signalRef.current.setData(signalLine.slice(-limit));
-    histRef.current.setData(histogram.slice(-limit));
+    macdRef.current.setData(macdLine.slice(-visibleRange));
+    signalRef.current.setData(signalLine.slice(-visibleRange));
+    histRef.current.setData(histogram.slice(-visibleRange));
 
-    if (visibleRange) chartRef.current.timeScale().setVisibleRange(visibleRange);
-  }, [data, range]);
+    if (vRange) chartRef.current.timeScale().setVisibleRange(vRange);
+  }, [data, visibleRange]);
 
   return (
     <div className="relative">

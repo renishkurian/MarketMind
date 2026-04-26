@@ -877,8 +877,8 @@ export default function DeepDive() {
                     <div className="space-y-4">
                       <CandlestickChart data={filteredHistory} theme={theme} trendLines={activeTrendLines} />
                       <VolumeChart data={filteredHistory} theme={theme} />
-                      <RSIChart data={fullHistoryForIndicators} theme={theme} range={range} />
-                      <MACDChart data={fullHistoryForIndicators} theme={theme} range={range} />
+                      <RSIChart data={fullHistoryForIndicators} visibleRange={rangeMap[range]} theme={theme} />
+                      <MACDChart data={fullHistoryForIndicators} visibleRange={rangeMap[range]} theme={theme} />
                     </div>
 
                     {/* OHLC last bar summary */}
