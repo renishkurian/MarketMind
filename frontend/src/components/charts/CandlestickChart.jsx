@@ -111,21 +111,13 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     seriesRef.current.setData(formattedData);
 
     // ── SMA Overlays ──────────────────────────────────────────────────────
-    if (sortedRaw.length >= 20) {
-      sma20Ref.current.setData(calcSMA(sortedRaw, 20));
-      sma20Ref.current.applyOptions({ visible: showSMAs });
-    }
-    if (sortedRaw.length >= 50) {
-      sma50Ref.current.setData(calcSMA(sortedRaw, 50));
-      sma50Ref.current.applyOptions({ visible: showSMAs });
-    }
-    if (sortedRaw.length >= 200) {
-      sma200Ref.current.setData(calcSMA(sortedRaw, 200));
-      sma200Ref.current.applyOptions({ visible: showSMAs });
-    } else {
-      // If we don't have enough data for SMA200, hide it
-      sma200Ref.current.applyOptions({ visible: false });
-    }
+    if (showSMAs && sma20Ref.current)  sma20Ref.current.setData(calcSMA(sortedRaw, 20));
+    if (showSMAs && sma50Ref.current)  sma50Ref.current.setData(calcSMA(sortedRaw, 50));
+    if (showSMAs && sma200Ref.current) sma200Ref.current.setData(calcSMA(sortedRaw, 200));
+
+    sma20Ref.current?.applyOptions({ visible: showSMAs });
+    sma50Ref.current?.applyOptions({ visible: showSMAs });
+    sma200Ref.current?.applyOptions({ visible: showSMAs && sortedRaw.length >= 200 });
 
     // Restore the zoom/pan if the user had one set, 
     // BUT only if the data length is similar (incremental update).
