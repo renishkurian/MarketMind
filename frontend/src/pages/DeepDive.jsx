@@ -473,9 +473,10 @@ export default function DeepDive() {
   useEffect(() => {
     fetchData();
     fetchPatterns();
+    fetchStockAlerts();
     window.addEventListener('generate-insight', handleGenerateInsight);
     return () => window.removeEventListener('generate-insight', handleGenerateInsight);
-  }, [fetchData, fetchPatterns, symbol]);
+  }, [fetchData, fetchPatterns, fetchStockAlerts, symbol]);
 
   // Chart range filtering
   const [range, setRange] = useState('3M');
@@ -808,6 +809,12 @@ export default function DeepDive() {
             {symbol}
             {stock?.company_name && (
               <span className="text-sm font-normal text-dark-muted">/ {stock.company_name}</span>
+            )}
+            {stockAlerts.length > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-accent/10 border border-accent/30 rounded-full">
+                <BellRing size={12} className="text-accent animate-pulse" />
+                <span className="text-[11px] font-black text-accent">{stockAlerts.length} alert{stockAlerts.length > 1 ? 's' : ''} active</span>
+              </div>
             )}
           </h1>
           {stock?.sector && (
