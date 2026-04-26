@@ -16,7 +16,9 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const trendSeriesRef = useRef([]);
-  const smaSeriesRef = useRef({ sma20: null, sma50: null, sma200: null });
+  const sma20Ref = useRef(null);
+  const sma50Ref = useRef(null);
+  const sma200Ref = useRef(null);
 
   // ── Init chart ONCE on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -56,6 +58,10 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     chartRef.current = chart;
     seriesRef.current = candlestickSeries;
 
+    sma20Ref.current  = chart.addSeries(LineSeries, { color: '#F59E0B', lineWidth: 1, title: 'SMA20',  priceLineVisible: false, lastValueVisible: false });
+    sma50Ref.current  = chart.addSeries(LineSeries, { color: '#3B82F6', lineWidth: 1, title: 'SMA50',  priceLineVisible: false, lastValueVisible: false });
+    sma200Ref.current = chart.addSeries(LineSeries, { color: '#A855F7', lineWidth: 1, title: 'SMA200', priceLineVisible: false, lastValueVisible: false });
+
     const handleResize = () => {
       if (chartContainerRef.current) {
         chart.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -69,7 +75,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
       chartRef.current = null;
       seriesRef.current = null;
       trendSeriesRef.current = [];
-      smaSeriesRef.current = { sma20: null, sma50: null, sma200: null };
+      sma20Ref.current = sma50Ref.current = sma200Ref.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]); // recreate only if theme changes
@@ -106,36 +112,20 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     seriesRef.current.setData(formattedData);
 
     // ── SMA Overlays ──────────────────────────────────────────────────────
-    // Remove if exists
-    ['sma20', 'sma50', 'sma200'].forEach(key => {
-      if (smaSeriesRef.current[key]) {
-        try { chart.removeSeries(smaSeriesRef.current[key]); } catch (_) {}
-        smaSeriesRef.current[key] = null;
-      }
-    });
-
-    if (showSMAs && formattedData.length >= 20) {
-      const config = [
-        { key: 'sma20',  period: 20,  color: '#3B82F6', title: 'SMA 20' },
-        { key: 'sma50',  period: 50,  color: '#F59E0B', title: 'SMA 50' },
-        { key: 'sma200', period: 200, color: '#A855F7', title: 'SMA 200' },
-      ];
-
-      config.forEach(c => {
-        if (formattedData.length >= c.period) {
-          const smaData = calculateSMA(formattedData, c.period);
-          const series = chart.addSeries(LineSeries, {
-            color: c.color,
-            lineWidth: 1,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-            title: c.title,
-          });
-          series.setData(smaData);
-          smaSeriesRef.current[c.key] = series;
-        }
-      });
+    if (formattedData.length >= 20) {
+      sma20Ref.current.setData(calculateSMA(formattedData, 20));
+      sma20Ref.current.applyOptions({ visible: showSMAs });
+    }
+    if (formattedData.length >= 50) {
+      sma50Ref.current.setData(calculateSMA(formattedData, 50));
+      sma50Ref.current.applyOptions({ visible: showSMAs });
+    }
+    if (formattedData.length >= 200) {
+      sma200Ref.current.setData(calculateSMA(formattedData, 200));
+      sma200Ref.current.applyOptions({ visible: showSMAs });
+    } else {
+      // If we don't have enough data for SMA200, hide it
+      sma200Ref.current.applyOptions({ visible: false });
     }
 
     // Restore the zoom/pan if the user had one set, 
