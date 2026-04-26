@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trophy, TrendingUp, TrendingDown, BarChart2, Calendar, Globe, Star, 
-  ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame, AlertTriangle
+  ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame, AlertTriangle, Eye, EyeOff
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../components/Loader';
@@ -14,6 +14,7 @@ const PerformancePage = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
     const [exchangeTab, setExchangeTab] = useState('nse'); // 'nse' or 'bse'
+    const [showAmounts, setShowAmounts] = useState(false);
     const navigate = useNavigate();
 
     const getToken = () => localStorage.getItem('mm_token') || localStorage.getItem('token');
@@ -165,7 +166,17 @@ const PerformancePage = () => {
                         <BarChart2 size={22} className="text-accent" />
                         ANNUAL PORTFOLIO GROWTH
                     </h3>
-                    <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] bg-accent/10 px-3 py-1 rounded-full border border-accent/20">Unified Returns Since 2021</span>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setShowAmounts(!showAmounts)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-dark-bg/60 border border-dark-border rounded-xl text-dark-muted hover:text-white hover:border-accent/40 transition-all"
+                            title={showAmounts ? "Hide Amounts" : "Show Amounts"}
+                        >
+                            {showAmounts ? <EyeOff size={16} /> : <Eye size={16} />}
+                            <span className="text-[10px] font-black uppercase tracking-widest">{showAmounts ? 'Mask' : 'Reveal'}</span>
+                        </button>
+                        <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] bg-accent/10 px-3 py-1 rounded-full border border-accent/20 italic">Unified Returns Since 2021</span>
+                    </div>
                 </div>
                 <div className="p-8">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
@@ -178,9 +189,9 @@ const PerformancePage = () => {
                                 </span>
                                 <div className="mt-4 flex flex-col gap-1.5 p-3 rounded-2xl bg-dark-bg/60 border border-dark-border/30">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[8px] font-black text-dark-muted uppercase">Gain</span>
+                                        <span className="text-[8px] font-black text-dark-muted uppercase font-mono">Gain</span>
                                         <span className={`text-[10px] font-black ${y.profit >=0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
-                                            ₹{Math.round(y.profit).toLocaleString()}
+                                            {showAmounts ? `₹${Math.round(y.profit).toLocaleString()}` : "••••••"}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between border-t border-dark-border/40 pt-1.5">
@@ -198,7 +209,7 @@ const PerformancePage = () => {
                         <div className="flex flex-col p-5 rounded-[2rem] bg-accent/10 border border-accent/30 shadow-lg shadow-accent/5 transition-all text-center min-w-[140px]">
                             <span className="text-[9px] font-black text-accent uppercase tracking-widest mb-2">Unrealized P&L</span>
                             <span className="text-xl font-black text-white italic truncate">
-                                ₹{Math.round(data.grand_total_profit).toLocaleString()}
+                                {showAmounts ? `₹${Math.round(data.grand_total_profit).toLocaleString()}` : "••••••••"}
                             </span>
                             <span className={`text-[10px] font-black mt-1 ${data.grand_total_roi >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
                                 {data.grand_total_roi > 0 ? '+' : ''}{data.grand_total_roi}% Total
