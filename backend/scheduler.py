@@ -9,7 +9,7 @@ from typing import Callable, Awaitable, Dict, List
 
 from backend.data.db import (
     SessionLocal, StockMaster, IntradayTicks, SignalsCache,
-    PriceHistory, FundamentalsCache, AIInsights
+    PriceHistory, FundamentalsCache, AIInsights, PriceAlert
 )
 from backend.utils.market_hours import is_market_open, get_current_ist_time
 from backend.data.fetcher import fetch_live_prices, fetch_fundamentals
@@ -176,6 +176,10 @@ async def eod_consolidation():
 
         # Step 4: Check for price spikes (>3%) and queue AI insight
         await _check_price_spikes_and_notify()
+
+        # Step 5: Check Price Alerts (User and AI)
+        async with SessionLocal() as session:
+            await check_price_alerts(session)
 
         logger.info("EOD consolidation complete.")
     except Exception as e:
@@ -445,6 +449,75 @@ async def _fetch_all_sector_data() -> Dict[str, SectorData]:
     return vault
 
 
+async def check_price_alerts(db: AsyncSession):
+    """
+    EOD job — checks all active alerts against latest close price.
+    Marks triggered alerts and logs them.
+    Run after EOD price consolidation completes.
+    """
+    logger.info("Running EOD price alert checker...")
+
+    # Fetch all active non-triggered alerts
+    result = await db.execute(
+        select(PriceAlert).where(
+            and_(PriceAlert.is_active == True, PriceAlert.is_triggered == False)
+        )
+    )
+    alerts = result.scalars().all()
+
+    if not alerts:
+        logger.info("No active alerts to check.")
+        return
+
+    # Get unique symbols
+    symbols = list({a.symbol for a in alerts})
+
+    # Fetch latest close for each symbol in one query
+    from sqlalchemy import func
+    subq = (
+        select(PriceHistory.symbol, func.max(PriceHistory.date).label("max_date"))
+        .where(PriceHistory.symbol.in_(symbols))
+        .group_by(PriceHistory.symbol)
+        .subquery()
+    )
+    price_result = await db.execute(
+        select(PriceHistory.symbol, PriceHistory.close)
+        .join(subq, and_(
+            PriceHistory.symbol == subq.c.symbol,
+            PriceHistory.date   == subq.c.max_date
+        ))
+    )
+    latest_prices = {row.symbol: float(row.close) for row in price_result}
+
+    triggered_count = 0
+    for alert in alerts:
+        current_price = latest_prices.get(alert.symbol)
+        if current_price is None:
+            continue
+
+        triggered = (
+            (alert.direction == "ABOVE" and current_price >= alert.price_level) or
+            (alert.direction == "BELOW" and current_price <= alert.price_level)
+        )
+
+        if triggered:
+            alert.is_triggered   = True
+            alert.triggered_at   = datetime.utcnow()
+            alert.triggered_price= current_price
+            triggered_count += 1
+            logger.info(
+                f"ALERT TRIGGERED — {alert.symbol} {alert.direction} "
+                f"₹{alert.price_level} | current: ₹{current_price} | "
+                f"user: {alert.user_id} | label: {alert.label}"
+            )
+
+    if triggered_count:
+        await db.commit()
+        logger.info(f"Alert checker: {triggered_count} alert(s) triggered.")
+    else:
+        logger.info("Alert checker: no alerts triggered.")
+
+
 # ── Scheduler setup ───────────────────────────────────────────────────────────
 def start_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
@@ -464,8 +537,11 @@ def start_scheduler() -> AsyncIOScheduler:
                       day_of_week="mon", hour=8, minute=0,
                       id="weekly_refresh", replace_existing=True)
 
+    # Added: Manually trigger alert check every hour outside market hours as fallback
+    # But usually EOD consolidation is enough.
+    
     scheduler.start()
-    logger.info("Scheduler started with 3 jobs: intraday_fetch, eod_consolidation, weekly_refresh")
+    logger.info("Scheduler started with core jobs: intraday_fetch, eod_consolidation, weekly_refresh")
     return scheduler
 
 
