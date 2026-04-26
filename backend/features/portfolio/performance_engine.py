@@ -309,16 +309,16 @@ class PerformanceEngine:
             if p_yr.empty or n_yr.empty:
                 continue
 
-            # Filter zero-value days for the portfolio (prevents inf on first buy)
+            # Use simple point-to-point: first/last price of the year.
+            # pct_change().prod() explodes when portfolio has 0 before first buy day.
             p_yr_active = p_yr[p_yr > 0]
-            if p_yr_active.empty:
+            if p_yr_active.empty or len(p_yr_active) < 2:
                 p_return = 0.0
             else:
-                p_daily_ret = p_yr_active.pct_change().dropna()
-                # Clean any accidental inf/nan to ensure JSON compliance
-                p_daily_ret = p_daily_ret.replace([np.inf, -np.inf], np.nan).dropna()
-                p_return = round(((1 + p_daily_ret).prod() - 1) * 100, 2) if not p_daily_ret.empty else 0.0
-            
+                p_first = float(p_yr_active.iloc[0])
+                p_last = float(p_yr_active.iloc[-1])
+                p_return = round(((p_last / p_first) - 1) * 100, 2) if p_first > 0 else 0.0
+
             n_first = float(n_yr.iloc[0])
             n_return = round(((float(n_yr.iloc[-1]) / n_first) - 1) * 100, 2) if n_first > 0 else 0
             

@@ -7,6 +7,21 @@ from .performance_engine import PerformanceEngine
 
 router = APIRouter(prefix="/api/portfolio-performance", tags=["Portfolio Performance"])
 
+@router.post("/flush-cache")
+@limiter.limit("5/minute")
+async def flush_performance_cache(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Flush all performance cache for the current user."""
+    from sqlalchemy import delete
+    from backend.data.db import PerformanceCache
+    await db.execute(delete(PerformanceCache).where(PerformanceCache.user_id == current_user.id))
+    await db.commit()
+    return {"status": "ok", "message": "Performance cache cleared"}
+
+
 @router.get("/benchmark-comparison")
 @limiter.limit("10/minute")
 async def get_benchmark_comparison(
