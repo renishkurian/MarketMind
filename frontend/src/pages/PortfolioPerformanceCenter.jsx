@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trophy, TrendingUp, TrendingDown, BarChart2, Calendar, Globe, Star, 
   ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame, AlertTriangle, Eye, EyeOff,
-  Sparkles, X, Send, ChevronRight
+  Sparkles, X, Send, ChevronRight, Brain
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../components/Loader';
@@ -20,6 +20,10 @@ const PerformancePage = () => {
     const [chatMessages, setChatMessages] = useState([]);
     const [chatLoading, setChatLoading] = useState(false);
     const [chatInput, setChatInput] = useState('');
+
+    const [explanations, setExplanations] = useState({});   // key: `${symbol}_${period}`
+    const [loadingExpl,  setLoadingExpl]  = useState({});
+    const [explModal,    setExplModal]    = useState(null);  // holds full explanation object
     const navigate = useNavigate();
 
     const openAI = (symbol, companyName, cardTitle, gain) => {
@@ -45,6 +49,23 @@ const PerformancePage = () => {
         } finally {
             setChatLoading(false);
         }
+    };
+
+    const fetchMoveExplanation = async (symbol, period, gainPct) => {
+      const key = `${symbol}_${period}`;
+      if (loadingExpl[key] || explanations[key]) return;
+      setLoadingExpl(prev => ({ ...prev, [key]: true }));
+      try {
+        const res = await axios.get(`${API_URL}/api/stock/${symbol}/move-explanation`, {
+          params: { period, gain_pct: gainPct },
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        setExplanations(prev => ({ ...prev, [key]: res.data }));
+      } catch (e) {
+        console.warn('Move explanation failed:', e);
+      } finally {
+        setLoadingExpl(prev => ({ ...prev, [key]: false }));
+      }
     };
 
     const handleSend = (text) => {
