@@ -1,13 +1,13 @@
 import pandas as pd
 import yfinance as yf
 import numpy as np
-from datetime import datetime, timedelta, date
+import datetime as dt
+from datetime import timedelta, date
 from sqlalchemy import select, and_, delete
 from sqlalchemy.dialects.mysql import insert
 from backend.data.db import PriceHistory, StockMaster, PerformanceCache, PortfolioTransaction
 import logging
 import asyncio
-import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class PerformanceEngine:
             entry = res.scalar_one_or_none()
             if entry:
                 # 4 hour cache
-                if (datetime.datetime.utcnow() - entry.updated_at).total_seconds() < 14400:
+                if (dt.datetime.utcnow() - entry.updated_at).total_seconds() < 14400:
                     logger.info(f"Returning DB cached performance for {cache_key}")
                     return entry.data
 
@@ -210,7 +210,7 @@ class PerformanceEngine:
                 cache_type="benchmark",
                 cache_key=cache_key,
                 data=result,
-                updated_at=datetime.datetime.utcnow()
+                updated_at=dt.datetime.utcnow()
             )
             self.db.add(new_cache)
             await self.db.commit()
@@ -236,7 +236,7 @@ class PerformanceEngine:
             res = await self.db.execute(stmt)
             entry = res.scalar_one_or_none()
             if entry:
-                if (datetime.datetime.utcnow() - entry.updated_at).total_seconds() < 14400:
+                if (dt.datetime.utcnow() - entry.updated_at).total_seconds() < 14400:
                     return entry.data
         
 
@@ -347,7 +347,7 @@ class PerformanceEngine:
                 cache_type="yearly",
                 cache_key="all",
                 data=res,
-                updated_at=datetime.datetime.utcnow()
+                updated_at=dt.datetime.utcnow()
             )
             self.db.add(new_cache)
             await self.db.commit()
@@ -375,7 +375,7 @@ class PerformanceEngine:
             c_res = await self.db.execute(c_stmt)
             cache = c_res.scalar_one_or_none()
             if cache:
-                age = (datetime.datetime.utcnow() - cache.updated_at).total_seconds()
+                age = (dt.datetime.utcnow() - cache.updated_at).total_seconds()
                 if age < 14400:  # 4 hour TTL same as others
                     return cache.data
 
@@ -474,7 +474,7 @@ class PerformanceEngine:
         final_data = {
             "years": all_years,
             "matrix": matrix,
-            "cached_at": datetime.datetime.now().isoformat()
+            "cached_at": dt.datetime.now().isoformat()
         }
 
         # E. Save to Cache
@@ -483,10 +483,10 @@ class PerformanceEngine:
             cache_type="STOCK_MATRIX",
             cache_key="ALL_ASSETS",
             data=final_data,
-            updated_at=datetime.datetime.utcnow()
+            updated_at=dt.datetime.utcnow()
         ).on_duplicate_key_update(
             data=final_data,
-            updated_at=datetime.datetime.utcnow()
+            updated_at=dt.datetime.utcnow()
         )
         await self.db.execute(upsert_stmt)
         await self.db.commit()
@@ -839,10 +839,10 @@ class PerformanceEngine:
             cache_type="PERFORMANCE_SUMMARY",
             cache_key="DASHBOARD",
             data=final_data,
-            updated_at=datetime.datetime.utcnow()
+            updated_at=dt.datetime.utcnow()
         ).on_duplicate_key_update(
             data=final_data,
-            updated_at=datetime.datetime.utcnow()
+            updated_at=dt.datetime.utcnow()
         )
         await self.db.execute(upsert_stmt)
         await self.db.commit()
