@@ -34,7 +34,7 @@ const NAV_SECTIONS = [
     label: 'System',
     items: [
       { path: '/ai-logs',       label: 'AI Logs',       Icon: LayoutDashboard },
-      { path: '/marketmind_user_guide.html', label: 'User Doc', Icon: Info, external: true },
+      { path: '/user-doc',      label: 'User Doc',      Icon: Info },
       { path: '/methodology',   label: 'Methodology',   Icon: Info       },
       { path: '/settings',      label: 'Settings',      Icon: Settings   },
     ]

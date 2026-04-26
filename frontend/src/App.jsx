@@ -22,6 +22,7 @@ import WarRoom from './pages/WarRoom';
 import BenchmarkDashboard from './pages/BenchmarkDashboard';
 import StockPerformanceHeatmap from './pages/StockPerformanceHeatmap';
 import PortfolioPerformanceCenter from './pages/PortfolioPerformanceCenter';
+import UserDoc from './pages/UserDoc';
 import { useAuthStore } from './store/authStore';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/market';
@@ -114,6 +115,10 @@ function AppInner() {
 
         <Route path="/methodology" element={
           <ProtectedRoute><Layout><Methodology /></Layout></ProtectedRoute>
+        } />
+
+        <Route path="/user-doc" element={
+          <ProtectedRoute><Layout><UserDoc /></Layout></ProtectedRoute>
         } />
 
         <Route path="/admin/users" element={
