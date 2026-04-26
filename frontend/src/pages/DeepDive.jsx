@@ -1123,6 +1123,14 @@ export default function DeepDive() {
                           {activeSkill ? activeSkill.name : (activeSession?.title || 'Chart Intelligence')}
                         </span>
                         <div className="flex items-center gap-1">
+                          {/* Skill Picker Toggle */}
+                          <button
+                            onClick={() => setShowSkillPicker(v => !v)}
+                            title="Switch Lens"
+                            className={`text-dark-muted hover:text-accent transition-colors p-1 rounded text-[11px] font-black ${showSkillPicker ? 'text-accent bg-accent/10' : ''}`}
+                          >
+                            {activeSkill ? activeSkill.icon : '🎭'}
+                          </button>
                           {/* New Chat */}
                           <button
                             onClick={() => createNewSession()}
