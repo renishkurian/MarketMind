@@ -879,6 +879,33 @@ export default function DeepDive() {
                     </button>
                   ))}
                 </div>
+                {/* Pattern badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {patternLoading && (
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-dark-card border border-dark-border rounded-full">
+                      <RefreshCw size={11} className="animate-spin text-dark-muted" />
+                      <span className="text-[10px] text-dark-muted font-bold">Scanning patterns…</span>
+                    </div>
+                  )}
+                  {!patternLoading && patterns.map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPatternModal(p)}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black transition-all hover:scale-105 ${
+                        p.implication === 'Bullish'
+                          ? 'bg-signal-buy/10 border-signal-buy/40 text-signal-buy hover:bg-signal-buy/20'
+                          : p.implication === 'Bearish'
+                          ? 'bg-signal-sell/10 border-signal-sell/40 text-signal-sell hover:bg-signal-sell/20'
+                          : 'bg-signal-hold/10 border-signal-hold/40 text-signal-hold hover:bg-signal-hold/20'
+                      }`}
+                    >
+                      <span>{p.implication === 'Bullish' ? '📐' : p.implication === 'Bearish' ? '📉' : '◈'}</span>
+                      {p.name}
+                      <span className="opacity-60">{Math.round(p.confidence * 100)}%</span>
+                    </button>
+                  ))}
+                </div>
+
                 <button 
                   onClick={toggleChat}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-colors border ${
