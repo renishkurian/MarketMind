@@ -611,7 +611,7 @@ export default function DeepDive() {
     setShowChartChat(willOpen);
     if (willOpen) {
       const stored = localStorage.getItem(CHAT_STORAGE_KEY);
-      const existingSessions = stored ? JSON.parse(stored) : [];
+      const existingSessions = (stored && stored !== 'undefined') ? JSON.parse(stored) : [];
       if (existingSessions.length === 0) {
         // Auto-start the very first session
         const newSession = {
@@ -624,13 +624,14 @@ export default function DeepDive() {
         const updated = [newSession];
         saveSessions(updated);
         setActiveChatSessionId(newSession.id);
-        const autoMsg = signals
-          ? `Analyze ${symbol} chart. Current price ₹${Number(signals.current_price).toFixed(2)}, ` +
-            `composite score ${signals.composite_score}/100, ` +
-            `ST signal ${signals.st_signal}, LT signal ${signals.lt_signal}. ` +
+        const autoMsg = sig
+          ? `Analyze ${symbol} chart. Current price ₹${Number(sig.current_price || 0).toFixed(2)}, ` +
+            `ST signal ${sig.st_signal}, LT signal ${sig.lt_signal}. ` +
             `Is this a good long-term entry? Plot key support/resistance levels.`
           : `Please analyze this ${symbol} chart. State if this is a good buy setup and plot key support/resistance.`;
-        sendChatMessage(autoMsg, newSession.id);
+        
+        // Instead of auto-sending, we just prepare the input for the user
+        setChatInput(autoMsg);
       }
     }
   };
