@@ -1223,8 +1223,21 @@ export default function DeepDive() {
                       >
                         {chatMessages.length === 0 && !chatLoading && (
                           <div className="flex flex-col items-center justify-center h-full gap-3 text-dark-muted">
-                            <Brain size={28} className="opacity-30"/>
-                            <p className="text-sm text-center">Analyzing chart…<br/><span className="text-xs opacity-60">This may take a few seconds</span></p>
+                            {activeSkill ? (
+                              <>
+                                <span className="text-4xl">{activeSkill.icon}</span>
+                                <div className="text-center">
+                                  <p className="text-sm font-black text-white">{activeSkill.name}</p>
+                                  <p className="text-xs text-dark-muted mt-1 max-w-[220px] mx-auto">{activeSkill.desc}</p>
+                                  <p className="text-[10px] text-accent mt-2 font-bold">Ask anything — responses are in this persona</p>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Brain size={28} className="opacity-30"/>
+                                <p className="text-sm text-center">Analyzing chart…<br/><span className="text-xs opacity-60">This may take a few seconds</span></p>
+                              </>
+                            )}
                           </div>
                         )}
                         {chatMessages.map((msg, i) => (
