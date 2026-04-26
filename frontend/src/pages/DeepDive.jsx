@@ -382,6 +382,26 @@ export default function DeepDive() {
     }
   };
 
+  const fetchPatterns = useCallback(async () => {
+    if (!symbol) return;
+    setPatternLoading(true);
+    try {
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/patterns`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPatterns(data.patterns || []);
+        setPatternSummary(data.summary || '');
+      }
+    } catch (e) {
+      console.warn('Pattern fetch failed:', e);
+    } finally {
+      setPatternLoading(false);
+    }
+  }, [symbol]);
+
   const handleSyncAndResearch = async () => {
     try {
       setFundSyncLoading(true);
