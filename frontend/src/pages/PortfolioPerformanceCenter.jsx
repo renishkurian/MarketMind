@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trophy, TrendingUp, TrendingDown, BarChart2, Calendar, Globe, Star, 
-  ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame, AlertTriangle, Eye, EyeOff
+  ArrowUpRight, ArrowDownRight, Info, Shield, Zap, Flame, AlertTriangle, Eye, EyeOff,
+  Sparkles, X, Send, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../components/Loader';
@@ -15,7 +16,45 @@ const PerformancePage = () => {
     const [error, setError] = useState(null);
     const [exchangeTab, setExchangeTab] = useState('nse'); // 'nse' or 'bse'
     const [showAmounts, setShowAmounts] = useState(false);
+    const [aiPanel, setAiPanel] = useState({ open: false, symbol: '' });
+    const [chatMessages, setChatMessages] = useState([]);
+    const [chatLoading, setChatLoading] = useState(false);
+    const [chatInput, setChatInput] = useState('');
     const navigate = useNavigate();
+
+    const openAI = (symbol, cardTitle, gain) => {
+        const question = `${symbol} is showing ${gain}% in '${cardTitle}'. Why has it moved this much? Is this a good entry/exit? Are there any news catalysts?`;
+        const initMessages = [{ role: 'user', content: question }];
+        setAiPanel({ open: true, symbol });
+        setChatMessages(initMessages);
+        setChatInput('');
+        _sendChat(symbol, initMessages);
+    };
+
+    const _sendChat = async (symbol, messages) => {
+        setChatLoading(true);
+        try {
+            const res = await axios.post(
+                `${API_URL}/api/stock/${symbol}/chart_chat`,
+                { messages },
+                { headers: { 'Authorization': `Bearer ${getToken()}` } }
+            );
+            setChatMessages(prev => [...prev, { role: 'assistant', content: res.data.reply || 'No response.' }]);
+        } catch {
+            setChatMessages(prev => [...prev, { role: 'assistant', content: 'AI unavailable. Please try again.' }]);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
+    const handleSend = (text) => {
+        const msg = text || chatInput;
+        if (!msg.trim() || chatLoading) return;
+        const next = [...chatMessages, { role: 'user', content: msg }];
+        setChatMessages(next);
+        setChatInput('');
+        _sendChat(aiPanel.symbol, next);
+    };
 
     const getToken = () => localStorage.getItem('mm_token') || localStorage.getItem('token');
 
@@ -79,9 +118,18 @@ const PerformancePage = () => {
                             </span>
                             <span className="text-[10px] text-dark-muted font-bold uppercase">{s.symbol}</span>
                         </div>
-                        <div className={`flex items-center gap-1 font-black ${s.gain >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
-                            <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
-                            {s.gain >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}
+                        <div className="flex items-center gap-1.5">
+                            <div className={`flex items-center gap-1 font-black ${s.gain >= 0 ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                                <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
+                                {s.gain >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}
+                            </div>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); openAI(s.symbol, title, s.gain); }}
+                                className="p-1 rounded-lg text-dark-muted hover:text-accent hover:bg-accent/10 transition-all opacity-0 group-hover/row:opacity-100"
+                                title="Ask AI"
+                            >
+                                <Sparkles size={13}/>
+                            </button>
                         </div>
                     </div>
                 )) : (
@@ -115,9 +163,18 @@ const PerformancePage = () => {
                             </span>
                             <span className="text-[10px] text-dark-muted font-bold uppercase">{s.symbol}</span>
                         </div>
-                        <div className="flex items-center gap-1 font-black text-signal-sell">
-                            <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
-                            <ArrowDownRight size={16}/>
+                        <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 font-black text-signal-sell">
+                                <span className="text-lg">{s.gain > 0 ? '+' : ''}{s.gain}%</span>
+                                <ArrowDownRight size={16}/>
+                            </div>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); openAI(s.symbol, title, s.gain); }}
+                                className="p-1 rounded-lg text-dark-muted hover:text-signal-sell hover:bg-signal-sell/10 transition-all opacity-0 group-hover/row:opacity-100"
+                                title="Ask AI"
+                            >
+                                <Sparkles size={13}/>
+                            </button>
                         </div>
                     </div>
                 )) : (
@@ -128,6 +185,7 @@ const PerformancePage = () => {
     );
 
     return (
+        <>
         <div className="p-6 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-700">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -309,6 +367,93 @@ const PerformancePage = () => {
                 </div>
             </div>
         </div>
+
+            {/* ── Floating AI Chat Panel ────────────────────────── */}
+            {aiPanel.open && (
+                <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[520px] bg-dark-card border border-accent/30 rounded-3xl shadow-2xl shadow-accent/10 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+                    {/* Panel Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border bg-gradient-to-r from-accent/10 to-transparent flex-shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="p-1.5 bg-accent/20 rounded-xl">
+                                <Sparkles size={16} className="text-accent" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-white tracking-tight">{aiPanel.symbol}</p>
+                                <p className="text-[10px] text-accent font-bold uppercase tracking-widest">AI Research Assistant</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setAiPanel({ open: false, symbol: '' })}
+                            className="p-1.5 rounded-xl text-dark-muted hover:text-white hover:bg-dark-border/60 transition-all"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scroll-smooth">
+                        {chatMessages.map((m, i) => (
+                            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-[12px] leading-relaxed font-medium ${
+                                    m.role === 'user'
+                                        ? 'bg-accent text-white rounded-br-sm'
+                                        : 'bg-dark-bg/80 text-dark-text border border-dark-border rounded-bl-sm'
+                                }`}>
+                                    {m.content}
+                                </div>
+                            </div>
+                        ))}
+                        {chatLoading && (
+                            <div className="flex justify-start">
+                                <div className="bg-dark-bg/80 border border-dark-border rounded-2xl rounded-bl-sm px-4 py-3">
+                                    <div className="flex gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{animationDelay:'0ms'}}/>
+                                        <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{animationDelay:'150ms'}}/>
+                                        <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{animationDelay:'300ms'}}/>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Quick Chips */}
+                    {!chatLoading && (
+                        <div className="px-4 py-2 flex flex-wrap gap-1.5 border-t border-dark-border/40 flex-shrink-0">
+                            {['Should I take profit?', 'Is this overbought?', 'Key support/resistance?', 'Any news catalyst?'].map(chip => (
+                                <button
+                                    key={chip}
+                                    onClick={() => handleSend(chip)}
+                                    className="flex items-center gap-1 px-2.5 py-1 bg-dark-bg/60 border border-dark-border hover:border-accent/50 hover:text-accent rounded-full text-[10px] font-bold text-dark-muted transition-all"
+                                >
+                                    <ChevronRight size={10}/>{chip}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Input */}
+                    <div className="px-4 py-3 border-t border-dark-border flex-shrink-0">
+                        <div className="flex gap-2">
+                            <input
+                                value={chatInput}
+                                onChange={e => setChatInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                                placeholder="Ask anything about this stock..."
+                                className="flex-1 bg-dark-bg/60 border border-dark-border rounded-2xl px-4 py-2 text-[12px] text-dark-text placeholder:text-dark-muted/50 focus:outline-none focus:border-accent/50 transition-all"
+                                disabled={chatLoading}
+                            />
+                            <button
+                                onClick={() => handleSend()}
+                                disabled={chatLoading || !chatInput.trim()}
+                                className="p-2.5 bg-accent rounded-2xl text-white hover:bg-accent/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                            >
+                                <Send size={14}/>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
 
