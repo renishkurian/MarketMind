@@ -1221,6 +1221,29 @@ export default function DeepDive() {
                         </div>
                       )}
 
+                      {/* Active Alerts for this stock */}
+                      {stockAlerts.length > 0 && (
+                        <div className="px-3 pb-2 shrink-0">
+                          <p className="text-[9px] font-black text-dark-muted uppercase tracking-widest mb-1.5">Active Alerts</p>
+                          <div className="space-y-1">
+                            {stockAlerts.map(a => (
+                              <div key={a.id} className="flex items-center justify-between bg-dark-bg border border-dark-border rounded-lg px-2.5 py-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Bell size={10} className={a.direction === 'ABOVE' ? 'text-signal-buy' : 'text-signal-sell'} />
+                                  <span className="text-[10px] font-bold text-dark-text truncate">{a.label || a.alert_type}</span>
+                                  <span className={`text-[10px] font-mono font-black ${a.direction === 'ABOVE' ? 'text-signal-buy' : 'text-signal-sell'}`}>
+                                    {a.direction === 'ABOVE' ? '▲' : '▼'} ₹{a.price_level?.toFixed(2)}
+                                  </span>
+                                </div>
+                                <button onClick={() => deleteAlert(a.id)} className="text-dark-muted hover:text-signal-sell p-0.5 shrink-0">
+                                  <X size={10}/>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Input Bar */}
                       <div className="p-3 border-t border-dark-border bg-dark-bg flex gap-2 shrink-0">
                         <input
