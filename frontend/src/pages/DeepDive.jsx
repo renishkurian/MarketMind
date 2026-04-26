@@ -457,8 +457,9 @@ export default function DeepDive() {
 
   // Chart range filtering
   const [range, setRange] = useState('3M');
-  const rangeMap = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': 9999 };
-  const filteredHistory = history.slice(-(rangeMap[range] ?? 90));
+  const rangeMap = { '1W': 7, '1M': 21, '3M': 63, '6M': 126, '1Y': 252, 'ALL': 9999 };
+  const filteredHistory = history.slice(-(rangeMap[range] ?? 63));
+  const fullHistoryForIndicators = history; // always full dataset for RSI/MACD accuracy
 
   // Volume max for bar scaling
   const maxVol = Math.max(...filteredHistory.map(d => d.volume || 0), 1);
@@ -876,8 +877,8 @@ export default function DeepDive() {
                     <div className="space-y-4">
                       <CandlestickChart data={filteredHistory} theme={theme} trendLines={activeTrendLines} />
                       <VolumeChart data={filteredHistory} theme={theme} />
-                      <RSIChart data={filteredHistory} theme={theme} />
-                      <MACDChart data={filteredHistory} theme={theme} />
+                      <RSIChart data={fullHistoryForIndicators} theme={theme} range={range} />
+                      <MACDChart data={fullHistoryForIndicators} theme={theme} range={range} />
                     </div>
 
                     {/* OHLC last bar summary */}

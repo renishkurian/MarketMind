@@ -2,16 +2,19 @@ import React, { useEffect, useRef } from 'react';
 import { createChart, ColorType, LineSeries, HistogramSeries } from 'lightweight-charts';
 
 const calculateEMA = (data, period) => {
+  if (data.length < period) return [];
   const k = 2 / (period + 1);
-  let prevEma = data[0].value;
-  return data.map((d, i) => {
-    const currentEma = i === 0 ? d.value : (d.value - prevEma) * k + prevEma;
+  const seed = data.slice(0, period).reduce((sum, d) => sum + d.value, 0) / period;
+  let prevEma = seed;
+  return data.slice(period - 1).map((d, i) => {
+    const currentEma = i === 0 ? seed : (d.value - prevEma) * k + prevEma;
     prevEma = currentEma;
     return { time: d.time, value: currentEma };
   });
 };
 
-const MACDChart = ({ data, theme = 'dark' }) => {
+const MACDChart = ({ data, range = '3M', theme = 'dark' }) => {
+  const rangeMap = { '1W': 7, '1M': 21, '3M': 63, '6M': 126, '1Y': 252, 'ALL': 9999 };
   const chartContainerRef = useRef();
   const chartRef = useRef(null);
   const macdRef = useRef(null);
@@ -68,7 +71,13 @@ const MACDChart = ({ data, theme = 'dark' }) => {
 
     const ema12 = calculateEMA(formattedData, 12);
     const ema26 = calculateEMA(formattedData, 26);
-    const macdLine   = ema12.map((e, i) => ({ time: e.time, value: e.value - ema26[i].value }));
+    
+    // Align: MACD line starts only where both series exist (effectively where EMA26 starts)
+    const macdLine = ema26.map(e26 => {
+      const e12 = ema12.find(e => e.time === e26.time);
+      return e12 ? { time: e26.time, value: e12.value - e26.value } : null;
+    }).filter(Boolean);
+
     const signalLine = calculateEMA(macdLine, 9);
     const histogram  = macdLine.map((ml, i) => {
       const sl = signalLine.find(s => s.time === ml.time);
@@ -77,12 +86,13 @@ const MACDChart = ({ data, theme = 'dark' }) => {
       return { time: ml.time, value: val, color: val >= 0 ? '#10B981' : '#EF4444' };
     }).filter(Boolean);
 
-    macdRef.current.setData(macdLine);
-    signalRef.current.setData(signalLine);
-    histRef.current.setData(histogram);
+    const limit = rangeMap[range] ?? 63;
+    macdRef.current.setData(macdLine.slice(-limit));
+    signalRef.current.setData(signalLine.slice(-limit));
+    histRef.current.setData(histogram.slice(-limit));
 
     if (visibleRange) chartRef.current.timeScale().setVisibleRange(visibleRange);
-  }, [data]);
+  }, [data, range]);
 
   return (
     <div className="relative">
