@@ -595,6 +595,15 @@ export default function DeepDive() {
     const text = msgOverride || chatInput;
     if (!text.trim() && !msgOverride) return;
 
+    // Intercept alert-intent messages — route to alert creation instead of chat
+    const alertKeywords = ['set an alert', 'set alert', 'alert me', 'notify me', 'set a stop', 'alert at'];
+    const isAlertRequest = alertKeywords.some(kw => text.toLowerCase().includes(kw));
+    if (isAlertRequest) {
+      if (!msgOverride) setChatInput('');
+      await createAIAlert(text);
+      return;
+    }
+
     const targetSessionId = sessionIdOverride || activeChatSessionId;
     if (!targetSessionId) return;
 
