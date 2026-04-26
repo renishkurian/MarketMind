@@ -1,11 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { createChart, ColorType, CandlestickSeries, LineSeries } from 'lightweight-charts';
 
-const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
+const calculateSMA = (data, period) => {
+  if (data.length < period) return [];
+  const sma = [];
+  for (let i = period - 1; i < data.length; i++) {
+    const sum = data.slice(i - period + 1, i + 1).reduce((acc, d) => acc + d.close, 0);
+    sma.push({ time: data[i].time, value: sum / period });
+  }
+  return sma;
+};
+
+const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = true }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const trendSeriesRef = useRef([]);
+  const smaSeriesRef = useRef({ sma20: null, sma50: null, sma200: null });
 
   // ── Init chart ONCE on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -58,6 +69,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
       chartRef.current = null;
       seriesRef.current = null;
       trendSeriesRef.current = [];
+      smaSeriesRef.current = { sma20: null, sma50: null, sma200: null };
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]); // recreate only if theme changes
@@ -93,6 +105,39 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
 
     seriesRef.current.setData(formattedData);
 
+    // ── SMA Overlays ──────────────────────────────────────────────────────
+    // Remove if exists
+    ['sma20', 'sma50', 'sma200'].forEach(key => {
+      if (smaSeriesRef.current[key]) {
+        try { chart.removeSeries(smaSeriesRef.current[key]); } catch (_) {}
+        smaSeriesRef.current[key] = null;
+      }
+    });
+
+    if (showSMAs && formattedData.length >= 20) {
+      const config = [
+        { key: 'sma20',  period: 20,  color: '#3B82F6', title: 'SMA 20' },
+        { key: 'sma50',  period: 50,  color: '#F59E0B', title: 'SMA 50' },
+        { key: 'sma200', period: 200, color: '#A855F7', title: 'SMA 200' },
+      ];
+
+      config.forEach(c => {
+        if (formattedData.length >= c.period) {
+          const smaData = calculateSMA(formattedData, c.period);
+          const series = chart.addSeries(LineSeries, {
+            color: c.color,
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+            title: c.title,
+          });
+          series.setData(smaData);
+          smaSeriesRef.current[c.key] = series;
+        }
+      });
+    }
+
     // Restore the zoom/pan if the user had one set, 
     // BUT only if the data length is similar (incremental update).
     // If it's a massive shift (range change), let the chart fit the new data.
@@ -109,7 +154,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [] }) => {
     }
     
     seriesRef.current.previousDataLength = data.length;
-  }, [data]);
+  }, [data, showSMAs]);
 
   // ── Update trend lines without destroying zoom state ─────────────────────
   useEffect(() => {
