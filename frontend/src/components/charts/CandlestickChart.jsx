@@ -24,7 +24,7 @@ const calcBB = (data, period = 20, stdDev = 2) => {
   return { upper, lower };
 };
 
-const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = true, showBBs = true }) => {
+const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = true, showBBs = true, priceTarget = null }) => {
   const chartContainerRef = useRef();
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -34,6 +34,8 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
   const sma200Ref = useRef(null);
   const bbUpperRef = useRef(null);
   const bbLowerRef = useRef(null);
+  const ptHighRef = useRef(null);
+  const ptLowRef = useRef(null);
 
   // ── Init chart ONCE on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -79,6 +81,9 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     bbUpperRef.current = chart.addSeries(LineSeries, { color: '#6B7280', lineWidth: 1, lineStyle: 2, title: 'BB Upper', priceLineVisible: false, lastValueVisible: false });
     bbLowerRef.current = chart.addSeries(LineSeries, { color: '#6B7280', lineWidth: 1, lineStyle: 2, title: 'BB Lower', priceLineVisible: false, lastValueVisible: false });
 
+    ptHighRef.current = chart.addSeries(LineSeries, { color: '#10B981', lineWidth: 1, lineStyle: 3, title: 'AI Target High', priceLineVisible: false, lastValueVisible: true });
+    ptLowRef.current  = chart.addSeries(LineSeries, { color: '#EF4444', lineWidth: 1, lineStyle: 3, title: 'AI Target Low',  priceLineVisible: false, lastValueVisible: true });
+
     const handleResize = () => {
       if (chartContainerRef.current) {
         chart.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -94,6 +99,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
       trendSeriesRef.current = [];
       sma20Ref.current = sma50Ref.current = sma200Ref.current = null;
       bbUpperRef.current = bbLowerRef.current = null;
+      ptHighRef.current = ptLowRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]); // recreate only if theme changes
