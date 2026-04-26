@@ -1453,6 +1453,147 @@ async def delete_alert(
     return {"deleted": True, "id": alert_id}
 
 
+@app.post("/api/stock/{symbol}/skill_chat")
+@limiter.limit("8/minute")
+async def handle_skill_chat(
+    symbol: str,
+    request: Request,
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Chat through a specific investment skill persona.
+    Payload: { skill_id: str, messages: list }
+    Same context pipeline as chart_chat — full OHLC + signals + news.
+    """
+    symbol   = symbol.upper()
+    skill_id = payload.get("skill_id", "")
+    chat_history = payload.get("messages", [])
+
+    if not skill_id:
+        raise HTTPException(status_code=400, detail="skill_id is required")
+
+    # Build full context — identical pipeline to chart_chat
+    sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
+    sig = sig_result.scalars().first()
+
+    hist_result = await db.execute(
+        select(PriceHistory)
+        .where(PriceHistory.symbol == symbol)
+        .order_by(PriceHistory.date.desc())
+        .limit(90)
+    )
+    history = hist_result.scalars().all()
+    history.reverse()
+
+    closes = [float(h.close) for h in history]
+    highs  = [float(h.high)  for h in history]
+    lows   = [float(h.low)   for h in history]
+    vols   = [int(h.volume)  for h in history]
+
+    def sma(series, n):
+        return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
+
+    def weekly_aggregates(hist):
+        buckets = []
+        for i in range(0, len(hist), 5):
+            chunk = hist[i:i+5]
+            if not chunk: continue
+            buckets.append({
+                "week_start": str(chunk[0].date),
+                "open":  round(float(chunk[0].open), 2),
+                "high":  round(max(float(h.high) for h in chunk), 2),
+                "low":   round(min(float(h.low)  for h in chunk), 2),
+                "close": round(float(chunk[-1].close), 2),
+                "avg_vol": round(sum(int(h.volume) for h in chunk) / len(chunk)),
+            })
+        return buckets
+
+    from datetime import date as dt_date
+    today_date = dt_date.today()
+
+    # Fetch fundamentals for skill context (especially important for Buffett/SEBI skills)
+    fund_result = await db.execute(
+        select(FundamentalsCache).where(FundamentalsCache.symbol == symbol)
+    )
+    fund = fund_result.scalar_one_or_none()
+
+    fa_data = {}
+    if fund:
+        fa_data = {
+            "pe_ratio":           float(fund.pe_ratio)           if fund.pe_ratio           else None,
+            "pe_5yr_avg":         float(fund.pe_5yr_avg)         if fund.pe_5yr_avg         else None,
+            "roe":                float(fund.roe)                if fund.roe                else None,
+            "roe_3yr_avg":        float(fund.roe_3yr_avg)        if fund.roe_3yr_avg        else None,
+            "debt_equity":        float(fund.debt_equity)        if fund.debt_equity        else None,
+            "revenue_growth_3yr": float(fund.revenue_growth_3yr) if fund.revenue_growth_3yr else None,
+            "pat_growth_3yr":     float(fund.pat_growth_3yr)     if fund.pat_growth_3yr     else None,
+            "operating_margin":   float(fund.operating_margin)   if fund.operating_margin   else None,
+            "promoter_holding":   float(fund.promoter_holding)   if fund.promoter_holding   else None,
+            "promoter_pledge_pct":float(fund.promoter_pledge_pct)if fund.promoter_pledge_pct else None,
+        }
+
+    context_data = {
+        "current_st_signal": sig.st_signal if sig else "HOLD",
+        "current_lt_signal": sig.lt_signal if sig else "HOLD",
+        "composite_score":   float(sig.composite_score) if sig and sig.composite_score else None,
+        "today": {
+            "date":       str(today_date),
+            "close":      float(sig.current_price) if sig and sig.current_price else (closes[-1] if closes else None),
+            "change_pct": float(sig.change_pct)    if sig and sig.change_pct    else None,
+        },
+        "price_summary": {
+            "period_change_pct": round((closes[-1] - closes[0]) / closes[0] * 100, 2) if len(closes) >= 2 else None,
+            "90d_high":    round(max(highs), 2) if highs else None,
+            "90d_low":     round(min(lows),  2) if lows  else None,
+            "avg_volume_90d": round(sum(vols) / len(vols)) if vols else None,
+            "sma_20":  sma(closes, 20),
+            "sma_50":  sma(closes, 50),
+            "sma_90":  sma(closes, 90),
+            "weekly_candles": weekly_aggregates(history),
+            "recent_5_bars": [
+                {
+                    "date":   str(h.date),
+                    "open":   round(float(h.open),  2),
+                    "high":   round(float(h.high),  2),
+                    "low":    round(float(h.low),   2),
+                    "close":  round(float(h.close), 2),
+                    "volume": int(h.volume)
+                } for h in history[-5:]
+            ],
+        },
+        "indicators": {
+            "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
+            "ta":       sig.ta_breakdown       or {} if sig else {},
+            "fa":       fa_data,
+            "momentum": sig.momentum_breakdown or {} if sig else {},
+        },
+        "backtest": {
+            "cagr":         float(sig.backtest_cagr)         if sig and sig.backtest_cagr         else None,
+            "win_rate":     float(sig.backtest_win_rate)     if sig and sig.backtest_win_rate     else None,
+            "sharpe":       float(sig.backtest_sharpe)       if sig and sig.backtest_sharpe       else None,
+            "max_drawdown": float(sig.backtest_max_drawdown) if sig and sig.backtest_max_drawdown else None,
+        },
+    }
+
+    try:
+        response = await generate_skill_chat_response(
+            symbol=symbol,
+            skill_id=skill_id,
+            user_message=chat_history[-1]["content"] if chat_history else "",
+            chat_history=chat_history,
+            context_data=context_data,
+            user_id=current_user.id,
+        )
+        return response
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Skill chat error {symbol}/{skill_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/ai-logs")
 async def get_ai_logs(
     limit: int = 100,
