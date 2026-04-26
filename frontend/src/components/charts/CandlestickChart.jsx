@@ -215,6 +215,7 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
           <span className="text-[10px] font-bold" style={{color:'#F59E0B'}}>── SMA20</span>
           <span className="text-[10px] font-bold" style={{color:'#3B82F6'}}>── SMA50</span>
           <span className="text-[10px] font-bold" style={{color:'#A855F7'}}>── SMA200</span>
+          <span className="text-[10px] font-bold text-gray-500">╌╌ BB(20,2)</span>
         </div>
       )}
     </div>
