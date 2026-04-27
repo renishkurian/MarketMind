@@ -829,10 +829,15 @@ def result_to_cache_dict(r: CompositeScoreResult) -> dict:
 
 def _build_ui_breakdown(r: CompositeScoreResult) -> dict:
     """Legacy UI expects SHORT_TERM/LONG_TERM buckets with {score, max} or {label}."""
+    RAW_VALUE_KEYS = {"beta", "52w_high", "52w_low"}
     def wrap(items):
         wrapped = {}
         for k, v in items.items():
-            if isinstance(v, (int, float)) and not isinstance(v, bool):
+            if v is None:
+                wrapped[k] = {"score": None, "max": 100}
+            elif k in RAW_VALUE_KEYS:
+                wrapped[k] = {"label": f"{v}"}
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
                 if k.endswith('_cross') or k.endswith('_crossover'):
                     wrapped[k] = {"label": v}
                 else:

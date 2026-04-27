@@ -1545,8 +1545,9 @@ export default function DeepDive() {
                             {Object.entries(breakdown).map(([name, data]) => {
                               const LABEL_MAP = {
                                 rsi: "RSI", macd: "MACD", price_vs_sma200: "SMA 200", price_vs_sma50: "SMA 50", adx: "ADX Trend", bb_position: "Bollinger", trade_activity: "Vol Shock",
-                                roc_1yr: "1Y ROC", roc_60d: "60d ROC", roc_20d: "20d ROC", volume_trend: "Vol Trend", "52w_rank": "52W Rank", rs_vs_nifty: "RS vs Nifty",
-                                pe_vs_5yr: "PE vs 5Y", roe_quality: "ROE", debt_equity: "D/E", revenue_growth_3yr: "Rev Growth", pat_growth_3yr: "PAT Growth", operating_margin: "Margin", pledge_penalty_on_roe: "Pledge Pnlty"
+                                roc_1yr: "1Y ROC", roc_60d: "60d ROC", roc_20d: "20d ROC", volume_trend: "Vol Trend", "52w_rank": "52W Rank", rs_vs_nifty: "RS vs Nifty", "52w_high": "52W High", "52w_low": "52W Low", beta: "Beta",
+                                pe_vs_5yr: "PE vs 5Y", roe_quality: "ROE", debt_equity: "D/E", revenue_growth_3yr: "Rev Growth", pat_growth_3yr: "PAT Growth", operating_margin: "Margin", pledge_penalty_on_roe: "Pledge Pnlty",
+                                institutional_hold: "Institutional", analyst_sentiment: "Analyst", balance_sheet_health: "Bal Sheet", peg_ratio: "PEG Ratio"
                               };
                                 const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
                                 const isLabel = data.label !== undefined;
