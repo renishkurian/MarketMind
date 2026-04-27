@@ -1021,6 +1021,26 @@ async def handle_chart_chat(
     def sma(series, n):
         return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
 
+    def calc_live_rsi(prices: list[float], period: int = 14) -> float | None:
+        """Wilder smoothed RSI matching frontend RSIChart.jsx exactly."""
+        if len(prices) < period + 1:
+            return None
+        gains, losses = 0.0, 0.0
+        for i in range(1, period + 1):
+            diff = prices[i] - prices[i - 1]
+            gains  += max(diff, 0)
+            losses += max(-diff, 0)
+        avg_gain = gains / period
+        avg_loss = losses / period
+        for i in range(period + 1, len(prices)):
+            diff = prices[i] - prices[i - 1]
+            avg_gain = (avg_gain * (period - 1) + max(diff, 0))  / period
+            avg_loss = (avg_loss * (period - 1) + max(-diff, 0)) / period
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        return round(100 - (100 / (1 + rs)), 2)
+
     # Build weekly buckets (5 bars ≈ 1 week)
     def weekly_aggregates(hist):
         buckets = []
@@ -1065,7 +1085,7 @@ async def handle_chart_chat(
         "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
         "indicators": {
             "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
-            "ta": sig.ta_breakdown or {},
+            "ta": {**(sig.ta_breakdown or {}), "rsi": calc_live_rsi(closes)},  # rsi overridden with live-computed value matching chart
             "fa": sig.fa_breakdown or {},
             "momentum": sig.momentum_breakdown or {},
         },
@@ -1271,6 +1291,26 @@ async def handle_move_explanation(
     def sma(series, n):
         return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
 
+    def calc_live_rsi(prices: list[float], period: int = 14) -> float | None:
+        """Wilder smoothed RSI matching frontend RSIChart.jsx exactly."""
+        if len(prices) < period + 1:
+            return None
+        gains, losses = 0.0, 0.0
+        for i in range(1, period + 1):
+            diff = prices[i] - prices[i - 1]
+            gains  += max(diff, 0)
+            losses += max(-diff, 0)
+        avg_gain = gains / period
+        avg_loss = losses / period
+        for i in range(period + 1, len(prices)):
+            diff = prices[i] - prices[i - 1]
+            avg_gain = (avg_gain * (period - 1) + max(diff, 0))  / period
+            avg_loss = (avg_loss * (period - 1) + max(-diff, 0)) / period
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        return round(100 - (100 / (1 + rs)), 2)
+
     from datetime import date as dt_date
     context_data = {
         "current_st_signal": sig.st_signal if sig else "HOLD",
@@ -1286,7 +1326,7 @@ async def handle_move_explanation(
             "sma_90":   sma(closes, 90),
         },
         "indicators": {
-            "ta": sig.ta_breakdown or {} if sig else {},
+            "ta": {**(sig.ta_breakdown or {} if sig else {}), "rsi": calc_live_rsi(closes)},  # rsi overridden with live-computed value matching chart
             "fa": sig.fa_breakdown or {} if sig else {},
         },
     }
@@ -1505,6 +1545,26 @@ async def handle_skill_chat(
     def sma(series, n):
         return round(sum(series[-n:]) / min(len(series), n), 2) if series else None
 
+    def calc_live_rsi(prices: list[float], period: int = 14) -> float | None:
+        """Wilder smoothed RSI matching frontend RSIChart.jsx exactly."""
+        if len(prices) < period + 1:
+            return None
+        gains, losses = 0.0, 0.0
+        for i in range(1, period + 1):
+            diff = prices[i] - prices[i - 1]
+            gains  += max(diff, 0)
+            losses += max(-diff, 0)
+        avg_gain = gains / period
+        avg_loss = losses / period
+        for i in range(period + 1, len(prices)):
+            diff = prices[i] - prices[i - 1]
+            avg_gain = (avg_gain * (period - 1) + max(diff, 0))  / period
+            avg_loss = (avg_loss * (period - 1) + max(-diff, 0)) / period
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        return round(100 - (100 / (1 + rs)), 2)
+
     def weekly_aggregates(hist):
         buckets = []
         for i in range(0, len(hist), 5):
@@ -1575,7 +1635,7 @@ async def handle_skill_chat(
         },
         "indicators": {
             "composite_score": float(sig.composite_score) if sig and sig.composite_score else None,
-            "ta":       sig.ta_breakdown       or {} if sig else {},
+            "ta":       {**(sig.ta_breakdown or {} if sig else {}), "rsi": calc_live_rsi(closes)},  # rsi overridden with live-computed value matching chart
             "fa":       fa_data,
             "momentum": sig.momentum_breakdown or {} if sig else {},
         },
