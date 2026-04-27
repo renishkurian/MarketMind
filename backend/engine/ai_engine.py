@@ -235,14 +235,20 @@ Last 5 Daily Bars:
 Weekly Candle Summary (last 6 weeks):
 {weekly_block}
 
+═══ CRITICAL CONSTRAINTS — READ BEFORE GENERATING REPLY ═══
+CURRENT CLOSE: ₹{today.get('close', 'N/A')}
+90D LOW: ₹{summary.get('90d_low', 'N/A')}
+
+RSI VALUE: {signals.get('ta', {}).get('rsi', 'N/A')}
+RSI RULE (NON-NEGOTIABLE):
+{"⚠ RSI IS BELOW 30 — THIS IS OVERSOLD, NOT OVERBOUGHT. You MUST say 'recovering from oversold'. Saying 'overbought' when RSI<30 is factually wrong." if isinstance(signals.get('ta', {}).get('rsi'), (int, float)) and signals.get('ta', {}).get('rsi', 100) < 30 else
+ "⚠ RSI IS 30–45 — recovering from lows. Do NOT say overbought." if isinstance(signals.get('ta', {}).get('rsi'), (int, float)) and signals.get('ta', {}).get('rsi', 100) < 45 else
+ "RSI is neutral-to-bullish. Only say overbought if RSI > 70."}
+
+ENTRY RULE (NON-NEGOTIABLE):
+Current close is ₹{today.get('close', 'N/A')}. Do NOT suggest entry below ₹{round(float(today.get('close', 0)) * 0.92, 2) if today.get('close') else 'N/A'} (more than 8% below current price) unless you explicitly justify a breakdown scenario. The 90d low of ₹{summary.get('90d_low', 'N/A')} is historical — do not use it as a default entry target if price has already recovered from it.
+
 ═══ INDICATOR SIGNALS ═══
-RSI INTERPRETATION RULES (apply before using RSI in your reply):
-- RSI < 30  → Oversold territory. Do NOT call this overbought. Phrase as "recovering from oversold" or "deeply oversold."
-- RSI 30–45 → Recovering / neutral-bearish. Phrase as "RSI recovering" or "building momentum from lows."
-- RSI 45–55 → Neutral. No directional RSI claim.
-- RSI 55–70 → Bullish momentum. Only flag mild overbought risk above 65.
-- RSI > 70  → Overbought. Warn of pullback risk.
-The RSI value below is LIVE-computed from the same price bars shown in the chart. Trust it exactly.
 {json.dumps(signals, indent=2)}
 
 ═══ LIVE NEWS (Google News) ═══
