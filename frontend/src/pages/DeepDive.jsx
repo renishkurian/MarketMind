@@ -1005,6 +1005,26 @@ export default function DeepDive() {
                       <span className="opacity-60">{Math.round(p.confidence * 100)}%</span>
                     </button>
                   ))}
+                  {!patternLoading && patterns.length === 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-dark-muted font-mono">No active patterns</span>
+                      <button
+                        onClick={async () => {
+                          const token = localStorage.getItem('mm_token');
+                          await fetch(`${API_URL}/api/stock/${symbol}/patterns/cache`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          fetchPatterns();
+                        }}
+                        title="Force rescan"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-dark-muted bg-gray-800 hover:bg-gray-700 hover:text-white transition-colors"
+                      >
+                        <RefreshCw size={9} />
+                        Rescan
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <button 

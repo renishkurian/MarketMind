@@ -1230,6 +1230,22 @@ async def handle_pattern_recognition(
         return {"patterns": [], "summary": "Pattern detection unavailable."}
 
 
+@app.delete("/api/stock/{symbol}/patterns/cache")
+async def clear_pattern_cache(
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Clear the pattern cache for a symbol so the next GET triggers a fresh AI scan."""
+    symbol = symbol.upper()
+    sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
+    sig = sig_result.scalars().first()
+    if sig:
+        sig.pattern_data = None
+        await db.commit()
+    return {"cleared": True, "symbol": symbol}
+
+
 @app.get("/api/stock/{symbol}/move-explanation")
 @limiter.limit("10/minute")
 async def handle_move_explanation(

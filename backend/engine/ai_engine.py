@@ -292,7 +292,11 @@ Return this exact structure:
   }}
 }}
 Return trend_lines as [] if none apply.
-Return price_target as null if the question is not about price direction or targets.
+Return price_target as null if the question is not about price direction, entry, exit, or targets.
+If the question asks about entry point, exit point, buy zone, sell zone, or target — you MUST populate price_target:
+  - confidence_low = the entry / buy zone price
+  - confidence_high = the exit / target price
+  - basis = one sentence explaining the entry and exit rationale
 Use backtest CAGR and win_rate from context to calibrate confidence_low/high band width.
 confidence_low and confidence_high are absolute price levels, not percentages.
 """
