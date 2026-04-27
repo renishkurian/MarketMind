@@ -104,8 +104,16 @@ async def _write_call_log(
 
 
 def _build_messages(prompt: str) -> list:
+    """For JSON-returning prompts (fallback insight, fundamentals, etc)."""
     return [
         {"role": "system", "content": "You are a financial analysis assistant. Always respond with valid JSON only — no text outside the JSON object."},
+        {"role": "user", "content": prompt},
+    ]
+
+def _build_text_messages(prompt: str) -> list:
+    """For skill prompts that return markdown essays (not JSON)."""
+    return [
+        {"role": "system", "content": "You are a financial analysis assistant."},
         {"role": "user", "content": prompt},
     ]
 
@@ -489,16 +497,30 @@ def _parse_skill_markdown(text: str) -> dict:
 
 async def _call_anthropic(messages: list, model: str, api_key: str) -> tuple[dict, int, int]:
     client = anthropic.AsyncAnthropic(api_key=api_key)
-    resp = await client.messages.create(
-        model=model,
-        max_tokens=1200,
-        messages=messages,
-    )
+    # Split system message out for Anthropic API format
+    system_msg = next((m["content"] for m in messages if m["role"] == "system"), None)
+    user_messages = [m for m in messages if m["role"] != "system"]
+    kwargs = {"model": model, "max_tokens": 4000, "messages": user_messages}
+    if system_msg:
+        kwargs["system"] = system_msg
+    resp = await client.messages.create(**kwargs)
     text = resp.content[0].text
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     parsed = json.loads(text)
     return parsed, resp.usage.input_tokens, resp.usage.output_tokens
+
+async def _call_anthropic_text(messages: list, model: str, api_key: str) -> tuple[dict, int, int]:
+    """Anthropic call for skill markdown essays — returns parsed skill dict, not raw JSON."""
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    system_msg = next((m["content"] for m in messages if m["role"] == "system"), None)
+    user_messages = [m for m in messages if m["role"] != "system"]
+    kwargs = {"model": model, "max_tokens": 4000, "messages": user_messages}
+    if system_msg:
+        kwargs["system"] = system_msg
+    resp = await client.messages.create(**kwargs)
+    text = resp.content[0].text or ""
+    return _parse_skill_markdown(text), resp.usage.input_tokens, resp.usage.output_tokens
 
 
 async def _call_xai(messages: list, model: str, api_key: str) -> tuple[dict, int, int]:
@@ -513,6 +535,13 @@ async def _call_xai(messages: list, model: str, api_key: str) -> tuple[dict, int
         text = text.split("```json")[1].split("```")[0].strip()
     parsed = json.loads(text)
     return parsed, resp.usage.prompt_tokens, resp.usage.completion_tokens
+
+async def _call_xai_text(messages: list, model: str, api_key: str) -> tuple[dict, int, int]:
+    """xAI call for skill markdown essays."""
+    client = openai.AsyncOpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=120.0)
+    resp = await client.chat.completions.create(model=model, messages=messages)
+    text = resp.choices[0].message.content or ""
+    return _parse_skill_markdown(text), resp.usage.prompt_tokens, resp.usage.completion_tokens
 
 
 async def generate_fundamentals(symbol: str, company_name: str = None) -> dict:
@@ -689,7 +718,7 @@ async def generate_insight(
     if not prompt:
         prompt = _build_fallback_prompt(symbol, company_name or symbol, trigger_reason, signals, fundamentals)
 
-    messages = _build_messages(prompt)
+    messages = _build_text_messages(prompt) if skill_id else _build_messages(prompt)
 
     # Call provider
     t0 = time.perf_counter()
@@ -707,9 +736,15 @@ async def generate_insight(
             else:
                 parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, api_key)
         elif provider == "anthropic":
-            parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, api_key)
+            if skill_id:
+                parsed, prompt_tokens, completion_tokens = await _call_anthropic_text(messages, model, api_key)
+            else:
+                parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, api_key)
         elif provider == "xai":
-            parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, api_key)
+            if skill_id:
+                parsed, prompt_tokens, completion_tokens = await _call_xai_text(messages, model, api_key)
+            else:
+                parsed, prompt_tokens, completion_tokens = await _call_xai(messages, model, api_key)
         else:
             return _get_mock_insight(symbol, trigger_reason)
 
@@ -774,6 +809,12 @@ async def generate_pro_research(
                 api_key = k
                 break
     
+    model = {
+        "openai": ai_cfg["openai_model"],
+        "anthropic": ai_cfg["anthropic_model"],
+        "xai": ai_cfg["xai_model"],
+    }.get(provider, "gpt-4o")
+
     t0 = time.perf_counter()
     prompt_tokens = completion_tokens = 0
     res_dict = {}
@@ -1572,11 +1613,6 @@ Return this exact structure:
 Return trend_lines as [] if none apply.
 """
 
-    # Prepend skill context message to history so AI knows what was asked before
-    skill_context_msg = {
-        "role": "system",
-        "content": f"[Skill activated: {skill['name']}. User is now asking through this lens.]"
-    }
     messages = [{"role": "system", "content": system_prompt}] + chat_history
 
     # Fetch live news and inject
