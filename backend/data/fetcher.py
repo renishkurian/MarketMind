@@ -89,7 +89,7 @@ async def fetch_live_prices(symbols: Union[List[str], Dict[str, str]]) -> Dict[s
         batch_yf = [symbols_map[s] for s in batch_internal]
         
         try:
-            df = yf.download(batch_yf, period='1d', interval='1m', progress=False, auto_adjust=False)
+            df = yf.download(batch_yf, period='1d', interval='1m', progress=False, auto_adjust=False, threads=False)
             
             if not df.empty:
                 for sym_int in batch_internal:
@@ -148,7 +148,7 @@ async def fetch_5min_candles(symbols: Union[List[str], Dict[str, str]]) -> Dict[
         batch_yf = [symbols_map[s] for s in batch_internal]
         
         try:
-            df = yf.download(batch_yf, period='1d', interval='5m', progress=False, auto_adjust=False)
+            df = yf.download(batch_yf, period='1d', interval='5m', progress=False, auto_adjust=False, threads=False)
             
             if not df.empty:
                 for sym_int in batch_internal:
@@ -302,7 +302,7 @@ async def fetch_max_history(symbol: str, yahoo_symbol: str = None) -> pd.DataFra
     """Fetch maximum history. yahoo_symbol is preferred."""
     yf_sym = yahoo_symbol or _get_yf_symbol(symbol)
     try:
-        df = yf.download(yf_sym, period='max', interval='1d', progress=False, auto_adjust=False)
+        df = yf.download(yf_sym, period='max', interval='1d', progress=False, auto_adjust=False, threads=False)
         return df
     except Exception as e:
         logger.error(f"Error fetching max history for {symbol} (ticker: {yf_sym}): {e}")
