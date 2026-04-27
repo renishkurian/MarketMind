@@ -312,141 +312,202 @@ async def fetch_max_history(symbol: str, yahoo_symbol: str = None) -> pd.DataFra
 async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
     """
     Scrape Screener.in for Indian-specific fundamental data missing from Yahoo.
-    Returns a dict with only the fields successfully extracted (None for failures).
-    Fields covered: roe, roe_3yr_avg, revenue_growth_3yr, pat_growth_3yr,
-                    operating_margin, pe_5yr_avg, promoter_holding, promoter_pledge_pct,
-                    pb_ratio, ev_ebitda, debt_equity, pe_ratio.
+    Robust multi-strategy extraction covering all ratio and growth fields.
     """
-    import json as _json
-
     result: Dict[str, Any] = {}
-    url = f"https://www.screener.in/company/{symbol}/consolidated/"
+    urls = [
+        f"https://www.screener.in/company/{symbol}/consolidated/",
+        f"https://www.screener.in/company/{symbol}/",
+    ]
 
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
             "Referer": "https://www.screener.in/",
+            "DNT": "1",
         }
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            resp = await client.get(url, headers=headers)
-            # If consolidated 404, try standalone
-            if resp.status_code == 404:
-                url = f"https://www.screener.in/company/{symbol}/"
+        html = ""
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            for url in urls:
                 resp = await client.get(url, headers=headers)
-            if resp.status_code != 200:
-                logger.warning(f"Screener.in returned {resp.status_code} for {symbol}")
+                if resp.status_code == 200:
+                    html = resp.text
+                    break
+            if not html:
+                logger.warning(f"Screener.in returned no usable response for {symbol}")
                 return result
-            html = resp.text
 
-        # ── Extract #company-ratios li items ──────────────────────────────
-        # Pattern: <li ...><span class="name">KEY</span><span ...>VALUE</span></li>
-        ratio_pattern = re.compile(
-            r'<li[^>]*>.*?<span[^>]*class="[^"]*name[^"]*"[^>]*>(.*?)</span>.*?'
-            r'<span[^>]*class="[^"]*number[^"]*"[^>]*>(.*?)</span>',
-            re.DOTALL | re.IGNORECASE,
-        )
+        # ── Strategy 1: Extract all <li> ratio items (handles any class structure) ──
+        # Screener structure: <li ...><span ...>Label</span><span ...>Value</span></li>
+        # Also handles: <li><span class="name">...</span><span class="nowrap">...</span>
         ratios: Dict[str, str] = {}
-        for m in ratio_pattern.finditer(html):
-            key = re.sub(r"<[^>]+>", "", m.group(1)).strip().lower()
-            val = re.sub(r"<[^>]+>", "", m.group(2)).strip().replace(",", "").replace("%", "").replace("₹", "").strip()
-            ratios[key] = val
 
-        def _f(key_fragments, d=ratios) -> Optional[float]:
-            """Find first matching key containing any fragment and return float."""
-            for frag in key_fragments:
-                for k, v in d.items():
-                    if frag in k:
+        # Extract all text from ratio section between id="company-ratios" and next section
+        ratios_section = re.search(
+            r'id=["']company-ratios["'][^>]*>(.*?)</(?:section|div)',
+            html, re.DOTALL | re.IGNORECASE
+        )
+        search_html = ratios_section.group(1) if ratios_section else html
+
+        # Match any <li> with two consecutive spans
+        li_pattern = re.compile(
+            r'<li[^>]*>\s*<span[^>]*>(.*?)</span>\s*<span[^>]*>(.*?)</span>',
+            re.DOTALL | re.IGNORECASE
+        )
+        for m in li_pattern.finditer(search_html):
+            key = re.sub(r'<[^>]+>', '', m.group(1)).strip().lower()
+            val = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            val = val.replace(',', '').replace('%', '').replace('₹', '').replace(' ', '').strip()
+            if key and val:
+                ratios[key] = val
+
+        # Also try dl/dt/dd structure that some Screener pages use
+        dl_pattern = re.compile(r'<dt[^>]*>(.*?)</dt>\s*<dd[^>]*>(.*?)</dd>', re.DOTALL | re.IGNORECASE)
+        for m in dl_pattern.finditer(html):
+            key = re.sub(r'<[^>]+>', '', m.group(1)).strip().lower()
+            val = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            val = val.replace(',', '').replace('%', '').replace('₹', '').strip()
+            if key and val:
+                ratios[key] = val
+
+        logger.debug(f"Screener ratio keys for {symbol}: {list(ratios.keys())}")
+
+        def _f(*fragments) -> Optional[float]:
+            for frag in fragments:
+                frag_l = frag.lower()
+                for k, v in ratios.items():
+                    if frag_l in k:
                         try:
-                            return float(v)
+                            f = float(v)
+                            if f != 0:
+                                return f
                         except (ValueError, TypeError):
                             pass
             return None
 
-        result["pe_ratio"]          = _f(["p/e", "price to earning"])
-        result["pb_ratio"]          = _f(["p/b", "price to book"])
-        result["ev_ebitda"]         = _f(["ev/ebitda", "ev / ebitda"])
-        result["roe"]               = _f(["roe", "return on equity"])
-        result["debt_equity"]       = _f(["debt to equity", "d/e"])
-        result["operating_margin"]  = _f(["opm", "operating profit margin", "operating margin"])
-        result["current_ratio"]     = _f(["current ratio", "current_ratio"])
+        result["pe_ratio"]         = _f("stock p/e", "p/e", "price to earning")
+        result["pb_ratio"]         = _f("price to book", "p/b value", "p/b")
+        result["ev_ebitda"]        = _f("ev/ebitda", "ev / ebitda", "ebitda")
+        result["roe"]              = _f("return on equity", "roe")
+        result["debt_equity"]      = _f("debt to equity", "d/e ratio", "d/e")
+        result["operating_margin"] = _f("opm", "operating profit margin", "operating margin")
+        result["current_ratio"]    = _f("current ratio")
 
-        # ── Extract promoter holding from shareholding table ───────────────
-        # <td>Promoters</td> row usually has the latest % in next <td>
-        prom_match = re.search(
-            r"Promoters\s*</td>\s*<td[^>]*>([\d.]+)\s*%?",
-            html, re.IGNORECASE
-        )
-        if prom_match:
-            try:
-                result["promoter_holding"] = float(prom_match.group(1))
-            except ValueError:
-                pass
-
-        # Pledged % — appears as "Pledged percentage" in a separate row
-        pledge_match = re.search(
-            r"[Pp]ledged[^<]*</td>\s*<td[^>]*>([\d.]+)",
-            html, re.IGNORECASE
-        )
-        if pledge_match:
-            try:
-                result["promoter_pledge_pct"] = float(pledge_match.group(1))
-            except ValueError:
-                pass
-
-        # ── 10-year financial table: extract 3yr CAGRs ────────────────────
-        # Screener shows "Compounded Sales Growth" / "Compounded Profit Growth" tables
-        # Each row: 10 Years / 5 Years / 3 Years / TTM
-        def _extract_3yr_cagr(label_pattern: str) -> Optional[float]:
-            block = re.search(
-                label_pattern + r".*?3 Years.*?:\s*([\d.]+)\s*%",
-                html, re.DOTALL | re.IGNORECASE
-            )
-            if block:
+        # ── Strategy 2: Regex directly on full HTML for fields not in ratio list ──
+        def _re_val(pattern: str) -> Optional[float]:
+            m = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
+            if m:
                 try:
-                    return float(block.group(1))
-                except ValueError:
-                    pass
-            # Alternate: table row
-            tbl = re.search(
-                label_pattern + r".*?<tr[^>]*>.*?<td[^>]*>3 Years?</td>\s*<td[^>]*>([\d.]+)",
-                html, re.DOTALL | re.IGNORECASE
-            )
-            if tbl:
-                try:
-                    return float(tbl.group(1))
-                except ValueError:
+                    return float(m.group(1).replace(',', '').replace('%', '').strip())
+                except (ValueError, TypeError):
                     pass
             return None
 
-        result["revenue_growth_3yr"] = _extract_3yr_cagr(r"[Cc]ompounded\s+[Ss]ales\s+[Gg]rowth")
-        result["pat_growth_3yr"]     = _extract_3yr_cagr(r"[Cc]ompounded\s+[Pp]rofit\s+[Gg]rowth")
+        # Fallbacks for ratio fields using direct HTML patterns
+        if result.get("debt_equity") is None:
+            result["debt_equity"] = _re_val(r'[Dd]ebt to [Ee]quity[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
+        if result.get("operating_margin") is None:
+            result["operating_margin"] = _re_val(r'OPM[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
+        if result.get("pb_ratio") is None:
+            result["pb_ratio"] = _re_val(r'Price to Book[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
+        if result.get("ev_ebitda") is None:
+            result["ev_ebitda"] = _re_val(r'EV\s*/\s*EBITDA[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
+        if result.get("current_ratio") is None:
+            result["current_ratio"] = _re_val(r'Current [Rr]atio[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
 
-        # ── ROE 3yr avg — from "Return on Equity" table ───────────────────
-        roe_block = re.search(
-            r"Return on [Ee]quity.*?(\d{4})\s+([\d.]+).*?(\d{4})\s+([\d.]+).*?(\d{4})\s+([\d.]+)",
-            html, re.DOTALL
-        )
-        if roe_block:
-            try:
-                vals = [float(roe_block.group(i)) for i in (2, 4, 6)]
-                result["roe_3yr_avg"] = round(sum(vals) / len(vals), 2)
-            except (ValueError, TypeError):
-                pass
+        # ── Strategy 3: Promoter holdings ────────────────────────────────
+        # Find the latest promoter holding from the shareholding table
+        # Screener format: row with "Promoters" label, columns are quarters newest-first
+        prom_patterns = [
+            r'Promoters\s*</td>\s*(?:<td[^>]*>[\d.]*%?\s*</td>\s*)*<td[^>]*>([\d.]+)\s*%?',
+            r'Promoters[^<]*</(?:td|th)>\s*<(?:td|th)[^>]*>([\d.]+)',
+            r'"Promoters"\s*[,:{]\s*"?([\d.]+)',
+        ]
+        for pat in prom_patterns:
+            m = re.search(pat, html, re.IGNORECASE)
+            if m:
+                try:
+                    v = float(m.group(1))
+                    if 0 < v <= 100:
+                        result["promoter_holding"] = v
+                        break
+                except (ValueError, TypeError):
+                    pass
 
-        # ── PE 5yr avg from "Price to Earning" historical block ───────────
-        pe_hist = re.findall(
-            r"Price to [Ee]arn(?:ing|ings).*?<td[^>]*>([\d.]+)</td>",
-            html, re.DOTALL
-        )
-        if len(pe_hist) >= 5:
-            try:
-                result["pe_5yr_avg"] = round(sum(float(x) for x in pe_hist[-5:]) / 5, 2)
-            except (ValueError, TypeError):
-                pass
+        # Pledged %
+        pledge_patterns = [
+            r'[Pp]ledged\s+[Pp]ercentage[^<]*</td>\s*<td[^>]*>([\d.]+)',
+            r'[Pp]ledged[^<]*</td>\s*(?:<td[^>]*>[\d.]*\s*</td>\s*)*<td[^>]*>([\d.]+)',
+            r'[Pp]ledge[^<]*:\s*([\d.]+)\s*%',
+        ]
+        for pat in pledge_patterns:
+            m = re.search(pat, html, re.IGNORECASE)
+            if m:
+                try:
+                    result["promoter_pledge_pct"] = float(m.group(1))
+                    break
+                except (ValueError, TypeError):
+                    pass
 
-        # Remove None values so caller can merge cleanly
+        # ── Strategy 4: CAGR growth from compounded tables ───────────────
+        def _extract_cagr(label_re: str) -> Optional[float]:
+            # Try: "3 Years: X %" inline format
+            m = re.search(label_re + r'.*?3\s+Years?\s*[:\-]\s*([\d.]+)\s*%', html, re.DOTALL | re.IGNORECASE)
+            if m:
+                try: return float(m.group(1))
+                except: pass
+            # Try: table format with "3 Years" cell
+            m = re.search(label_re + r'.*?<tr[^>]*>.*?<td[^>]*>\s*3\s+[Yy]ears?\s*</td>\s*<td[^>]*>\s*([\d.]+)', html, re.DOTALL | re.IGNORECASE)
+            if m:
+                try: return float(m.group(1))
+                except: pass
+            # Try: "3 Yrs" variant
+            m = re.search(label_re + r'.*?3\s+[Yy]rs?\s*[:\-]?\s*([\d.]+)\s*%', html, re.DOTALL | re.IGNORECASE)
+            if m:
+                try: return float(m.group(1))
+                except: pass
+            return None
+
+        if not result.get("revenue_growth_3yr"):
+            result["revenue_growth_3yr"] = _extract_cagr(r'[Cc]ompounded\s+[Ss]ales\s+[Gg]rowth')
+        if not result.get("pat_growth_3yr"):
+            result["pat_growth_3yr"] = _extract_cagr(r'[Cc]ompounded\s+[Pp]rofit\s+[Gg]rowth')
+
+        # ── Strategy 5: ROE 3yr avg from annual table ─────────────────────
+        if not result.get("roe_3yr_avg"):
+            # Find ROE values in the annual P&L or ratios section
+            roe_vals = re.findall(
+                r'[Rr]eturn on [Ee]quity[^%]*?(\d{4})[^%\d]*([\d.]+)\s*%[^%\d]*(\d{4})[^%\d]*([\d.]+)\s*%[^%\d]*(\d{4})[^%\d]*([\d.]+)\s*%',
+                html, re.DOTALL
+            )
+            if roe_vals:
+                try:
+                    vals = [float(roe_vals[0][i]) for i in (1, 3, 5)]
+                    result["roe_3yr_avg"] = round(sum(vals) / 3, 2)
+                except: pass
+            if not result.get("roe_3yr_avg"):
+                # Simpler: find 3+ numbers in ROE row
+                roe_row = re.search(r'[Rr]eturn on [Ee]quity.*?(<tr.*?</tr>)', html, re.DOTALL)
+                if roe_row:
+                    nums = re.findall(r'<td[^>]*>\s*([\d.]+)\s*</td>', roe_row.group(1))
+                    if len(nums) >= 3:
+                        try:
+                            vals = [float(x) for x in nums[-3:]]
+                            result["roe_3yr_avg"] = round(sum(vals) / 3, 2)
+                        except: pass
+
+        # ── Strategy 6: PE 5yr avg ────────────────────────────────────────
+        if not result.get("pe_5yr_avg"):
+            pe_hist = re.findall(r'Price to [Ee]arn(?:ing|ings?).*?<td[^>]*>([\d.]+)</td>', html, re.DOTALL)
+            if len(pe_hist) >= 5:
+                try:
+                    result["pe_5yr_avg"] = round(sum(float(x) for x in pe_hist[-5:]) / 5, 2)
+                except: pass
+
+        # Remove None/zero values
         result = {k: v for k, v in result.items() if v is not None}
         logger.info(f"Screener.in filled {len(result)} fields for {symbol}: {list(result.keys())}")
         return result
