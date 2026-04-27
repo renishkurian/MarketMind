@@ -924,6 +924,35 @@ Neutral: Symmetrical Triangle, Rectangle, Doji Cluster, Inside Bar
 5. target_price is the measured move target — null if not applicable.
 6. Reply ONLY as valid JSON. No text outside the JSON object.
 
+═══ STRICT PATTERN-SPECIFIC CRITERIA ═══
+DOUBLE BOTTOM:
+  - The two troughs must be within 2% of each other in price. A broad base or gradual
+    accumulation zone does NOT qualify as a double bottom.
+  - Confidence >= 60% ONLY if price has ALREADY closed above the neckline (the peak
+    between the two troughs). If price is still below the neckline, cap confidence at 45%
+    (which means it will be excluded by Rule 1).
+  - Both troughs must be clearly identifiable on the provided OHLCV bars with distinct
+    dates — do not infer a trough from a sideways drift.
+
+DOUBLE TOP:
+  - Same mirror logic: two peaks within 2% of each other, and price must have closed
+    below the neckline for confidence >= 60%.
+
+HEAD & SHOULDERS / INVERSE HEAD & SHOULDERS:
+  - Shoulders must be roughly symmetric in time and price (within 5%).
+  - Confidence >= 65% only if neckline break is confirmed or price is within 1% of it.
+
+BULL FLAG / BEAR FLAG:
+  - A valid pole (sharp directional move of >= 5% in <= 10 bars) must precede the flag.
+  - Flag channel must slope against the pole direction.
+
+CUP & HANDLE:
+  - Cup must span at least 6 weeks. Handle must retrace no more than 50% of the cup depth.
+
+GENERAL:
+  - Do not assign confidence > 80% to any unconfirmed (pre-breakout) pattern.
+  - A pattern that is "possibly forming" should be described honestly in the description field.
+
 Return this exact structure:
 {{
   "patterns": [
