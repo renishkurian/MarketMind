@@ -3,7 +3,7 @@ import sys
 import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger, ForeignKey, Float, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, BigInteger, JSON, Enum, UniqueConstraint, SmallInteger, ForeignKey, Float, Text, text
 from sqlalchemy.orm import relationship
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -382,6 +382,28 @@ class PriceAlert(Base):
     triggered_price= Column(Float, nullable=True)
     created_at     = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at     = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+# ── Schema Migrations (safe, idempotent — ADD COLUMN IF NOT EXISTS) ──────────
+async def run_migrations():
+    """
+    Apply any missing columns that were added to models after the table was first
+    created.  Uses IF NOT EXISTS so every statement is safe to re-run on restart.
+    """
+    migrations = [
+        # Feature 3: move_explanations.should_act added after initial table creation
+        "ALTER TABLE move_explanations ADD COLUMN IF NOT EXISTS should_act VARCHAR(30) NULL",
+        # Feature 4: price_alerts — ensure table exists (create_all handles new tables,
+        #   but if the table was never created we surface a cleaner error via create_all)
+    ]
+    async with engine.begin() as conn:
+        for stmt in migrations:
+            try:
+                await conn.execute(text(stmt))
+            except Exception as e:
+                # Log but don't crash — worst case the column already exists
+                import logging
+                logging.getLogger(__name__).warning(f"Migration skipped ({e}): {stmt}")
+
 
 # Database Dependency
 async def get_db():

@@ -961,7 +961,6 @@ BB UPPER BREAKOUT:
   - Must be accompanied by a strong green candle (close > open by >= 2%).
   - Confidence capped at 70% — breakouts above BB Upper often mean-revert.
   - Implication: Bullish (momentum) — always mention overbought risk in description.
-
 GENERAL:
   - Do not assign confidence > 80% to any unconfirmed (pre-breakout) pattern.
   - A pattern that is "possibly forming" should be described honestly in the description field.

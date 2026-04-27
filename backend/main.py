@@ -17,7 +17,7 @@ import pandas as pd
 from datetime import datetime, date, timedelta
 
 from backend.data.db import (
-    get_db, SessionLocal,
+    get_db, SessionLocal, run_migrations,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
     PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
     User, MoveExplanation, PriceAlert, PerformanceCache
@@ -78,6 +78,10 @@ async def lifespan(app: FastAPI):
             raise RuntimeError("FATAL: SECRET_KEY must be changed from default before running in production.")
         if settings.ADMIN_PASSWORD == "admin":
             raise RuntimeError("FATAL: ADMIN_PASSWORD must be changed from default before running in production.")
+    # Run safe schema migrations (ADD COLUMN IF NOT EXISTS)
+    await run_migrations()
+    logger.info("DB migrations applied.")
+
     # Startup: attach broadcast hook and start scheduler
     from backend import scheduler as sched_module
     sched_module.broadcast_price_update = broadcast_price_update
