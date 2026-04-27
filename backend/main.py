@@ -2055,7 +2055,7 @@ async def sync_fundamental_data(
     # 2b. Fill missing fields from Screener.in
     screener_fields = ["pe_ratio", "roe", "debt_equity", "revenue_growth_3yr", "pat_growth_3yr",
                        "operating_margin", "pe_5yr_avg", "roe_3yr_avg", "pb_ratio", "ev_ebitda",
-                       "promoter_holding", "promoter_pledge_pct"]
+                       "promoter_holding", "promoter_pledge_pct", "current_ratio"]
     missing = [f for f in screener_fields if not data.get(f)]
     if missing:
         screener_data = await fetch_screener_fundamentals(symbol)
@@ -2135,7 +2135,7 @@ async def sync_screener_data(
     # Only fill fields that are currently null
     fillable = ["pe_ratio", "roe", "debt_equity", "revenue_growth_3yr", "pat_growth_3yr",
                 "operating_margin", "pe_5yr_avg", "roe_3yr_avg", "pb_ratio", "ev_ebitda",
-                "promoter_holding", "promoter_pledge_pct"]
+                "promoter_holding", "promoter_pledge_pct", "current_ratio"]
     updates = {}
     for field in fillable:
         current_val = getattr(row, field, None) if row else None

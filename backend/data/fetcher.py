@@ -370,6 +370,7 @@ async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         result["roe"]               = _f(["roe", "return on equity"])
         result["debt_equity"]       = _f(["debt to equity", "d/e"])
         result["operating_margin"]  = _f(["opm", "operating profit margin", "operating margin"])
+        result["current_ratio"]     = _f(["current ratio", "current_ratio"])
 
         # ── Extract promoter holding from shareholding table ───────────────
         # <td>Promoters</td> row usually has the latest % in next <td>
