@@ -301,9 +301,10 @@ export default function DeepDive() {
         body: JSON.stringify({ skill_id: selectedSkill })
       });
       if (res.ok) {
-        toast.success('AI generation started. Refreshing in 15s...');
-        // Poll for result after a longer delay (Pi can be slow)
-        setTimeout(fetchData, 15000);
+        toast.success('AI generation started. Refreshing in 30s...');
+        // Poll for result — Pi can be slow, try at 30s then 60s
+        setTimeout(fetchData, 30000);
+        setTimeout(fetchData, 60000);
       } else {
         const err = await res.json();
         toast.error(err.detail || 'Failed to generate insight');

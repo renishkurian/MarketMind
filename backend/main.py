@@ -2344,6 +2344,15 @@ async def _generate_and_save_insight(symbol: str, trigger: str, skill_id: str = 
                 "pb_ratio": float(fund.pb_ratio) if fund and fund.pb_ratio else None,
                 "ev_ebitda": float(fund.ev_ebitda) if fund and fund.ev_ebitda else None,
                 "held_percent_institutions": float(fund.held_percent_institutions) if fund and fund.held_percent_institutions else None,
+                # Extended fields required by skill templates via StockMeta
+                "pe_5yr_avg": float(fund.pe_5yr_avg) if fund and fund.pe_5yr_avg else None,
+                "roe_3yr_avg": float(fund.roe_3yr_avg) if fund and fund.roe_3yr_avg else None,
+                "revenue_growth_3yr": float(fund.revenue_growth_3yr) if fund and fund.revenue_growth_3yr else None,
+                "pat_growth_3yr": float(fund.pat_growth_3yr) if fund and fund.pat_growth_3yr else None,
+                "operating_margin": float(fund.operating_margin) if fund and fund.operating_margin else None,
+                "promoter_holding": float(fund.promoter_holding) if fund and fund.promoter_holding else None,
+                "promoter_pledge_pct": float(fund.promoter_pledge_pct) if fund and fund.promoter_pledge_pct else None,
+                "market_cap": int(fund.market_cap) if fund and fund.market_cap else None,
             } if fund else {}
 
         insight_data = await generate_insight(symbol, df, signals, fundamentals, trigger, skill_id, company_name=company_name)

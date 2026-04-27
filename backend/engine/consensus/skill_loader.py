@@ -155,7 +155,11 @@ class StockMeta:
 
 class SkillLoader:
 
-    def __init__(self, skills_dir: str = "backend/engine/skills"):
+    def __init__(self, skills_dir: str = None):
+        if skills_dir is None:
+            # Always resolve relative to this file's location so it works
+            # regardless of the working directory (Docker, systemd, uvicorn, etc.)
+            skills_dir = str(Path(__file__).resolve().parent.parent / "skills")
         self.skills_dir = Path(skills_dir)
         self._cache: dict[str, str] = {}
 

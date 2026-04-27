@@ -714,7 +714,8 @@ async def generate_insight(
             prompt = loader.build_prompt(skill_id, meta, csr)
         except Exception as e:
             logger.error(f"Failed to load prompt for skill {skill_id}: {e}")
-            
+            skill_id = None  # fall back to JSON mode so parsing works correctly
+
     if not prompt:
         prompt = _build_fallback_prompt(symbol, company_name or symbol, trigger_reason, signals, fundamentals)
 
