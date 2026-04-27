@@ -2112,6 +2112,57 @@ async def sync_fundamental_data(
     return {"message": f"Fundamentals synced from {sources} for {symbol}.", "status": data.get("data_quality")}
 
 
+@app.post("/api/stock/{symbol}/fundamentals/sync-screener")
+async def sync_screener_data(
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Fetch missing fundamentals from Screener.in and merge into FundamentalsCache."""
+    from backend.data.fetcher import fetch_screener_fundamentals
+    from backend.scheduler import recompute_signals_for
+    from sqlalchemy.dialects.mysql import insert as mysql_insert
+    symbol = symbol.upper()
+
+    screener_data = await fetch_screener_fundamentals(symbol)
+    if not screener_data:
+        raise HTTPException(status_code=502, detail="Screener.in returned no data for this symbol.")
+
+    # Load existing row to avoid overwriting good Yahoo data
+    existing = await db.execute(select(FundamentalsCache).where(FundamentalsCache.symbol == symbol))
+    row = existing.scalars().first()
+
+    # Only fill fields that are currently null
+    fillable = ["pe_ratio", "roe", "debt_equity", "revenue_growth_3yr", "pat_growth_3yr",
+                "operating_margin", "pe_5yr_avg", "roe_3yr_avg", "pb_ratio", "ev_ebitda",
+                "promoter_holding", "promoter_pledge_pct"]
+    updates = {}
+    for field in fillable:
+        current_val = getattr(row, field, None) if row else None
+        if current_val is None and screener_data.get(field) is not None:
+            updates[field] = screener_data[field]
+
+    if not updates:
+        return {"message": f"No missing fields to fill for {symbol}. All data already present.", "filled": 0}
+
+    if row:
+        for k, v in updates.items():
+            setattr(row, k, v)
+        # Recompute quality
+        required = ["pe_ratio", "roe", "debt_equity"]
+        if all(getattr(row, k, None) for k in required):
+            row.data_quality = "FULL"
+        await db.commit()
+    else:
+        stmt = mysql_insert(FundamentalsCache).values(symbol=symbol, fetched_at=datetime.now(), **updates)
+        stmt = stmt.on_duplicate_key_update(**{k: stmt.inserted[k] for k in updates})
+        await db.execute(stmt)
+        await db.commit()
+
+    await recompute_signals_for(symbol)
+    return {"message": f"Screener.in filled {len(updates)} field(s) for {symbol}.", "filled": len(updates), "fields": list(updates.keys())}
+
+
 @app.post("/api/stock/{symbol}/signals/recompute")
 async def recompute_stock_signals(
     symbol: str,

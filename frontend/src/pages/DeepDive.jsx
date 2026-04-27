@@ -183,6 +183,7 @@ export default function DeepDive() {
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [fundSyncLoading, setFundSyncLoading] = useState(false);
+  const [screenerSyncLoading, setScreenerSyncLoading] = useState(false);
   const [editData, setEditData] = useState({});
   const [activeTab, setActiveTab] = useState('chart');
   const [selectedSkill, setSelectedSkill] = useState(SKILLS[0].id);
@@ -359,6 +360,33 @@ export default function DeepDive() {
       toast.error('Sync error');
     } finally {
       setFundSyncLoading(false);
+    }
+  };
+
+  const handleScreenerSync = async () => {
+    try {
+      setScreenerSyncLoading(true);
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/sync-screener`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.filled > 0) {
+          toast.success(`Screener.in filled ${data.filled} field(s): ${data.fields?.join(', ')}`);
+          await handleRegenerateSignals();
+        } else {
+          toast.success('No missing fields — all data already present.');
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Screener.in sync failed');
+      }
+    } catch (e) {
+      toast.error('Screener sync error');
+    } finally {
+      setScreenerSyncLoading(false);
     }
   };
 
@@ -1572,6 +1600,15 @@ export default function DeepDive() {
                   >
                     <RefreshCw size={12} className={fundSyncLoading ? 'animate-spin' : ''} />
                     Sync Yahoo
+                  </button>
+                  <button
+                    onClick={handleScreenerSync}
+                    disabled={screenerSyncLoading}
+                    title="Fill missing fields from Screener.in"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-[10px] font-bold text-dark-muted hover:border-accent/60 hover:text-accent transition-all disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={screenerSyncLoading ? 'animate-spin' : ''} />
+                    Sync Screener
                   </button>
                   <button 
                     onClick={() => {
