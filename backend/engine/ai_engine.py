@@ -236,6 +236,13 @@ Weekly Candle Summary (last 6 weeks):
 {weekly_block}
 
 ═══ INDICATOR SIGNALS ═══
+RSI INTERPRETATION RULES (apply before using RSI in your reply):
+- RSI < 30  → Oversold territory. Do NOT call this overbought. Phrase as "recovering from oversold" or "deeply oversold."
+- RSI 30–45 → Recovering / neutral-bearish. Phrase as "RSI recovering" or "building momentum from lows."
+- RSI 45–55 → Neutral. No directional RSI claim.
+- RSI 55–70 → Bullish momentum. Only flag mild overbought risk above 65.
+- RSI > 70  → Overbought. Warn of pullback risk.
+The RSI value below is LIVE-computed from the same price bars shown in the chart. Trust it exactly.
 {json.dumps(signals, indent=2)}
 
 ═══ LIVE NEWS (Google News) ═══
@@ -248,6 +255,8 @@ If no news matches the move, say "appears purely technical."
 2. Always cite today's verified High/Low when discussing intraday action.
 3. Identify support/resistance from weekly candles and SMA levels.
 4. State your buy/hold/sell conviction with a specific reason.
+4a. ENTRY POINT RULE: Never suggest an entry price significantly below the current close unless there is a confirmed breakdown. If price has already bounced from lows, the realistic entry is near current price or a minor pullback (5–10%), not a re-test of the prior low.
+4b. EXIT / TARGET RULE: Base exit/target on actual SMA levels and resistance from weekly candles in the data above — do not fabricate levels not present in the data.
 5. Only include trend_lines that directly answer the question asked.
 5a. CRITICAL: trend_line start_price and end_price MUST equal the exact price level named in the reply. If the reply says support is at ₹143.13, the line must be drawn at 143.13 — never at the current price.
 6. Format all dates as YYYY-MM-DD matching the data above.
