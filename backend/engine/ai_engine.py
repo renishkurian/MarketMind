@@ -911,7 +911,8 @@ Recent 5 Daily Bars:
 
 ═══ PATTERNS TO DETECT ═══
 Bullish: Cup & Handle, Inverse Head & Shoulders, Double Bottom, Ascending Triangle,
-         Bull Flag, Falling Wedge, Morning Star, Golden Cross
+         Bull Flag, Falling Wedge, Morning Star, Golden Cross,
+         V-Bottom Recovery, BB Upper Breakout
 Bearish: Head & Shoulders, Double Top, Descending Triangle, Bear Flag,
          Rising Wedge, Evening Star, Death Cross, Rounding Top
 Neutral: Symmetrical Triangle, Rectangle, Doji Cluster, Inside Bar
@@ -948,6 +949,18 @@ BULL FLAG / BEAR FLAG:
 
 CUP & HANDLE:
   - Cup must span at least 6 weeks. Handle must retrace no more than 50% of the cup depth.
+
+V-BOTTOM RECOVERY:
+  - Price must have recovered >= 25% from its recent low within <= 15 bars.
+  - The low must be a single trough (not a double bottom) — a sharp V shape.
+  - Confidence >= 60% only if current price is above both SMA20 and SMA50.
+  - Implication: Bullish but flag high reversal risk in the description.
+
+BB UPPER BREAKOUT:
+  - Current close must be above the upper Bollinger Band (20,2).
+  - Must be accompanied by a strong green candle (close > open by >= 2%).
+  - Confidence capped at 70% — breakouts above BB Upper often mean-revert.
+  - Implication: Bullish (momentum) — always mention overbought risk in description.
 
 GENERAL:
   - Do not assign confidence > 80% to any unconfirmed (pre-breakout) pattern.
