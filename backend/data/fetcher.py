@@ -307,3 +307,149 @@ async def fetch_max_history(symbol: str, yahoo_symbol: str = None) -> pd.DataFra
     except Exception as e:
         logger.error(f"Error fetching max history for {symbol} (ticker: {yf_sym}): {e}")
         return pd.DataFrame()
+
+
+async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
+    """
+    Scrape Screener.in for Indian-specific fundamental data missing from Yahoo.
+    Returns a dict with only the fields successfully extracted (None for failures).
+    Fields covered: roe, roe_3yr_avg, revenue_growth_3yr, pat_growth_3yr,
+                    operating_margin, pe_5yr_avg, promoter_holding, promoter_pledge_pct,
+                    pb_ratio, ev_ebitda, debt_equity, pe_ratio.
+    """
+    import json as _json
+
+    result: Dict[str, Any] = {}
+    url = f"https://www.screener.in/company/{symbol}/consolidated/"
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.screener.in/",
+        }
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            # If consolidated 404, try standalone
+            if resp.status_code == 404:
+                url = f"https://www.screener.in/company/{symbol}/"
+                resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                logger.warning(f"Screener.in returned {resp.status_code} for {symbol}")
+                return result
+            html = resp.text
+
+        # ── Extract #company-ratios li items ──────────────────────────────
+        # Pattern: <li ...><span class="name">KEY</span><span ...>VALUE</span></li>
+        ratio_pattern = re.compile(
+            r'<li[^>]*>.*?<span[^>]*class="[^"]*name[^"]*"[^>]*>(.*?)</span>.*?'
+            r'<span[^>]*class="[^"]*number[^"]*"[^>]*>(.*?)</span>',
+            re.DOTALL | re.IGNORECASE,
+        )
+        ratios: Dict[str, str] = {}
+        for m in ratio_pattern.finditer(html):
+            key = re.sub(r"<[^>]+>", "", m.group(1)).strip().lower()
+            val = re.sub(r"<[^>]+>", "", m.group(2)).strip().replace(",", "").replace("%", "").replace("₹", "").strip()
+            ratios[key] = val
+
+        def _f(key_fragments, d=ratios) -> Optional[float]:
+            """Find first matching key containing any fragment and return float."""
+            for frag in key_fragments:
+                for k, v in d.items():
+                    if frag in k:
+                        try:
+                            return float(v)
+                        except (ValueError, TypeError):
+                            pass
+            return None
+
+        result["pe_ratio"]          = _f(["p/e", "price to earning"])
+        result["pb_ratio"]          = _f(["p/b", "price to book"])
+        result["ev_ebitda"]         = _f(["ev/ebitda", "ev / ebitda"])
+        result["roe"]               = _f(["roe", "return on equity"])
+        result["debt_equity"]       = _f(["debt to equity", "d/e"])
+        result["operating_margin"]  = _f(["opm", "operating profit margin", "operating margin"])
+
+        # ── Extract promoter holding from shareholding table ───────────────
+        # <td>Promoters</td> row usually has the latest % in next <td>
+        prom_match = re.search(
+            r"Promoters\s*</td>\s*<td[^>]*>([\d.]+)\s*%?",
+            html, re.IGNORECASE
+        )
+        if prom_match:
+            try:
+                result["promoter_holding"] = float(prom_match.group(1))
+            except ValueError:
+                pass
+
+        # Pledged % — appears as "Pledged percentage" in a separate row
+        pledge_match = re.search(
+            r"[Pp]ledged[^<]*</td>\s*<td[^>]*>([\d.]+)",
+            html, re.IGNORECASE
+        )
+        if pledge_match:
+            try:
+                result["promoter_pledge_pct"] = float(pledge_match.group(1))
+            except ValueError:
+                pass
+
+        # ── 10-year financial table: extract 3yr CAGRs ────────────────────
+        # Screener shows "Compounded Sales Growth" / "Compounded Profit Growth" tables
+        # Each row: 10 Years / 5 Years / 3 Years / TTM
+        def _extract_3yr_cagr(label_pattern: str) -> Optional[float]:
+            block = re.search(
+                label_pattern + r".*?3 Years.*?:\s*([\d.]+)\s*%",
+                html, re.DOTALL | re.IGNORECASE
+            )
+            if block:
+                try:
+                    return float(block.group(1))
+                except ValueError:
+                    pass
+            # Alternate: table row
+            tbl = re.search(
+                label_pattern + r".*?<tr[^>]*>.*?<td[^>]*>3 Years?</td>\s*<td[^>]*>([\d.]+)",
+                html, re.DOTALL | re.IGNORECASE
+            )
+            if tbl:
+                try:
+                    return float(tbl.group(1))
+                except ValueError:
+                    pass
+            return None
+
+        result["revenue_growth_3yr"] = _extract_3yr_cagr(r"[Cc]ompounded\s+[Ss]ales\s+[Gg]rowth")
+        result["pat_growth_3yr"]     = _extract_3yr_cagr(r"[Cc]ompounded\s+[Pp]rofit\s+[Gg]rowth")
+
+        # ── ROE 3yr avg — from "Return on Equity" table ───────────────────
+        roe_block = re.search(
+            r"Return on [Ee]quity.*?(\d{4})\s+([\d.]+).*?(\d{4})\s+([\d.]+).*?(\d{4})\s+([\d.]+)",
+            html, re.DOTALL
+        )
+        if roe_block:
+            try:
+                vals = [float(roe_block.group(i)) for i in (2, 4, 6)]
+                result["roe_3yr_avg"] = round(sum(vals) / len(vals), 2)
+            except (ValueError, TypeError):
+                pass
+
+        # ── PE 5yr avg from "Price to Earning" historical block ───────────
+        pe_hist = re.findall(
+            r"Price to [Ee]arn(?:ing|ings).*?<td[^>]*>([\d.]+)</td>",
+            html, re.DOTALL
+        )
+        if len(pe_hist) >= 5:
+            try:
+                result["pe_5yr_avg"] = round(sum(float(x) for x in pe_hist[-5:]) / 5, 2)
+            except (ValueError, TypeError):
+                pass
+
+        # Remove None values so caller can merge cleanly
+        result = {k: v for k, v in result.items() if v is not None}
+        logger.info(f"Screener.in filled {len(result)} fields for {symbol}: {list(result.keys())}")
+        return result
+
+    except Exception as e:
+        logger.warning(f"Screener.in fetch failed for {symbol}: {e}")
+        return result

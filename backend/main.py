@@ -2049,9 +2049,31 @@ async def sync_fundamental_data(
     yf_sym = stock_res.scalar_one_or_none()
     
     # 2. Fetch from Yahoo
+    from backend.data.fetcher import fetch_screener_fundamentals
     data = await fetch_fundamentals(symbol, yahoo_symbol=yf_sym)
-    
-    # 2. Persist
+
+    # 2b. Fill missing fields from Screener.in
+    screener_fields = ["pe_ratio", "roe", "debt_equity", "revenue_growth_3yr", "pat_growth_3yr",
+                       "operating_margin", "pe_5yr_avg", "roe_3yr_avg", "pb_ratio", "ev_ebitda",
+                       "promoter_holding", "promoter_pledge_pct"]
+    missing = [f for f in screener_fields if not data.get(f)]
+    if missing:
+        screener_data = await fetch_screener_fundamentals(symbol)
+        for field in missing:
+            if screener_data.get(field) is not None:
+                data[field] = screener_data[field]
+        if screener_data:
+            logger.info(f"Screener.in filled {len(screener_data)} missing fields for {symbol}")
+
+    # Recompute quality after merge
+    required_keys = ["pe_ratio", "eps", "roe", "debt_equity", "revenue_growth"]
+    missing_count = sum(1 for k in required_keys if not data.get(k))
+    if missing_count == 0:
+        data["data_quality"] = "FULL"
+    elif missing_count < len(required_keys):
+        data["data_quality"] = "PARTIAL"
+
+    # 3. Persist
     stmt = mysql_insert(FundamentalsCache).values(
         symbol=symbol,
         fetched_at=datetime.now(),
@@ -2061,19 +2083,33 @@ async def sync_fundamental_data(
         debt_equity=data.get("debt_equity"),
         revenue_growth=data.get("revenue_growth"),
         market_cap=data.get("market_cap"),
+        revenue_growth_3yr=data.get("revenue_growth_3yr"),
+        pat_growth_3yr=data.get("pat_growth_3yr"),
+        operating_margin=data.get("operating_margin"),
+        pe_5yr_avg=data.get("pe_5yr_avg"),
+        roe_3yr_avg=data.get("roe_3yr_avg"),
+        pb_ratio=data.get("pb_ratio"),
+        ev_ebitda=data.get("ev_ebitda"),
+        promoter_holding=data.get("promoter_holding"),
+        promoter_pledge_pct=data.get("promoter_pledge_pct"),
         data_quality=data.get("data_quality", "FULL")
     )
-    
-    cols = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity", "revenue_growth", "market_cap", "data_quality"]
+
+    cols = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity", "revenue_growth", "market_cap",
+            "revenue_growth_3yr", "pat_growth_3yr", "operating_margin", "pe_5yr_avg", "roe_3yr_avg",
+            "pb_ratio", "ev_ebitda", "promoter_holding", "promoter_pledge_pct", "data_quality"]
     stmt = stmt.on_duplicate_key_update(**{c: stmt.inserted[c] for c in cols})
-    
+
     await db.execute(stmt)
     await db.commit()
-    
-    # 3. Always recompute signals when data changes
+
+    # 4. Always recompute signals when data changes
     await recompute_signals_for(symbol)
-    
-    return {"message": f"Fundamentals synced from Yahoo Finance for {symbol}.", "status": data.get("data_quality")}
+
+    sources = "Yahoo Finance"
+    if missing and screener_data:
+        sources += " + Screener.in"
+    return {"message": f"Fundamentals synced from {sources} for {symbol}.", "status": data.get("data_quality")}
 
 
 @app.post("/api/stock/{symbol}/signals/recompute")
