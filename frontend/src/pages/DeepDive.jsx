@@ -123,7 +123,7 @@ const AIInsightPanel = ({ insight, loading, error }) => {
         </div>
       )}
       {insight.long_summary && (
-        <p className="text-sm text-dark-muted leading-relaxed">{insight.long_summary}</p>
+        <pre className="text-sm text-dark-muted leading-relaxed whitespace-pre-wrap font-sans">{insight.long_summary}</pre>
       )}
 
       {/* Opportunities & Risks */}

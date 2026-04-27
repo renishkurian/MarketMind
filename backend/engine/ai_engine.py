@@ -430,6 +430,63 @@ async def _call_openai(messages: list, model: str, api_key: str) -> tuple[dict, 
     return parsed, resp.usage.prompt_tokens, resp.usage.completion_tokens
 
 
+async def _call_openai_text(messages: list, model: str, api_key: str) -> tuple[dict, int, int]:
+    """Returns plain text response wrapped as dict (for skill prompts that return markdown, not JSON)."""
+    client = openai.AsyncOpenAI(api_key=api_key, timeout=120.0)
+    resp = await client.chat.completions.create(model=model, messages=messages)
+    text = resp.choices[0].message.content or ""
+    return _parse_skill_markdown(text), resp.usage.prompt_tokens, resp.usage.completion_tokens
+
+
+def _parse_skill_markdown(text: str) -> dict:
+    """Extract short_summary, key_risks, key_opportunities from a markdown skill essay."""
+    lines = text.strip().splitlines()
+    short_summary = ""
+    key_risks = []
+    key_opportunities = []
+
+    # short_summary = first non-empty, non-heading paragraph
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not stripped.startswith("---"):
+            short_summary = stripped[:300]
+            break
+
+    # Extract bullet points under risk/opportunity sections
+    in_risk = False
+    in_opp = False
+    for line in lines:
+        lower = line.lower()
+        if any(k in lower for k in ["risk", "concern", "red flag", "weakness", "avoid", "warning"]):
+            in_risk = True; in_opp = False
+        elif any(k in lower for k in ["opportunit", "strength", "moat", "buy", "upside", "catalyst"]):
+            in_opp = True; in_risk = False
+        stripped = line.strip()
+        if stripped.startswith(("- ", "* ", "• ")) or (stripped and stripped[0].isdigit() and ". " in stripped[:4]):
+            item = stripped.lstrip("-*•0123456789. ").strip()
+            if item and len(item) > 5:
+                if in_risk and len(key_risks) < 4:
+                    key_risks.append(item)
+                elif in_opp and len(key_opportunities) < 4:
+                    key_opportunities.append(item)
+
+    # Fallback: if no bullets found, pull verdict line as summary item
+    if not key_risks and not key_opportunities:
+        for line in lines:
+            if "verdict" in line.lower() or "rating" in line.lower():
+                item = line.strip().lstrip("#").strip()
+                if item:
+                    key_opportunities.append(item)
+                break
+
+    return {
+        "short_summary": short_summary,
+        "long_summary": text,
+        "key_risks": key_risks,
+        "key_opportunities": key_opportunities,
+    }
+
+
 async def _call_anthropic(messages: list, model: str, api_key: str) -> tuple[dict, int, int]:
     client = anthropic.AsyncAnthropic(api_key=api_key)
     resp = await client.messages.create(
@@ -644,7 +701,11 @@ async def generate_insight(
     try:
         api_key = key_map[provider]
         if provider == "openai":
-            parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, api_key)
+            # Skill prompts return markdown essays — use text mode; fallback prompt returns JSON
+            if skill_id:
+                parsed, prompt_tokens, completion_tokens = await _call_openai_text(messages, model, api_key)
+            else:
+                parsed, prompt_tokens, completion_tokens = await _call_openai(messages, model, api_key)
         elif provider == "anthropic":
             parsed, prompt_tokens, completion_tokens = await _call_anthropic(messages, model, api_key)
         elif provider == "xai":
