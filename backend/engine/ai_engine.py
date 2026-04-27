@@ -104,7 +104,10 @@ async def _write_call_log(
 
 
 def _build_messages(prompt: str) -> list:
-    return [{"role": "user", "content": prompt}]
+    return [
+        {"role": "system", "content": "You are a financial analysis assistant. Always respond with valid JSON only — no text outside the JSON object."},
+        {"role": "user", "content": prompt},
+    ]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
