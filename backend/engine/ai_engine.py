@@ -249,6 +249,7 @@ If no news matches the move, say "appears purely technical."
 3. Identify support/resistance from weekly candles and SMA levels.
 4. State your buy/hold/sell conviction with a specific reason.
 5. Only include trend_lines that directly answer the question asked.
+5a. CRITICAL: trend_line start_price and end_price MUST equal the exact price level named in the reply. If the reply says support is at ₹143.13, the line must be drawn at 143.13 — never at the current price.
 6. Format all dates as YYYY-MM-DD matching the data above.
 7. When computing price_target, use backtest CAGR to project forward and win_rate to set band width.
    A 55% win rate = wider band. A 75% win rate = tighter band. Never fabricate — if data is insufficient return null.
