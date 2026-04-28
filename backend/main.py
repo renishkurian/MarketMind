@@ -2197,12 +2197,12 @@ async def sync_screener_data(
     symbol = symbol.upper()
 
     # Resolve screener slug: use master override if set, else fall back to auto-derive
-    master_res = await db.execute(select(StockMaster.screener_symbol).where(StockMaster.symbol == symbol))
-    screener_slug = master_res.scalar_one_or_none()
+    master_res = await db.execute(select(StockMaster.screener_symbol).where(StockMaster.symbol == symbol).limit(1))
+    screener_slug = master_res.scalars().first()
 
     screener_data = await fetch_screener_fundamentals(symbol, screener_symbol=screener_slug or None)
     if not screener_data:
-        raise HTTPException(status_code=404, detail=f"Screener.in returned no data for {symbol} (slug: '{screener_slug or symbol.lower()}'). Check backend logs — may need SCREENER_EMAIL/PASSWORD in .env.")
+        raise HTTPException(status_code=404, detail=f"Screener.in returned no data for {symbol} (slug: '{screener_slug or symbol.lower()}'). The symbol may not exist on Screener.in.")
 
     # ── 1. Merge scalars into FundamentalsCache ───────────────────────────
     existing = await db.execute(select(FundamentalsCache).where(FundamentalsCache.symbol == symbol))

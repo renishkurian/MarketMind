@@ -5,64 +5,12 @@ import httpx
 import logging
 import urllib.request
 import re
-import os
 from typing import List, Dict, Any, Union, Optional
 from datetime import datetime
 
 from backend.utils.market_hours import get_current_ist_time
 
 logger = logging.getLogger(__name__)
-
-# ── Screener.in session cache ─────────────────────────────────────────────────
-# Stores cookies after a successful login so we don't re-login on every request
-_screener_cookies: Dict[str, str] = {}
-
-async def _get_screener_session() -> Dict[str, str]:
-    """Login to Screener.in and return session cookies. Caches until process restart."""
-    global _screener_cookies
-    if _screener_cookies:
-        return _screener_cookies
-
-    from backend.config import settings
-    email = settings.SCREENER_EMAIL
-    password = settings.SCREENER_PASSWORD
-    if not email or not password:
-        logger.warning("SCREENER_EMAIL / SCREENER_PASSWORD not set in .env — scraping without auth")
-        return {}
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Referer": "https://www.screener.in/login/",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-            # Step 1: GET login page to get CSRF token
-            login_page = await client.get("https://www.screener.in/login/", headers=headers)
-            csrf_match = re.search(r'csrfmiddlewaretoken["\s]+value=["\'](.*?)["\']', login_page.text)
-            if not csrf_match:
-                csrf_match = re.search(r'name="csrfmiddlewaretoken"\s+value="([^"]+)"', login_page.text)
-            csrf = csrf_match.group(1) if csrf_match else ""
-
-            login_cookies = dict(login_page.cookies)
-
-            # Step 2: POST credentials
-            resp = await client.post(
-                "https://www.screener.in/login/",
-                data={"username": email, "password": password, "csrfmiddlewaretoken": csrf},
-                headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
-                cookies=login_cookies,
-            )
-            combined = {**login_cookies, **dict(resp.cookies)}
-            if "sessionid" in combined:
-                logger.info("Screener.in login successful — session cached")
-                _screener_cookies = combined
-                return _screener_cookies
-            else:
-                logger.warning(f"Screener.in login failed — no sessionid. Check SCREENER_EMAIL/PASSWORD in .env")
-                return {}
-    except Exception as e:
-        logger.warning(f"Screener.in login error: {e}")
-        return {}
 
 def _get_yf_symbol(symbol: str) -> str:
     """Legacy helper. Callers should transition to using DB-defined yahoo_symbol."""
@@ -490,7 +438,7 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
         session_cookies = await _get_screener_session()
         html = ""
         fetched_url = ""
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True, cookies=session_cookies) as client:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
             for url in urls:
                 resp = await client.get(url, headers=headers)
                 fetched_url = str(resp.url)
