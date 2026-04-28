@@ -460,7 +460,7 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
 
         # Extract all text from ratio section between id="company-ratios" and next section
         ratios_section = re.search(
-            r'id=["\']company-ratios["\'][^>]*>(.*?)</(?:section|div)',
+            r'id=["\'](?:top-ratios|company-ratios)["\'][^>]*>(.*?)</(?:ul|section|div)',
             html, re.DOTALL | re.IGNORECASE
         )
         search_html = ratios_section.group(1) if ratios_section else html
@@ -533,22 +533,35 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
 
         # ── Strategy 3: Promoter holdings ────────────────────────────────
         # Find the latest promoter holding from the shareholding table
-        # Screener format: row with "Promoters" label, columns are quarters newest-first
-        prom_patterns = [
-            r'Promoters\s*</td>\s*(?:<td[^>]*>[\d.]*%?\s*</td>\s*)*<td[^>]*>([\d.]+)\s*%?',
-            r'Promoters[^<]*</(?:td|th)>\s*<(?:td|th)[^>]*>([\d.]+)',
-            r'"Promoters"\s*[,:{]\s*"?([\d.]+)',
-        ]
-        for pat in prom_patterns:
-            m = re.search(pat, html, re.IGNORECASE)
-            if m:
+        # Screener format: Promoters button inside td, then td cells with percentages (newest last)
+        prom_row = re.search(
+            r'Promoters.*?</tr>',
+            html, re.DOTALL | re.IGNORECASE
+        )
+        if prom_row:
+            prom_vals = re.findall(r'<td[^>]*>([\d.]+)%?</td>', prom_row.group(0))
+            if prom_vals:
                 try:
-                    v = float(m.group(1))
+                    v = float(prom_vals[-1])
                     if 0 < v <= 100:
                         result["promoter_holding"] = v
-                        break
                 except (ValueError, TypeError):
                     pass
+        if not result.get("promoter_holding"):
+            prom_patterns = [
+                r'Promoters\s*</td>\s*(?:<td[^>]*>[\d.]*%?\s*</td>\s*)*<td[^>]*>([\d.]+)\s*%?',
+                r'"Promoters"\s*[,:{]\s*"?([\d.]+)',
+            ]
+            for pat in prom_patterns:
+                m = re.search(pat, html, re.IGNORECASE)
+                if m:
+                    try:
+                        v = float(m.group(1))
+                        if 0 < v <= 100:
+                            result["promoter_holding"] = v
+                            break
+                    except (ValueError, TypeError):
+                        pass
 
         # Pledged %
         pledge_patterns = [
@@ -572,8 +585,8 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
             if m:
                 try: return float(m.group(1))
                 except: pass
-            # Try: table format with "3 Years" cell
-            m = re.search(label_re + r'.*?<tr[^>]*>.*?<td[^>]*>\s*3\s+[Yy]ears?\s*</td>\s*<td[^>]*>\s*([\d.]+)', html, re.DOTALL | re.IGNORECASE)
+            # Try: table format with "3 Years:" cell (colon inside td — actual Screener format)
+            m = re.search(label_re + r'.*?<td[^>]*>\s*3\s+[Yy]ears?:?\s*</td>\s*<td[^>]*>\s*([\d.]+)', html, re.DOTALL | re.IGNORECASE)
             if m:
                 try: return float(m.group(1))
                 except: pass
