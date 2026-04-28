@@ -1632,7 +1632,8 @@ export default function DeepDive() {
                         debt_equity: fundamentals?.debt_equity,
                         revenue_growth: fundamentals?.revenue_growth,
                         market_cap: fundamentals?.market_cap,
-                        yahoo_symbol: fundamentals?.yahoo_symbol
+                        yahoo_symbol: fundamentals?.yahoo_symbol,
+                        screener_symbol: fundamentals?.screener_symbol
                       });
                       setIsEditModalOpen(true);
                     }}
@@ -2332,6 +2333,20 @@ export default function DeepDive() {
                   className="w-full bg-dark-bg border border-accent/20 rounded-xl px-4 py-3 text-sm font-mono focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all placeholder:text-dark-muted/30"
                 />
                 <p className="text-[9px] text-dark-muted mt-1.5">When you click "Sync Yahoo", this symbol will be used for the fetch.</p>
+              </div>
+
+              <div className="col-span-full">
+                <label className="block text-[10px] font-bold text-orange-400 uppercase mb-1.5 flex items-center gap-1.5">
+                  <RefreshCw size={10} /> Screener.in Symbol
+                </label>
+                <input 
+                  type="text"
+                  placeholder="e.g. ashok-leyland"
+                  defaultValue={editData.screener_symbol}
+                  onChange={(e) => setEditData({ ...editData, screener_symbol: e.target.value.toLowerCase().trim() })}
+                  className="w-full bg-dark-bg border border-orange-400/20 rounded-xl px-4 py-3 text-sm font-mono focus:border-orange-400 focus:ring-1 focus:ring-orange-400 outline-none transition-all placeholder:text-dark-muted/30"
+                />
+                <p className="text-[9px] text-dark-muted mt-1.5">The slug used on screener.in — check the URL: screener.in/company/<span className="text-orange-400 font-mono">ashok-leyland</span>. When you click "Sync Screener", this is used.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
