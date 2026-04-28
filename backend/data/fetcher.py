@@ -435,7 +435,6 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
             "Referer": "https://www.screener.in/",
             "DNT": "1",
         }
-        session_cookies = await _get_screener_session()
         html = ""
         fetched_url = ""
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
