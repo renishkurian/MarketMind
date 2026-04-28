@@ -2059,9 +2059,11 @@ async def sync_fundamental_data(
     from sqlalchemy.dialects.mysql import insert as mysql_insert
     symbol = symbol.upper()
     
-    # 1. Fetch from StockMaster for Yahoo symbol mapping
-    stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol))
-    yf_sym = stock_res.scalar_one_or_none()
+    # 1. Fetch from StockMaster for Yahoo + Screener symbol mappings
+    stock_res = await db.execute(select(StockMaster.yahoo_symbol, StockMaster.screener_symbol).where(StockMaster.symbol == symbol))
+    stock_row = stock_res.first()
+    yf_sym = stock_row[0] if stock_row else None
+    screener_slug = stock_row[1] if stock_row else None
     
     # 2. Fetch from Yahoo
     from backend.data.fetcher import fetch_screener_fundamentals
@@ -2073,7 +2075,7 @@ async def sync_fundamental_data(
                        "promoter_holding", "promoter_pledge_pct", "current_ratio"]
     missing = [f for f in screener_fields if not data.get(f)]
     if missing:
-        screener_data = await fetch_screener_fundamentals(symbol)
+        screener_data = await fetch_screener_fundamentals(symbol, screener_symbol=screener_slug or None)
         for field in missing:
             if screener_data.get(field) is not None:
                 data[field] = screener_data[field]
