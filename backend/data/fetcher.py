@@ -513,5 +513,5 @@ async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         return result
 
     except Exception as e:
-        logger.warning(f"Screener.in fetch failed for {symbol}: {e}")
+        logger.warning(f"Screener.in fetch failed for {symbol}: {e!r}", exc_info=True)
         return result
