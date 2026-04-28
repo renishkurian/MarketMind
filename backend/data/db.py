@@ -57,6 +57,7 @@ class StockMaster(Base):
     added_date = Column(Date, nullable=False)
     is_active = Column(Boolean, default=True)
     yahoo_symbol = Column(String(20), index=True)
+    screener_symbol = Column(String(50), nullable=True)  # Custom slug for screener.in (e.g. "ashok-leyland")
     
     # Portfolio specific fields
     quantity = Column(Numeric(14,4))
@@ -440,6 +441,8 @@ async def run_migrations():
     migrations = [
         # Feature 3: move_explanations.should_act added after initial table creation
         "ALTER TABLE move_explanations ADD COLUMN IF NOT EXISTS should_act VARCHAR(30) NULL",
+        # Feature: stocks_master.screener_symbol — custom screener.in slug per stock
+        "ALTER TABLE stocks_master ADD COLUMN IF NOT EXISTS screener_symbol VARCHAR(50) NULL",
         # Feature 4: price_alerts — ensure table exists (create_all handles new tables,
         #   but if the table was never created we surface a cleaner error via create_all)
     ]

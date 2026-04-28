@@ -909,8 +909,10 @@ async def get_stock_fundamentals(
     )
     fund = result.scalars().first()
     # Join or fetch StockMaster metadata too
-    stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol.upper()))
-    stock_row = stock_res.scalar_one_or_none()
+    stock_res = await db.execute(select(StockMaster.yahoo_symbol, StockMaster.screener_symbol).where(StockMaster.symbol == symbol.upper()))
+    stock_row = stock_res.first()
+    yahoo_sym = stock_row[0] if stock_row else None
+    screener_sym = stock_row[1] if stock_row else None
 
     return {
         "fetched_at": str(fund.fetched_at),
@@ -939,7 +941,8 @@ async def get_stock_fundamentals(
         "current_ratio": float(fund.current_ratio) if fund.current_ratio else None,
         
         "data_quality": fund.data_quality,
-        "yahoo_symbol": stock_row,
+        "yahoo_symbol": yahoo_sym,
+        "screener_symbol": screener_sym,
     }
 
 
@@ -1940,6 +1943,7 @@ class FundamentalUpdateRequest(BaseModel):
     revenue_growth: Optional[float] = None
     market_cap: Optional[float] = None
     yahoo_symbol: Optional[str] = None
+    screener_symbol: Optional[str] = None
 
 @app.post("/api/stock/{symbol}/insight/generate")
 @limiter.limit("5/minute")
@@ -2021,12 +2025,18 @@ async def update_fundamentals(
     
     await db.execute(stmt)
     
-    # 2. Update yahoo_symbol in StockMaster if provided
+    # 2. Update yahoo_symbol / screener_symbol in StockMaster if provided
     if update.yahoo_symbol is not None:
         await db.execute(
             update(StockMaster)
             .where(StockMaster.symbol == symbol)
             .values(yahoo_symbol=update.yahoo_symbol)
+        )
+    if update.screener_symbol is not None:
+        await db.execute(
+            update(StockMaster)
+            .where(StockMaster.symbol == symbol)
+            .values(screener_symbol=update.screener_symbol)
         )
     
     await db.commit()
@@ -2184,7 +2194,11 @@ async def sync_screener_data(
     from sqlalchemy.dialects.mysql import insert as mysql_insert
     symbol = symbol.upper()
 
-    screener_data = await fetch_screener_fundamentals(symbol)
+    # Resolve screener slug: use master override if set, else fall back to auto-derive
+    master_res = await db.execute(select(StockMaster.screener_symbol).where(StockMaster.symbol == symbol))
+    screener_slug = master_res.scalar_one_or_none()
+
+    screener_data = await fetch_screener_fundamentals(symbol, screener_symbol=screener_slug or None)
     if not screener_data:
         raise HTTPException(status_code=404, detail=f"Screener.in returned no data for {symbol}. The symbol may not exist on Screener.in.")
 

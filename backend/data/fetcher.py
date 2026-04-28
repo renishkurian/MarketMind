@@ -309,15 +309,18 @@ async def fetch_max_history(symbol: str, yahoo_symbol: str = None) -> pd.DataFra
         return pd.DataFrame()
 
 
-async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
+async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) -> Dict[str, Any]:
     """
     Scrape Screener.in for Indian-specific fundamental data missing from Yahoo.
     Robust multi-strategy extraction covering all ratio and growth fields.
+    If screener_symbol is provided, it is used as the slug (e.g. "ashok-leyland");
+    otherwise the NSE symbol is tried directly.
     """
     result: Dict[str, Any] = {}
+    slug = screener_symbol if screener_symbol else symbol
     urls = [
-        f"https://www.screener.in/company/{symbol}/consolidated/",
-        f"https://www.screener.in/company/{symbol}/",
+        f"https://www.screener.in/company/{slug}/consolidated/",
+        f"https://www.screener.in/company/{slug}/",
     ]
 
     try:
