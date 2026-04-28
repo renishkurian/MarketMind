@@ -339,6 +339,7 @@ async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
             if not html:
                 logger.warning(f"Screener.in returned no usable response for {symbol}")
                 return result
+            logger.info(f"[Screener debug] {symbol} HTML len={len(html)}, sample={html[200:600]!r}")
 
         # ── Strategy 1: Extract all <li> ratio items (handles any class structure) ──
         # Screener structure: <li ...><span ...>Label</span><span ...>Value</span></li>
