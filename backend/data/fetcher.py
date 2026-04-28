@@ -467,13 +467,14 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
 
         # Match any <li> with two consecutive spans
         li_pattern = re.compile(
-            r'<li[^>]*>\s*<span[^>]*>(.*?)</span>\s*<span[^>]*>(.*?)</span>',
+            r'<li[^>]*>\s*<span[^>]*>(.*?)</span>\s*<span[^>]*>(.*?)</span\s*>',
             re.DOTALL | re.IGNORECASE
         )
         for m in li_pattern.finditer(search_html):
             key = re.sub(r'<[^>]+>', '', m.group(1)).strip().lower()
-            val = re.sub(r'<[^>]+>', '', m.group(2)).strip()
-            val = val.replace(',', '').replace('%', '').replace('₹', '').replace(' ', '').strip()
+            raw = re.sub(r'<[^>]+>', ' ', m.group(2))
+            num_m = re.search(r'([\d,]+(?:\.\d+)?)', raw)
+            val = num_m.group(1).replace(',', '') if num_m else ''
             if key and val:
                 ratios[key] = val
 
@@ -502,6 +503,9 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
             return None
 
         result["pe_ratio"]         = _f("stock p/e", "p/e", "price to earning")
+        result["roce"]             = _f("roce")
+        result["book_value"]       = _f("book value")
+        result["market_cap"]       = _f("market cap")
         result["pb_ratio"]         = _f("price to book", "p/b value", "p/b")
         result["ev_ebitda"]        = _f("ev/ebitda", "ev / ebitda", "ebitda")
         result["roe"]              = _f("return on equity", "roe")
@@ -523,7 +527,15 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
         if result.get("debt_equity") is None:
             result["debt_equity"] = _re_val(r'[Dd]ebt to [Ee]quity[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
         if result.get("operating_margin") is None:
-            result["operating_margin"] = _re_val(r'OPM[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
+            # OPM % is in the P&L table as <td>OPM %</td> followed by td cells; grab last annual value
+            opm_row = re.search(r'OPM\s*%.*?</tr>', html, re.DOTALL | re.IGNORECASE)
+            if opm_row:
+                opm_vals = re.findall(r'<td[^>]*>\s*([\d.]+)%?\s*</td>', opm_row.group(0))
+                if opm_vals:
+                    try: result["operating_margin"] = float(opm_vals[-2] if len(opm_vals) > 1 else opm_vals[-1])  # skip TTM, use last annual
+                    except: pass
+            if result.get("operating_margin") is None:
+                result["operating_margin"] = _re_val(r'OPM[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
         if result.get("pb_ratio") is None:
             result["pb_ratio"] = _re_val(r'Price to Book[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
         if result.get("ev_ebitda") is None:
