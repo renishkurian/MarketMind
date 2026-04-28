@@ -347,7 +347,7 @@ async def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
 
         # Extract all text from ratio section between id="company-ratios" and next section
         ratios_section = re.search(
-            r'id=["']company-ratios["'][^>]*>(.*?)</(?:section|div)',
+            r'id=["\']company-ratios["\'][^>]*>(.*?)</(?:section|div)',
             html, re.DOTALL | re.IGNORECASE
         )
         search_html = ratios_section.group(1) if ratios_section else html
