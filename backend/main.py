@@ -20,7 +20,7 @@ from backend.data.db import (
     get_db, SessionLocal, run_migrations,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
     PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
-    User, MoveExplanation, PriceAlert, PerformanceCache
+    User, MoveExplanation, PriceAlert, PerformanceCache, ScreenerCache
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
@@ -2112,13 +2112,68 @@ async def sync_fundamental_data(
     return {"message": f"Fundamentals synced from {sources} for {symbol}.", "status": data.get("data_quality")}
 
 
+@app.get("/api/stock/{symbol}/screener")
+async def get_screener_data(symbol: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Return cached Screener.in rich data for a symbol."""
+    symbol = symbol.upper()
+    res = await db.execute(select(ScreenerCache).where(ScreenerCache.symbol == symbol))
+    row = res.scalars().first()
+    if not row:
+        return {"available": False}
+    return {
+        "available": True,
+        "fetched_at": row.fetched_at.isoformat() if row.fetched_at else None,
+        "roce": float(row.roce) if row.roce else None,
+        "dividend_yield": float(row.dividend_yield) if row.dividend_yield else None,
+        "dividend_payout_pct": float(row.dividend_payout_pct) if row.dividend_payout_pct else None,
+        "face_value": float(row.face_value) if row.face_value else None,
+        "book_value": float(row.book_value) if row.book_value else None,
+        "market_cap_cr": float(row.market_cap_cr) if row.market_cap_cr else None,
+        "promoter_holding": float(row.promoter_holding) if row.promoter_holding else None,
+        "fii_holding": float(row.fii_holding) if row.fii_holding else None,
+        "dii_holding": float(row.dii_holding) if row.dii_holding else None,
+        "public_holding": float(row.public_holding) if row.public_holding else None,
+        "promoter_pledge_pct": float(row.promoter_pledge_pct) if row.promoter_pledge_pct else None,
+        "debtor_days": float(row.debtor_days) if row.debtor_days else None,
+        "inventory_days": float(row.inventory_days) if row.inventory_days else None,
+        "days_payable": float(row.days_payable) if row.days_payable else None,
+        "cash_conversion_cycle": float(row.cash_conversion_cycle) if row.cash_conversion_cycle else None,
+        "working_capital_days": float(row.working_capital_days) if row.working_capital_days else None,
+        "revenue_cagr_3yr": float(row.revenue_cagr_3yr) if row.revenue_cagr_3yr else None,
+        "revenue_cagr_5yr": float(row.revenue_cagr_5yr) if row.revenue_cagr_5yr else None,
+        "revenue_cagr_10yr": float(row.revenue_cagr_10yr) if row.revenue_cagr_10yr else None,
+        "profit_cagr_3yr": float(row.profit_cagr_3yr) if row.profit_cagr_3yr else None,
+        "profit_cagr_5yr": float(row.profit_cagr_5yr) if row.profit_cagr_5yr else None,
+        "profit_cagr_10yr": float(row.profit_cagr_10yr) if row.profit_cagr_10yr else None,
+        "price_cagr_1yr": float(row.price_cagr_1yr) if row.price_cagr_1yr else None,
+        "price_cagr_3yr": float(row.price_cagr_3yr) if row.price_cagr_3yr else None,
+        "price_cagr_5yr": float(row.price_cagr_5yr) if row.price_cagr_5yr else None,
+        "price_cagr_10yr": float(row.price_cagr_10yr) if row.price_cagr_10yr else None,
+        "roe_avg_3yr": float(row.roe_avg_3yr) if row.roe_avg_3yr else None,
+        "roe_avg_5yr": float(row.roe_avg_5yr) if row.roe_avg_5yr else None,
+        "roe_avg_10yr": float(row.roe_avg_10yr) if row.roe_avg_10yr else None,
+        "quarterly_results": row.quarterly_results or [],
+        "annual_pnl": row.annual_pnl or [],
+        "annual_balance_sheet": row.annual_balance_sheet or [],
+        "annual_cashflows": row.annual_cashflows or [],
+        "annual_ratios": row.annual_ratios or [],
+        "shareholding_history": row.shareholding_history or [],
+        "screener_pros": row.screener_pros or [],
+        "screener_cons": row.screener_cons or [],
+        "about_text": row.about_text,
+        "sector": row.sector,
+        "industry": row.industry,
+    }
+
+
 @app.post("/api/stock/{symbol}/fundamentals/sync-screener")
 async def sync_screener_data(
     symbol: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Fetch missing fundamentals from Screener.in and merge into FundamentalsCache."""
+    """Fetch fundamentals + full rich data from Screener.in.
+    Merges scalars into FundamentalsCache and stores historical data in ScreenerCache."""
     from backend.data.fetcher import fetch_screener_fundamentals
     from backend.scheduler import recompute_signals_for
     from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -2128,11 +2183,9 @@ async def sync_screener_data(
     if not screener_data:
         raise HTTPException(status_code=502, detail="Screener.in returned no data for this symbol.")
 
-    # Load existing row to avoid overwriting good Yahoo data
+    # ── 1. Merge scalars into FundamentalsCache ───────────────────────────
     existing = await db.execute(select(FundamentalsCache).where(FundamentalsCache.symbol == symbol))
     row = existing.scalars().first()
-
-    # Only fill fields that are currently null
     fillable = ["pe_ratio", "roe", "debt_equity", "revenue_growth_3yr", "pat_growth_3yr",
                 "operating_margin", "pe_5yr_avg", "roe_3yr_avg", "pb_ratio", "ev_ebitda",
                 "promoter_holding", "promoter_pledge_pct", "current_ratio"]
@@ -2141,26 +2194,71 @@ async def sync_screener_data(
         current_val = getattr(row, field, None) if row else None
         if current_val is None and screener_data.get(field) is not None:
             updates[field] = screener_data[field]
+    if updates:
+        if row:
+            for k, v in updates.items():
+                setattr(row, k, v)
+            required = ["pe_ratio", "roe", "debt_equity"]
+            if all(getattr(row, k, None) for k in required):
+                row.data_quality = "FULL"
+            await db.commit()
+        else:
+            stmt = mysql_insert(FundamentalsCache).values(symbol=symbol, fetched_at=datetime.now(), **updates)
+            stmt = stmt.on_duplicate_key_update(**{k: stmt.inserted[k] for k in updates})
+            await db.execute(stmt)
+            await db.commit()
 
-    if not updates:
-        return {"message": f"No missing fields to fill for {symbol}. All data already present.", "filled": 0}
-
-    if row:
-        for k, v in updates.items():
-            setattr(row, k, v)
-        # Recompute quality
-        required = ["pe_ratio", "roe", "debt_equity"]
-        if all(getattr(row, k, None) for k in required):
-            row.data_quality = "FULL"
-        await db.commit()
-    else:
-        stmt = mysql_insert(FundamentalsCache).values(symbol=symbol, fetched_at=datetime.now(), **updates)
-        stmt = stmt.on_duplicate_key_update(**{k: stmt.inserted[k] for k in updates})
-        await db.execute(stmt)
-        await db.commit()
+    # ── 2. Save rich data into ScreenerCache ─────────────────────────────
+    rich = screener_data.get("screener_full", {})
+    if rich:
+        sc_res = await db.execute(select(ScreenerCache).where(ScreenerCache.symbol == symbol))
+        sc_row = sc_res.scalars().first()
+        sc_vals = {
+            "symbol": symbol, "fetched_at": datetime.now(),
+            "roce": rich.get("roce"), "dividend_yield": rich.get("dividend_yield"),
+            "dividend_payout_pct": rich.get("dividend_payout_pct"), "face_value": rich.get("face_value"),
+            "book_value": rich.get("book_value"), "market_cap_cr": rich.get("market_cap_cr"),
+            "promoter_holding": rich.get("promoter_holding") or screener_data.get("promoter_holding"),
+            "fii_holding": rich.get("fii_holding"), "dii_holding": rich.get("dii_holding"),
+            "public_holding": rich.get("public_holding"),
+            "promoter_pledge_pct": rich.get("promoter_pledge_pct") or screener_data.get("promoter_pledge_pct"),
+            "debtor_days": rich.get("debtor_days"), "inventory_days": rich.get("inventory_days"),
+            "days_payable": rich.get("days_payable"), "cash_conversion_cycle": rich.get("cash_conversion_cycle"),
+            "working_capital_days": rich.get("working_capital_days"),
+            "revenue_cagr_3yr": rich.get("revenue_cagr_3yr"), "revenue_cagr_5yr": rich.get("revenue_cagr_5yr"),
+            "revenue_cagr_10yr": rich.get("revenue_cagr_10yr"), "profit_cagr_3yr": rich.get("profit_cagr_3yr"),
+            "profit_cagr_5yr": rich.get("profit_cagr_5yr"), "profit_cagr_10yr": rich.get("profit_cagr_10yr"),
+            "price_cagr_1yr": rich.get("price_cagr_1yr"), "price_cagr_3yr": rich.get("price_cagr_3yr"),
+            "price_cagr_5yr": rich.get("price_cagr_5yr"), "price_cagr_10yr": rich.get("price_cagr_10yr"),
+            "roe_avg_3yr": rich.get("roe_avg_3yr"), "roe_avg_5yr": rich.get("roe_avg_5yr"),
+            "roe_avg_10yr": rich.get("roe_avg_10yr"),
+            "quarterly_results": rich.get("quarterly_results"), "annual_pnl": rich.get("annual_pnl"),
+            "annual_balance_sheet": rich.get("annual_balance_sheet"), "annual_cashflows": rich.get("annual_cashflows"),
+            "annual_ratios": rich.get("annual_ratios"), "shareholding_history": rich.get("shareholding_history"),
+            "screener_pros": rich.get("screener_pros"), "screener_cons": rich.get("screener_cons"),
+            "about_text": rich.get("about_text"), "sector": rich.get("sector"), "industry": rich.get("industry"),
+        }
+        sc_clean = {k: v for k, v in sc_vals.items() if v is not None}
+        if sc_row:
+            for k, v in sc_clean.items():
+                if k != "symbol":
+                    setattr(sc_row, k, v)
+            await db.commit()
+        else:
+            stmt = mysql_insert(ScreenerCache).values(**sc_clean)
+            stmt = stmt.on_duplicate_key_update(**{k: stmt.inserted[k] for k in sc_clean if k != "symbol"})
+            await db.execute(stmt)
+            await db.commit()
 
     await recompute_signals_for(symbol)
-    return {"message": f"Screener.in filled {len(updates)} field(s) for {symbol}.", "filled": len(updates), "fields": list(updates.keys())}
+    return {
+        "message": f"Screener sync complete for {symbol}.",
+        "fundamentals_filled": len(updates), "fundamentals_fields": list(updates.keys()),
+        "rich_data_stored": bool(rich),
+        "has_quarterly": bool(rich.get("quarterly_results")),
+        "has_annual_pnl": bool(rich.get("annual_pnl")),
+        "has_shareholding": bool(rich.get("shareholding_history")),
+    }
 
 
 @app.post("/api/stock/{symbol}/signals/recompute")

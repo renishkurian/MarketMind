@@ -360,6 +360,54 @@ class MoveExplanation(Base):
         UniqueConstraint("symbol", "period", name="uq_move_explanation_symbol_period"),
     )
 
+class ScreenerCache(Base):
+    """Rich financial data scraped from Screener.in."""
+    __tablename__ = "screener_cache"
+    id                    = Column(Integer, primary_key=True, autoincrement=True)
+    symbol                = Column(String(20), unique=True, index=True, nullable=False)
+    fetched_at            = Column(DateTime, nullable=False)
+    roce                  = Column(Numeric(6, 2))
+    dividend_yield        = Column(Numeric(6, 2))
+    dividend_payout_pct   = Column(Numeric(6, 2))
+    face_value            = Column(Numeric(10, 2))
+    book_value            = Column(Numeric(10, 2))
+    market_cap_cr         = Column(Numeric(14, 2))
+    promoter_holding      = Column(Numeric(6, 2))
+    fii_holding           = Column(Numeric(6, 2))
+    dii_holding           = Column(Numeric(6, 2))
+    public_holding        = Column(Numeric(6, 2))
+    promoter_pledge_pct   = Column(Numeric(6, 2))
+    debtor_days           = Column(Numeric(8, 1))
+    inventory_days        = Column(Numeric(8, 1))
+    days_payable          = Column(Numeric(8, 1))
+    cash_conversion_cycle = Column(Numeric(8, 1))
+    working_capital_days  = Column(Numeric(8, 1))
+    revenue_cagr_3yr      = Column(Numeric(6, 2))
+    revenue_cagr_5yr      = Column(Numeric(6, 2))
+    revenue_cagr_10yr     = Column(Numeric(6, 2))
+    profit_cagr_3yr       = Column(Numeric(6, 2))
+    profit_cagr_5yr       = Column(Numeric(6, 2))
+    profit_cagr_10yr      = Column(Numeric(6, 2))
+    price_cagr_1yr        = Column(Numeric(6, 2))
+    price_cagr_3yr        = Column(Numeric(6, 2))
+    price_cagr_5yr        = Column(Numeric(6, 2))
+    price_cagr_10yr       = Column(Numeric(6, 2))
+    roe_avg_3yr           = Column(Numeric(6, 2))
+    roe_avg_5yr           = Column(Numeric(6, 2))
+    roe_avg_10yr          = Column(Numeric(6, 2))
+    quarterly_results     = Column(JSON)
+    annual_pnl            = Column(JSON)
+    annual_balance_sheet  = Column(JSON)
+    annual_cashflows      = Column(JSON)
+    annual_ratios         = Column(JSON)
+    shareholding_history  = Column(JSON)
+    screener_pros         = Column(JSON)
+    screener_cons         = Column(JSON)
+    about_text            = Column(Text)
+    sector                = Column(String(100))
+    industry              = Column(String(100))
+
+
 class PriceAlert(Base):
     """
     AI-generated or user-confirmed price alerts.
@@ -392,6 +440,9 @@ async def run_migrations():
     migrations = [
         # Feature 3: move_explanations.should_act added after initial table creation
         "ALTER TABLE move_explanations ADD COLUMN IF NOT EXISTS should_act VARCHAR(30) NULL",
+        # ScreenerCache table is created by create_all — migration only needed for new columns
+        "ALTER TABLE screener_cache ADD COLUMN IF NOT EXISTS sector VARCHAR(100) NULL",
+        "ALTER TABLE screener_cache ADD COLUMN IF NOT EXISTS industry VARCHAR(100) NULL",
         # Feature 4: price_alerts — ensure table exists (create_all handles new tables,
         #   but if the table was never created we surface a cleaner error via create_all)
     ]

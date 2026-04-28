@@ -11,7 +11,7 @@ import {
   Zap,
   Star,
   Database,
-  Bell, BellRing
+  Bell, BellRing, PieChart, Users, TrendingUp as TrendUp
 } from 'lucide-react';
 import HistoricalPricesTable from '../components/HistoricalPricesTable';
 
@@ -186,6 +186,7 @@ export default function DeepDive() {
   const [screenerSyncLoading, setScreenerSyncLoading] = useState(false);
   const [editData, setEditData] = useState({});
   const [activeTab, setActiveTab] = useState('chart');
+  const [screenerData, setScreenerData] = useState(null);
   const [selectedSkill, setSelectedSkill] = useState(SKILLS[0].id);
   const [signals, setSignals] = useState(null);
   const [fundamentals, setFundamentals] = useState(null);
@@ -227,13 +228,14 @@ export default function DeepDive() {
     const headers = { 'Authorization': `Bearer ${token}` };
 
     // Parallel fetches
-    const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes] = await Promise.allSettled([
+    const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes, screenerRes] = await Promise.allSettled([
       fetch(`${API_URL}/api/stock/${symbol}/history`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/insight`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/signals`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/fundamentals`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/lots`, { headers }),
       fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`, { headers }),
+      fetch(`${API_URL}/api/stock/${symbol}/screener`, { headers }),
     ]);
 
     if (histRes.status === 'fulfilled' && histRes.value.ok) {
@@ -268,6 +270,11 @@ export default function DeepDive() {
       setInsightHistory(await historyRes.value.json());
     } else {
       setInsightHistory([]);
+    }
+
+    if (screenerRes.status === 'fulfilled' && screenerRes.value.ok) {
+      const sd = await screenerRes.value.json();
+      if (sd.available) setScreenerData(sd);
     }
 
     // Fetch Full Consensus Analysis if ISIN exists
@@ -797,6 +804,7 @@ export default function DeepDive() {
     { id: 'fundamentals', label: 'Fundamentals', Icon: BookOpen },
     { id: 'ai', label: 'AI Insight', Icon: Brain },
     { id: 'historical', label: 'Historical Data', Icon: Database },
+    { id: 'screener', label: 'Screener', Icon: PieChart },
   ];
 
   return (
@@ -1920,6 +1928,357 @@ export default function DeepDive() {
                 </div>
               </div>
               <HistoricalPricesTable history={history} symbol={symbol} />
+            </div>
+          )}
+
+          {activeTab === 'screener' && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-black text-dark-text uppercase tracking-widest flex items-center gap-2">
+                    <PieChart size={16} className="text-accent" />
+                    Screener.in Financial Data
+                  </h3>
+                  <p className="text-xs text-dark-muted mt-1">
+                    {screenerData ? `Last synced: ${new Date(screenerData.fetched_at).toLocaleString()}` : 'No data yet — click Sync Screener in Fundamentals tab'}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
+                    toast.loading('Syncing Screener.in...');
+                    const r = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/sync-screener`, {
+                      method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    toast.dismiss();
+                    if (r.ok) { toast.success('Synced!'); setTimeout(fetchData, 1000); }
+                    else toast.error('Sync failed');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 border border-accent/30 rounded-lg text-accent text-xs font-semibold transition-colors"
+                >
+                  <RefreshCw size={12} /> Sync Screener
+                </button>
+              </div>
+
+              {!screenerData ? (
+                <div className="flex flex-col items-center justify-center py-20 text-dark-muted">
+                  <PieChart size={40} className="opacity-20 mb-3" />
+                  <p className="text-sm">No Screener data available.</p>
+                  <p className="text-xs mt-1">Click "Sync Screener" to fetch from Screener.in</p>
+                </div>
+              ) : (
+                <>
+                  {/* Pros & Cons */}
+                  {((screenerData.screener_pros?.length > 0) || (screenerData.screener_cons?.length > 0)) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {screenerData.screener_pros?.length > 0 && (
+                        <div className="bg-signal-buy/5 border border-signal-buy/20 rounded-xl p-4">
+                          <h4 className="text-xs font-bold text-signal-buy uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <CheckCircle size={12} /> Pros
+                          </h4>
+                          <ul className="space-y-1.5">
+                            {screenerData.screener_pros.map((p, i) => (
+                              <li key={i} className="text-xs text-dark-muted flex items-start gap-1.5">
+                                <span className="text-signal-buy mt-0.5">•</span>{p}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {screenerData.screener_cons?.length > 0 && (
+                        <div className="bg-signal-sell/5 border border-signal-sell/20 rounded-xl p-4">
+                          <h4 className="text-xs font-bold text-signal-sell uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <AlertTriangle size={12} /> Cons
+                          </h4>
+                          <ul className="space-y-1.5">
+                            {screenerData.screener_cons.map((c, i) => (
+                              <li key={i} className="text-xs text-dark-muted flex items-start gap-1.5">
+                                <span className="text-signal-sell mt-0.5">•</span>{c}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* CAGR Tables */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Revenue Growth', fields: ['revenue_cagr_3yr','revenue_cagr_5yr','revenue_cagr_10yr'] },
+                      { label: 'Profit Growth', fields: ['profit_cagr_3yr','profit_cagr_5yr','profit_cagr_10yr'] },
+                      { label: 'Stock Price CAGR', fields: ['price_cagr_1yr','price_cagr_3yr','price_cagr_5yr','price_cagr_10yr'] },
+                      { label: 'Return on Equity', fields: ['roe_avg_3yr','roe_avg_5yr','roe_avg_10yr'] },
+                    ].map(({ label, fields }) => (
+                      <div key={label} className="bg-dark-card border border-dark-border rounded-xl p-4">
+                        <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest mb-3">{label}</h4>
+                        <div className="space-y-2">
+                          {fields.map(f => {
+                            const periods = { revenue_cagr_3yr:'3Y', revenue_cagr_5yr:'5Y', revenue_cagr_10yr:'10Y', profit_cagr_3yr:'3Y', profit_cagr_5yr:'5Y', profit_cagr_10yr:'10Y', price_cagr_1yr:'1Y', price_cagr_3yr:'3Y', price_cagr_5yr:'5Y', price_cagr_10yr:'10Y', roe_avg_3yr:'3Y Avg', roe_avg_5yr:'5Y Avg', roe_avg_10yr:'10Y Avg' };
+                            const v = screenerData[f];
+                            const color = v === null || v === undefined ? 'text-dark-muted' : v >= 0 ? 'text-signal-buy' : 'text-signal-sell';
+                            return (
+                              <div key={f} className="flex justify-between items-center">
+                                <span className="text-xs text-dark-muted">{periods[f]}</span>
+                                <span className={`text-xs font-bold font-mono ${color}`}>
+                                  {v !== null && v !== undefined ? `${v > 0 ? '+' : ''}${v}%` : '—'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Key Metrics Row */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {[
+                      { label: 'ROCE', value: screenerData.roce != null ? `${screenerData.roce}%` : '—' },
+                      { label: 'Div Yield', value: screenerData.dividend_yield != null ? `${screenerData.dividend_yield}%` : '—' },
+                      { label: 'Div Payout', value: screenerData.dividend_payout_pct != null ? `${screenerData.dividend_payout_pct}%` : '—' },
+                      { label: 'Face Value', value: screenerData.face_value != null ? `₹${screenerData.face_value}` : '—' },
+                      { label: 'Debtor Days', value: screenerData.debtor_days != null ? `${screenerData.debtor_days}d` : '—' },
+                      { label: 'WC Days', value: screenerData.working_capital_days != null ? `${screenerData.working_capital_days}d` : '—' },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-dark-card border border-dark-border rounded-xl p-3 text-center">
+                        <div className="text-xs text-dark-muted mb-1">{label}</div>
+                        <div className="text-sm font-bold text-dark-text font-mono">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Shareholding Pattern */}
+                  {(screenerData.promoter_holding != null || screenerData.fii_holding != null) && (
+                    <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                      <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                        <Users size={12} /> Shareholding Pattern (Latest Quarter)
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                          { label: 'Promoters', value: screenerData.promoter_holding, color: 'text-accent', bar: 'bg-accent' },
+                          { label: 'FII', value: screenerData.fii_holding, color: 'text-blue-400', bar: 'bg-blue-400' },
+                          { label: 'DII', value: screenerData.dii_holding, color: 'text-purple-400', bar: 'bg-purple-400' },
+                          { label: 'Public', value: screenerData.public_holding, color: 'text-yellow-400', bar: 'bg-yellow-400' },
+                        ].map(({ label, value, color, bar }) => (
+                          <div key={label}>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-xs text-dark-muted">{label}</span>
+                              <span className={`text-xs font-bold font-mono ${color}`}>{value != null ? `${value}%` : '—'}</span>
+                            </div>
+                            <div className="h-1.5 bg-dark-border rounded-full overflow-hidden">
+                              {value != null && <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.min(value, 100)}%` }} />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {screenerData.promoter_pledge_pct != null && (
+                        <div className="mt-3 pt-3 border-t border-dark-border flex items-center justify-between">
+                          <span className="text-xs text-dark-muted">Promoter Pledge %</span>
+                          <span className={`text-xs font-bold font-mono ${screenerData.promoter_pledge_pct > 20 ? 'text-signal-sell' : screenerData.promoter_pledge_pct > 5 ? 'text-signal-hold' : 'text-signal-buy'}`}>
+                            {screenerData.promoter_pledge_pct}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Shareholding History Table */}
+                  {screenerData.shareholding_history?.length > 0 && (() => {
+                    const rows = screenerData.shareholding_history;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9); // max 9 cols
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest flex items-center gap-1.5">
+                            <Users size={12} /> Shareholding History
+                          </h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className="border-b border-dark-border/50 hover:bg-dark-border/20">
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Quarterly Results Table */}
+                  {screenerData.quarterly_results?.length > 0 && (() => {
+                    const rows = screenerData.quarterly_results;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest">Quarterly Results (Rs. Cr)</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Annual P&L Table */}
+                  {screenerData.annual_pnl?.length > 0 && (() => {
+                    const rows = screenerData.annual_pnl;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest">Annual Profit & Loss (Rs. Cr)</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Balance Sheet Table */}
+                  {screenerData.annual_balance_sheet?.length > 0 && (() => {
+                    const rows = screenerData.annual_balance_sheet;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest">Balance Sheet (Rs. Cr)</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Cash Flows Table */}
+                  {screenerData.annual_cashflows?.length > 0 && (() => {
+                    const rows = screenerData.annual_cashflows;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest">Cash Flows (Rs. Cr)</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Annual Ratios Table */}
+                  {screenerData.annual_ratios?.length > 0 && (() => {
+                    const rows = screenerData.annual_ratios;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest">Annual Ratios</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>
           )}
         </div>
