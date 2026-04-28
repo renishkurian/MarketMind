@@ -936,7 +936,31 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
 
     sys_prompt = build_chart_chat_system_prompt(symbol, context_data)
 
-    messages = [{"role": "system", "content": sys_prompt}] + user_messages
+    # Inject a fresh-data reminder before the latest user message so the AI
+    # always uses current prices, not stale values mentioned in old chat history.
+    today = context_data.get("today", {})
+    current_price = today.get("close") or today.get("prev_close")
+    change_pct    = today.get("change_pct")
+    st_signal     = context_data.get("current_st_signal", "HOLD")
+    lt_signal     = context_data.get("current_lt_signal", "HOLD")
+    refresh_note  = (
+        f"[LIVE DATA REFRESH — {__import__("datetime").date.today()}] "
+        f"Current price: ₹{current_price} ({change_pct:+.2f}%) | ST: {st_signal} | LT: {lt_signal}. "
+        f"Ignore any prices or signals mentioned earlier in this conversation that differ from these values."
+    ) if current_price else "[LIVE DATA REFRESH] Use only the latest data from the system prompt."
+
+    # Split messages: history (all but last) + fresh note + last user message
+    if len(user_messages) > 1:
+        history_msgs  = user_messages[:-1]
+        last_msg      = user_messages[-1]
+        messages = (
+            [{"role": "system", "content": sys_prompt}]
+            + history_msgs
+            + [{"role": "system", "content": refresh_note}]
+            + [last_msg]
+        )
+    else:
+        messages = [{"role": "system", "content": sys_prompt}] + user_messages
 
     t0 = time.perf_counter()
     status = "SUCCESS"
@@ -1614,7 +1638,25 @@ Return this exact structure:
 Return trend_lines as [] if none apply.
 """
 
-    messages = [{"role": "system", "content": system_prompt}] + chat_history
+    # Inject fresh data before the latest message (same pattern as chart_chat)
+    today_sc    = context_data.get("today", {})
+    cur_price   = today_sc.get("close") or today_sc.get("prev_close")
+    cur_chg     = today_sc.get("change_pct")
+    refresh_sc  = (
+        f"[LIVE DATA REFRESH — {__import__("datetime").date.today()}] "
+        f"Current price: ₹{cur_price} ({cur_chg:+.2f}%) | ST: {st_sig} | LT: {lt_sig}. "
+        f"Ignore any stale prices from earlier in this conversation."
+    ) if cur_price else "[LIVE DATA REFRESH] Use only the latest data from the system prompt."
+
+    if len(chat_history) > 1:
+        messages = (
+            [{"role": "system", "content": system_prompt}]
+            + chat_history[:-1]
+            + [{"role": "system", "content": refresh_sc}]
+            + [chat_history[-1]]
+        )
+    else:
+        messages = [{"role": "system", "content": system_prompt}] + chat_history
 
     # Fetch live news and inject
     recent_news = await _fetch_symbol_news(symbol)
