@@ -78,6 +78,10 @@ async def lifespan(app: FastAPI):
             raise RuntimeError("FATAL: SECRET_KEY must be changed from default before running in production.")
         if settings.ADMIN_PASSWORD == "admin":
             raise RuntimeError("FATAL: ADMIN_PASSWORD must be changed from default before running in production.")
+    # Create any new tables (idempotent — skips existing)
+    from backend.data.db import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     # Run safe schema migrations (ADD COLUMN IF NOT EXISTS)
     await run_migrations()
     logger.info("DB migrations applied.")
