@@ -381,12 +381,15 @@ export default function DeepDive() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.filled > 0) {
-          toast.success(`Screener.in filled ${data.filled} field(s): ${data.fields?.join(', ')}`);
+        const filled = data.fundamentals_filled ?? data.filled ?? 0;
+        const fields = data.fundamentals_fields ?? data.fields ?? [];
+        if (filled > 0) {
+          toast.success(`Screener.in filled ${filled} field(s): ${fields.join(', ')}`);
           await handleRegenerateSignals();
         } else {
-          toast.success('No missing fields — all data already present.');
+          toast.success(data.rich_data_stored ? 'Rich data stored! No new scalar fields.' : 'No missing fields — all data already present.');
         }
+        setTimeout(fetchData, 500);
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.detail || 'Screener.in sync failed');
@@ -1947,13 +1950,28 @@ export default function DeepDive() {
                 <button
                   onClick={async () => {
                     const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
-                    toast.loading('Syncing Screener.in...');
-                    const r = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/sync-screener`, {
-                      method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    toast.dismiss();
-                    if (r.ok) { toast.success('Synced!'); setTimeout(fetchData, 1000); }
-                    else toast.error('Sync failed');
+                    const toastId = toast.loading('Syncing Screener.in... (may take 20-30s)');
+                    try {
+                      const controller = new AbortController();
+                      const timeout = setTimeout(() => controller.abort(), 60000);
+                      const r = await fetch(`${API_URL}/api/stock/${symbol}/fundamentals/sync-screener`, {
+                        method: 'POST', headers: { 'Authorization': `Bearer ${token}` },
+                        signal: controller.signal
+                      });
+                      clearTimeout(timeout);
+                      toast.dismiss(toastId);
+                      if (r.ok) {
+                        const data = await r.json();
+                        toast.success(`Synced! ${data.fundamentals_filled || 0} fields filled`);
+                        setTimeout(fetchData, 500);
+                      } else {
+                        const err = await r.json().catch(() => ({}));
+                        toast.error(`Sync failed: ${err.detail || r.status}`);
+                      }
+                    } catch (e) {
+                      toast.dismiss(toastId);
+                      toast.error(e.name === 'AbortError' ? 'Sync timed out (60s)' : `Error: ${e.message}`);
+                    }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 border border-accent/30 rounded-lg text-accent text-xs font-semibold transition-colors"
                 >
