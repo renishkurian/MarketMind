@@ -2202,7 +2202,7 @@ async def sync_screener_data(
 
     screener_data = await fetch_screener_fundamentals(symbol, screener_symbol=screener_slug or None)
     if not screener_data:
-        raise HTTPException(status_code=404, detail=f"Screener.in returned no data for {symbol}. The symbol may not exist on Screener.in.")
+        raise HTTPException(status_code=404, detail=f"Screener.in returned no data for {symbol} (slug: '{screener_slug or symbol.lower()}'). Check backend logs — may need SCREENER_EMAIL/PASSWORD in .env.")
 
     # ── 1. Merge scalars into FundamentalsCache ───────────────────────────
     existing = await db.execute(select(FundamentalsCache).where(FundamentalsCache.symbol == symbol))

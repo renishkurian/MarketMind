@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin"
     LOG_LEVEL: str = "INFO"
 
+    SCREENER_EMAIL: str = ""
+    SCREENER_PASSWORD: str = ""
+
     @property
     def async_database_url(self) -> str:
         return f"mysql+aiomysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
