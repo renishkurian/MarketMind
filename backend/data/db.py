@@ -440,20 +440,16 @@ async def run_migrations():
     migrations = [
         # Feature 3: move_explanations.should_act added after initial table creation
         "ALTER TABLE move_explanations ADD COLUMN IF NOT EXISTS should_act VARCHAR(30) NULL",
-        # ScreenerCache table is created by create_all — migration only needed for new columns
-        "ALTER TABLE screener_cache ADD COLUMN IF NOT EXISTS sector VARCHAR(100) NULL",
-        "ALTER TABLE screener_cache ADD COLUMN IF NOT EXISTS industry VARCHAR(100) NULL",
         # Feature 4: price_alerts — ensure table exists (create_all handles new tables,
         #   but if the table was never created we surface a cleaner error via create_all)
     ]
-    async with engine.begin() as conn:
-        for stmt in migrations:
-            try:
+    for stmt in migrations:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(stmt))
-            except Exception as e:
-                # Log but don't crash — worst case the column already exists
-                import logging
-                logging.getLogger(__name__).warning(f"Migration skipped ({e}): {stmt}")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Migration skipped ({e}): {stmt}")
 
 
 # Database Dependency

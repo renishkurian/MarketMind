@@ -82,6 +82,7 @@ async def lifespan(app: FastAPI):
     from backend.data.db import engine, Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    logger.info("DB create_all done.")
     # Run safe schema migrations (ADD COLUMN IF NOT EXISTS)
     await run_migrations()
     logger.info("DB migrations applied.")
