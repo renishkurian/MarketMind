@@ -2230,46 +2230,49 @@ async def sync_screener_data(
             await db.commit()
 
     # ── 2. Save rich data into ScreenerCache ─────────────────────────────
-    rich = screener_data.get("screener_full", {})
-    if rich:
-        sc_res = await db.execute(select(ScreenerCache).where(ScreenerCache.symbol == symbol))
-        sc_row = sc_res.scalars().first()
-        sc_vals = {
-            "symbol": symbol, "fetched_at": datetime.now(),
-            "roce": rich.get("roce"), "dividend_yield": rich.get("dividend_yield"),
-            "dividend_payout_pct": rich.get("dividend_payout_pct"), "face_value": rich.get("face_value"),
-            "book_value": rich.get("book_value"), "market_cap_cr": rich.get("market_cap_cr"),
-            "promoter_holding": rich.get("promoter_holding") or screener_data.get("promoter_holding"),
-            "fii_holding": rich.get("fii_holding"), "dii_holding": rich.get("dii_holding"),
-            "public_holding": rich.get("public_holding"),
-            "promoter_pledge_pct": rich.get("promoter_pledge_pct") or screener_data.get("promoter_pledge_pct"),
-            "debtor_days": rich.get("debtor_days"), "inventory_days": rich.get("inventory_days"),
-            "days_payable": rich.get("days_payable"), "cash_conversion_cycle": rich.get("cash_conversion_cycle"),
-            "working_capital_days": rich.get("working_capital_days"),
-            "revenue_cagr_3yr": rich.get("revenue_cagr_3yr"), "revenue_cagr_5yr": rich.get("revenue_cagr_5yr"),
-            "revenue_cagr_10yr": rich.get("revenue_cagr_10yr"), "profit_cagr_3yr": rich.get("profit_cagr_3yr"),
-            "profit_cagr_5yr": rich.get("profit_cagr_5yr"), "profit_cagr_10yr": rich.get("profit_cagr_10yr"),
-            "price_cagr_1yr": rich.get("price_cagr_1yr"), "price_cagr_3yr": rich.get("price_cagr_3yr"),
-            "price_cagr_5yr": rich.get("price_cagr_5yr"), "price_cagr_10yr": rich.get("price_cagr_10yr"),
-            "roe_avg_3yr": rich.get("roe_avg_3yr"), "roe_avg_5yr": rich.get("roe_avg_5yr"),
-            "roe_avg_10yr": rich.get("roe_avg_10yr"),
-            "quarterly_results": rich.get("quarterly_results"), "annual_pnl": rich.get("annual_pnl"),
-            "annual_balance_sheet": rich.get("annual_balance_sheet"), "annual_cashflows": rich.get("annual_cashflows"),
-            "annual_ratios": rich.get("annual_ratios"), "shareholding_history": rich.get("shareholding_history"),
-            "screener_pros": rich.get("screener_pros"), "screener_cons": rich.get("screener_cons"),
-            "about_text": rich.get("about_text"), "sector": rich.get("sector"), "industry": rich.get("industry"),
-        }
-        sc_clean = {k: v for k, v in sc_vals.items() if v is not None}
-        if sc_row:
-            for k, v in sc_clean.items():
-                if k != "symbol":
-                    setattr(sc_row, k, v)
-            await db.commit()
-        else:
-            stmt = mysql_insert(ScreenerCache).values(**sc_clean)
-            stmt = stmt.on_duplicate_key_update(**{k: stmt.inserted[k] for k in sc_clean if k != "symbol"})
-            await db.execute(stmt)
-            await db.commit()
+    # screener_data is a flat dict — screener_full key is not used
+    sd = screener_data
+    sc_res = await db.execute(select(ScreenerCache).where(ScreenerCache.symbol == symbol))
+    sc_row = sc_res.scalars().first()
+    sc_vals = {
+        "symbol": symbol, "fetched_at": datetime.now(),
+        "roce": sd.get("roce"), "dividend_yield": sd.get("dividend_yield"),
+        "dividend_payout_pct": sd.get("dividend_payout_pct"), "face_value": sd.get("face_value"),
+        "book_value": sd.get("book_value"),
+        "market_cap_cr": sd.get("market_cap_cr") or (sd.get("market_cap") / 1e7 if sd.get("market_cap") else None),
+        "promoter_holding": sd.get("promoter_holding"),
+        "fii_holding": sd.get("fii_holding"), "dii_holding": sd.get("dii_holding"),
+        "public_holding": sd.get("public_holding"),
+        "promoter_pledge_pct": sd.get("promoter_pledge_pct"),
+        "debtor_days": sd.get("debtor_days"), "inventory_days": sd.get("inventory_days"),
+        "days_payable": sd.get("days_payable"), "cash_conversion_cycle": sd.get("cash_conversion_cycle"),
+        "working_capital_days": sd.get("working_capital_days"),
+        "revenue_cagr_3yr": sd.get("revenue_cagr_3yr") or sd.get("revenue_growth_3yr"),
+        "revenue_cagr_5yr": sd.get("revenue_cagr_5yr"),
+        "revenue_cagr_10yr": sd.get("revenue_cagr_10yr"),
+        "profit_cagr_3yr": sd.get("profit_cagr_3yr") or sd.get("pat_growth_3yr"),
+        "profit_cagr_5yr": sd.get("profit_cagr_5yr"), "profit_cagr_10yr": sd.get("profit_cagr_10yr"),
+        "price_cagr_1yr": sd.get("price_cagr_1yr"), "price_cagr_3yr": sd.get("price_cagr_3yr"),
+        "price_cagr_5yr": sd.get("price_cagr_5yr"), "price_cagr_10yr": sd.get("price_cagr_10yr"),
+        "roe_avg_3yr": sd.get("roe_avg_3yr") or sd.get("roe_3yr_avg"),
+        "roe_avg_5yr": sd.get("roe_avg_5yr"), "roe_avg_10yr": sd.get("roe_avg_10yr"),
+        "quarterly_results": sd.get("quarterly_results"), "annual_pnl": sd.get("annual_pnl"),
+        "annual_balance_sheet": sd.get("annual_balance_sheet"), "annual_cashflows": sd.get("annual_cashflows"),
+        "annual_ratios": sd.get("annual_ratios"), "shareholding_history": sd.get("shareholding_history"),
+        "screener_pros": sd.get("screener_pros"), "screener_cons": sd.get("screener_cons"),
+        "about_text": sd.get("about_text"), "sector": sd.get("sector"), "industry": sd.get("industry"),
+    }
+    sc_clean = {k: v for k, v in sc_vals.items() if v is not None}
+    if sc_row:
+        for k, v in sc_clean.items():
+            if k != "symbol":
+                setattr(sc_row, k, v)
+        await db.commit()
+    else:
+        stmt = mysql_insert(ScreenerCache).values(**sc_clean)
+        stmt = stmt.on_duplicate_key_update(**{k: stmt.inserted[k] for k in sc_clean if k != "symbol"})
+        await db.execute(stmt)
+        await db.commit()
 
     await recompute_signals_for(symbol)
     return {
