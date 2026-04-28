@@ -648,8 +648,104 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
         # Remove None/zero values
         result = {k: v for k, v in result.items() if v is not None}
         logger.info(f"Screener.in filled {len(result)} fields for {symbol}: {list(result.keys())}")
-        return result
 
     except Exception as e:
         logger.warning(f"Screener.in fetch failed for {symbol}: {e!r}", exc_info=True)
-        return result
+
+    # ── yfinance fallback: fill missing computed fields ──────────────────────
+    missing_computed = [f for f in (
+        "revenue_growth_3yr", "pat_growth_3yr", "operating_margin",
+        "roe_3yr_avg", "pe_5yr_avg", "debt_equity", "current_ratio", "roe"
+    ) if not result.get(f)]
+
+    if missing_computed:
+        try:
+            yf_sym = _get_yf_symbol(symbol)
+            ticker = yf.Ticker(yf_sym)
+            fin = ticker.financials
+            bs  = ticker.balance_sheet
+            cf  = ticker.cashflow
+
+            def _yf_row(df, *names):
+                if df is None or df.empty:
+                    return []
+                for name in names:
+                    for idx in df.index:
+                        if name.lower() in str(idx).lower():
+                            vals = df.loc[idx].dropna().tolist()
+                            return [float(v) for v in vals if v != 0]
+                return []
+
+            if "revenue_growth_3yr" in missing_computed:
+                rev = _yf_row(fin, "Total Revenue", "Revenue")
+                if len(rev) >= 4:
+                    try:
+                        result["revenue_growth_3yr"] = round(((rev[0] / rev[3]) ** (1/3) - 1) * 100, 2)
+                    except Exception:
+                        pass
+
+            if "pat_growth_3yr" in missing_computed:
+                pat = _yf_row(fin, "Net Income", "Net Income Common Stockholders")
+                if len(pat) >= 4 and pat[3] > 0 and pat[0] > 0:
+                    try:
+                        result["pat_growth_3yr"] = round(((pat[0] / pat[3]) ** (1/3) - 1) * 100, 2)
+                    except Exception:
+                        pass
+
+            if "operating_margin" in missing_computed:
+                ebit = _yf_row(fin, "EBIT", "Operating Income")
+                rev  = _yf_row(fin, "Total Revenue", "Revenue")
+                if ebit and rev:
+                    try:
+                        result["operating_margin"] = round((ebit[0] / rev[0]) * 100, 2)
+                    except Exception:
+                        pass
+
+            if "roe" in missing_computed:
+                ni = _yf_row(fin, "Net Income")
+                eq = _yf_row(bs, "Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity")
+                if ni and eq:
+                    try:
+                        result["roe"] = round((ni[0] / eq[0]) * 100, 2)
+                    except Exception:
+                        pass
+
+            if "roe_3yr_avg" in missing_computed:
+                ni_list = _yf_row(fin, "Net Income")
+                eq_list = _yf_row(bs, "Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity")
+                pairs = min(len(ni_list), len(eq_list), 3)
+                if pairs >= 2:
+                    try:
+                        roe_vals = [(ni_list[i] / eq_list[i]) * 100 for i in range(pairs) if eq_list[i] != 0]
+                        if roe_vals:
+                            result["roe_3yr_avg"] = round(sum(roe_vals) / len(roe_vals), 2)
+                    except Exception:
+                        pass
+
+            if "debt_equity" in missing_computed:
+                debt = _yf_row(bs, "Total Debt", "Long Term Debt")
+                eq   = _yf_row(bs, "Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity")
+                if debt and eq and eq[0] != 0:
+                    try:
+                        result["debt_equity"] = round(debt[0] / eq[0], 2)
+                    except Exception:
+                        pass
+
+            if "current_ratio" in missing_computed:
+                ca = _yf_row(bs, "Current Assets", "Total Current Assets")
+                cl = _yf_row(bs, "Current Liabilities", "Total Current Liabilities")
+                if ca and cl and cl[0] != 0:
+                    try:
+                        result["current_ratio"] = round(ca[0] / cl[0], 2)
+                    except Exception:
+                        pass
+
+            yf_filled = [f for f in missing_computed if result.get(f) is not None]
+            if yf_filled:
+                logger.info(f"yfinance fallback filled {len(yf_filled)} fields for {symbol}: {yf_filled}")
+
+        except Exception as e:
+            logger.warning(f"yfinance fallback failed for {symbol}: {e!r}")
+
+    result = {k: v for k, v in result.items() if v is not None}
+    return result
