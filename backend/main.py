@@ -1174,7 +1174,45 @@ async def handle_pattern_recognition(
             if cached_at:
                 age = (datetime.utcnow() - datetime.fromisoformat(cached_at)).total_seconds()
                 if age < 14400:
-                    return cached
+                    # Validate cached double bottom / double top patterns against actual price data
+                    # to reject false positives where troughs/peaks differ by more than 3%
+                    _invalidate = False
+                    _cached_patterns = cached.get("patterns", [])
+                    for _p in _cached_patterns:
+                        _pname = (_p.get("name") or "").lower()
+                        if "double bottom" in _pname or "double top" in _pname:
+                            _tls = _p.get("trend_lines") or []
+                            _level_prices = [tl.get("start_price") for tl in _tls if tl.get("start_price")]
+                            _level_prices += [tl.get("end_price") for tl in _tls if tl.get("end_price")]
+                            if len(_level_prices) >= 2:
+                                _lo = min(_level_prices)
+                                _hi = max(_level_prices)
+                                # If the recorded levels span >3% apart, treat as false positive
+                                if _lo > 0 and (_hi - _lo) / _lo > 0.03:
+                                    _invalidate = True
+                                    break
+                            else:
+                                # No trend lines to validate — fetch raw lows and check
+                                # If 90-bar low and the median low differ by >3%, likely one trough
+                                _quick_hist = await db.execute(
+                                    select(PriceHistory)
+                                    .where(PriceHistory.symbol == symbol)
+                                    .order_by(PriceHistory.date.desc())
+                                    .limit(90)
+                                )
+                                _qh = list(reversed(_quick_hist.scalars().all()))
+                                if _qh:
+                                    _all_lows = sorted([float(h.low) for h in _qh])
+                                    _min_low = _all_lows[0]
+                                    _p10_low = _all_lows[len(_all_lows) // 10]
+                                    if _min_low > 0 and (_p10_low - _min_low) / _min_low > 0.03:
+                                        _invalidate = True
+                    if not _invalidate:
+                        return cached
+                    # Invalidate and fall through to fresh AI scan
+                    sig.pattern_data = None
+                    await db.commit()
+                    logger.info(f"Pattern cache invalidated for {symbol}: double bottom/top failed price validation")
         except Exception:
             pass
 
