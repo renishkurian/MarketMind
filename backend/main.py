@@ -1269,6 +1269,8 @@ async def handle_pattern_recognition(
             "sma_20":   sma(closes, 20),
             "sma_50":   sma(closes, 50),
             "sma_90":   sma(closes, 90),
+            "bb_upper": round((lambda c20, mean: mean + 2*(sum((x-mean)**2 for x in c20)/20)**0.5)(closes[-20:], sum(closes[-20:])/20), 2) if len(closes) >= 20 else None,
+            "bb_lower": round((lambda c20, mean: mean - 2*(sum((x-mean)**2 for x in c20)/20)**0.5)(closes[-20:], sum(closes[-20:])/20), 2) if len(closes) >= 20 else None,
             "weekly_candles":  weekly_aggregates(history),
             "recent_5_bars": [
                 {
@@ -1277,6 +1279,8 @@ async def handle_pattern_recognition(
                     "close": round(float(h.close), 2), "volume": int(h.volume)
                 } for h in history[-5:]
             ],
+            "daily_lows_90d": [round(float(h.low), 2) for h in history],
+            "daily_dates_90d": [str(h.date) for h in history],
         },
     }
 

@@ -1041,6 +1041,10 @@ async def generate_pattern_recognition(symbol: str, context_data: dict, user_id:
 
     weekly_block = json.dumps(summary.get("weekly_candles", []), indent=2)
     recent_block = json.dumps(summary.get("recent_5_bars", []), indent=2)
+    daily_lows   = summary.get("daily_lows_90d", [])
+    daily_dates  = summary.get("daily_dates_90d", [])
+    bb_upper_val = summary.get("bb_upper", "N/A")
+    bb_lower_val = summary.get("bb_lower", "N/A")
 
     system_prompt = f"""You are an expert technical analyst specialising in NSE/BSE chart pattern detection.
 Analyse the provided OHLCV data and identify any ACTIVE chart patterns forming or recently completed.
@@ -1052,6 +1056,11 @@ ST Signal: {st_sig} | LT Signal: {lt_sig}
 Current Price   : ₹{today.get('close', 'N/A')}
 90d High/Low    : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
 SMA 20/50/90    : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+BB Upper/Lower  : ₹{bb_upper_val} / ₹{bb_lower_val}
+
+Daily Lows (oldest→newest, use to verify Double Bottom troughs):
+{daily_dates}
+{daily_lows}
 
 Weekly Candles (last 18 weeks):
 {weekly_block}
@@ -1084,12 +1093,18 @@ DOUBLE BOTTOM:
   - Confidence >= 60% ONLY if price has ALREADY closed above the neckline (the peak
     between the two troughs). If price is still below the neckline, cap confidence at 45%
     (which means it will be excluded by Rule 1).
-  - Both troughs must be clearly identifiable on the provided OHLCV bars with distinct
-    dates — do not infer a trough from a sideways drift.
+  - Both troughs must be clearly identifiable on the daily_lows_90d array above with
+    distinct dates — you must name the exact two dates. Do not infer a trough from a
+    sideways drift or multi-week consolidation zone.
   - If the two troughs differ by MORE than 3% in price, reject entirely regardless of
-    visual appearance.
+    visual appearance. Use the daily_lows_90d values to verify.
+  - A sideways consolidation base (even 4-6 weeks) is NOT a double bottom — it is a
+    Rectangle or Accumulation Zone. Do not mislabel it.
   - Do NOT confuse a V-Bottom Recovery with a Double Bottom. If there is only one sharp
     low, classify it as V-Bottom Recovery instead.
+  - Mandatory: in trend_lines, include start_price and end_price for both troughs so the
+    backend can validate the price difference. If you cannot identify two distinct troughs
+    with prices, do NOT report Double Bottom.
 
 DOUBLE TOP:
   - Same mirror logic: two peaks within 2% of each other, at least 10 bars apart, and
