@@ -1079,15 +1079,21 @@ Neutral: Symmetrical Triangle, Rectangle, Doji Cluster, Inside Bar
 DOUBLE BOTTOM:
   - The two troughs must be within 2% of each other in price. A broad base or gradual
     accumulation zone does NOT qualify as a double bottom.
+  - The two troughs must be separated by AT LEAST 10 bars — a quick double-dip within
+    1-2 weeks is noise, not a pattern.
   - Confidence >= 60% ONLY if price has ALREADY closed above the neckline (the peak
     between the two troughs). If price is still below the neckline, cap confidence at 45%
     (which means it will be excluded by Rule 1).
   - Both troughs must be clearly identifiable on the provided OHLCV bars with distinct
     dates — do not infer a trough from a sideways drift.
+  - If the two troughs differ by MORE than 3% in price, reject entirely regardless of
+    visual appearance.
+  - Do NOT confuse a V-Bottom Recovery with a Double Bottom. If there is only one sharp
+    low, classify it as V-Bottom Recovery instead.
 
 DOUBLE TOP:
-  - Same mirror logic: two peaks within 2% of each other, and price must have closed
-    below the neckline for confidence >= 60%.
+  - Same mirror logic: two peaks within 2% of each other, at least 10 bars apart, and
+    price must have closed below the neckline for confidence >= 60%.
 
 HEAD & SHOULDERS / INVERSE HEAD & SHOULDERS:
   - Shoulders must be roughly symmetric in time and price (within 5%).

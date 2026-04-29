@@ -960,7 +960,7 @@ export default function DeepDive() {
         <MetricCard
           label="LT Score"
           value={sig.lt_score?.toFixed(1) ?? '—'}
-          sub="Long-term fundamental"
+          sub="Composite score"
           color={(sig.lt_score ?? 0) > 60 ? 'text-signal-buy' : (sig.lt_score ?? 0) < 40 ? 'text-signal-sell' : 'text-signal-hold'}
         />
         <MetricCard
