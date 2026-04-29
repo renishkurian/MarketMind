@@ -1003,14 +1003,10 @@ async def handle_chart_chat(
     from sqlalchemy import func, cast, Date as SADate
     from datetime import date as dt_date
     today_date = dt_date.today()
-    intraday_result = await db.execute(
-        select(
-            func.min(IntradayTicks.open).label("open"),
-            func.max(IntradayTicks.high).label("high"),
-            func.min(IntradayTicks.low).label("low"),
-            IntradayTicks.close,
-            func.sum(IntradayTicks.volume).label("volume"),
-        )
+
+    # Step 1: latest close price from most recent tick today
+    latest_tick_result = await db.execute(
+        select(IntradayTicks.close, IntradayTicks.timestamp)
         .where(
             IntradayTicks.symbol == symbol,
             func.date(IntradayTicks.timestamp) == today_date,
@@ -1018,7 +1014,29 @@ async def handle_chart_chat(
         .order_by(IntradayTicks.timestamp.desc())
         .limit(1)
     )
-    intraday_row = intraday_result.first()
+    latest_tick = latest_tick_result.first()
+
+    # Step 2: aggregate OHLV for today
+    agg_result = await db.execute(
+        select(
+            func.min(IntradayTicks.open).label("open"),
+            func.max(IntradayTicks.high).label("high"),
+            func.min(IntradayTicks.low).label("low"),
+            func.sum(IntradayTicks.volume).label("volume"),
+        )
+        .where(
+            IntradayTicks.symbol == symbol,
+            func.date(IntradayTicks.timestamp) == today_date,
+        )
+    )
+    agg_row = agg_result.first()
+
+    # Build intraday snapshot: live close from latest tick, OHLV from aggregates
+    live_close = float(latest_tick.close) if latest_tick and latest_tick.close else None
+    intraday_open   = float(agg_row.open)   if agg_row and agg_row.open   else None
+    intraday_high   = float(agg_row.high)   if agg_row and agg_row.high   else None
+    intraday_low    = float(agg_row.low)    if agg_row and agg_row.low    else None
+    intraday_volume = int(agg_row.volume)   if agg_row and agg_row.volume else None
 
     # Aggregate 90 bars into compact summary to minimize AI token cost
     closes = [float(h.close) for h in history]
@@ -1100,13 +1118,17 @@ async def handle_chart_chat(
         # ── TODAY's live intraday snapshot — use these exact values, do NOT guess ──
         "today": {
             "date": str(today_date),
-            "open": float(intraday_row.open) if intraday_row and intraday_row.open else None,
-            "high": float(intraday_row.high) if intraday_row and intraday_row.high else None,
-            "low": float(intraday_row.low) if intraday_row and intraday_row.low else None,
-            "close": float(sig.current_price) if sig and sig.current_price else (float(intraday_row.close) if intraday_row and intraday_row.close else None),
+            "open":      intraday_open,
+            "high":      intraday_high,
+            "low":       intraday_low,
+            "close":     live_close or (float(sig.current_price) if sig and sig.current_price else None),
             "prev_close": float(sig.prev_close) if sig and sig.prev_close else None,
-            "change_pct": float(sig.change_pct) if sig and sig.change_pct else None,
-            "volume": int(intraday_row.volume) if intraday_row and intraday_row.volume else None,
+            "change_pct": (
+                round((live_close - float(sig.prev_close)) / float(sig.prev_close) * 100, 2)
+                if live_close and sig and sig.prev_close and float(sig.prev_close) > 0
+                else (float(sig.change_pct) if sig and sig.change_pct else None)
+            ),
+            "volume":    intraday_volume,
         },
         "price_summary": price_summary,  # aggregated — replaces raw 90-bar dump
         "backtest": {
