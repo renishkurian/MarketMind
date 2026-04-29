@@ -645,7 +645,69 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
                     result["pe_5yr_avg"] = round(sum(float(x) for x in pe_hist[-5:]) / 5, 2)
                 except: pass
 
-        # Remove None/zero values
+        # ── Strategy 7: Extract Rich Data Tables ──────────────────────────
+        def _extract_rich_table(section_id: str) -> List[Dict[str, Any]]:
+            # Match section with data-result-table
+            sect = re.search(f'id=["\']{section_id}["\'].*?data-result-table>(.*?)</table>', html, re.DOTALL | re.IGNORECASE)
+            if not sect: return []
+            tbl = sect.group(1)
+            # Headers
+            headers = []
+            th_matches = re.findall(r'<th[^>]*>(.*?)</th>', tbl, re.DOTALL)
+            for th in th_matches:
+                txt = re.sub(r'<[^>]+>', '', th).strip()
+                if txt: headers.append(txt)
+            # Rows
+            rows = []
+            tr_matches = re.findall(r'<tr[^>]*>(.*?)</tr>', tbl, re.DOTALL)
+            for tr in tr_matches:
+                tds = re.findall(r'<td[^>]*>(.*?)</td>', tr, re.DOTALL)
+                if not tds: continue
+                metric = re.sub(r'<[^>]+>', '', tds[0]).replace('&nbsp;', ' ').strip()
+                if not metric: continue
+                row_obj = {"Report Date": metric}
+                for i, td in enumerate(tds[1:]):
+                    if i < len(headers):
+                        val = re.sub(r'<[^>]+>', '', td).replace(',', '').replace('%', '').strip()
+                        row_obj[headers[i]] = val
+                rows.append(row_obj)
+            return rows
+
+        result["quarterly_results"]    = _extract_rich_table("quarters")
+        result["annual_pnl"]           = _extract_rich_table("profit-loss")
+        result["annual_balance_sheet"] = _extract_rich_table("balance-sheet")
+        result["annual_cashflows"]      = _extract_rich_table("cash-flow")
+        result["annual_ratios"]         = _extract_rich_table("ratios")
+        result["shareholding_history"]  = _extract_rich_table("shareholding")
+
+        # ── Strategy 8: Pros & Cons ──────────────────────────────────────
+        pros = re.search(r'class=["\']eight columns pro["\'].*?<ul>(.*?)</ul>', html, re.DOTALL | re.IGNORECASE)
+        if pros:
+            result["screener_pros"] = [re.sub(r'<[^>]+>', '', li).strip() for li in re.findall(r'<li>(.*?)</li>', pros.group(1), re.DOTALL)]
+        cons = re.search(r'class=["\']eight columns con["\'].*?<ul>(.*?)</ul>', html, re.DOTALL | re.IGNORECASE)
+        if cons:
+            result["screener_cons"] = [re.sub(r'<[^>]+>', '', li).strip() for li in re.findall(r'<li>(.*?)</li>', cons.group(1), re.DOTALL)]
+
+        # ── Strategy 9: Metadata (About, Sector, Industry) ────────────────
+        about = re.search(r'class=["\']about["\'][^>]*>(.*?)</div>', html, re.DOTALL | re.IGNORECASE)
+        if about:
+            result["about_text"] = re.sub(r'<[^>]+>', '', about.group(1)).strip()
+        
+        intro = re.search(r'class=["\']introduction["\'][^>]*>(.*?)</div>', html, re.DOTALL | re.IGNORECASE)
+        if intro:
+            links = re.findall(r'<a[^>]*>(.*?)</a>', intro.group(1))
+            if len(links) >= 2:
+                result["sector"] = links[0].strip()
+                result["industry"] = links[1].strip()
+
+        # Adjust units
+        if result.get("market_cap"):
+            # If the value is in Cr (typical Screener), and we want it in Absolute for FundamentalsCache
+            # We also store a market_cap_cr for ScreenerCache specifically
+            result["market_cap_cr"] = result["market_cap"]
+            result["market_cap"]    = int(result["market_cap"] * 10_000_000)
+
+        # Remove None/empty values
         result = {k: v for k, v in result.items() if v is not None}
         logger.info(f"Screener.in filled {len(result)} fields for {symbol}: {list(result.keys())}")
 

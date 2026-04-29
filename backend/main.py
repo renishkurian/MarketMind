@@ -2457,10 +2457,10 @@ async def sync_screener_data(
     return {
         "message": f"Screener sync complete for {symbol}.",
         "fundamentals_filled": len(updates), "fundamentals_fields": list(updates.keys()),
-        "rich_data_stored": bool(rich),
-        "has_quarterly": bool(rich.get("quarterly_results")),
-        "has_annual_pnl": bool(rich.get("annual_pnl")),
-        "has_shareholding": bool(rich.get("shareholding_history")),
+        "rich_data_stored": bool(screener_data),
+        "has_quarterly": bool(screener_data.get("quarterly_results")),
+        "has_annual_pnl": bool(screener_data.get("annual_pnl")),
+        "has_shareholding": bool(screener_data.get("shareholding_history")),
     }
 
 
