@@ -2864,8 +2864,20 @@ def _serialize_signal(signal) -> dict:
 
 @app.get("/api/stock/{symbol}/corporate-actions")
 async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    """
+    Corporate actions endpoint — layered data strategy:
+      Layer 1: yf.Ticker().calendar  — official upcoming ex-date/amount if Yahoo has it
+      Layer 2: yf.Ticker().actions / .dividends / .splits — full history
+      Layer 3: Algorithmic prediction engine — uses history to predict next dividend
+                 - detects payout frequency (annual / semi-annual / quarterly)
+                 - computes avg amount per cycle, trends over last 3 cycles
+                 - projects next ex-date + estimated range
+                 - computes dividend CAGR, yield, consistency score
+      Layer 4: info fields — exDividendDate, lastDividendValue as cross-check
+    """
     import yfinance as yf
     import numpy as np
+    from datetime import date as date_cls
 
     stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol.upper()))
     row = stock_res.first()
@@ -2874,78 +2886,112 @@ async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db),
     def _safe(v):
         if v is None:
             return None
-        if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
-            return None
+        try:
+            if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
+                return None
+        except Exception:
+            pass
         if hasattr(v, 'item'):
             return v.item()
         return v
 
+    def _to_date(v):
+        """Normalize various date representations to date string."""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            # Unix timestamp
+            try:
+                return date_cls.fromtimestamp(int(v)).isoformat()
+            except Exception:
+                return None
+        try:
+            return str(pd.Timestamp(v).date())
+        except Exception:
+            return str(v)
+
+    # ── Layer 1+2: pull raw yfinance data ────────────────────────────────────
+    dividend_history = []
+    split_history    = []
+    upcoming_dividend = None
+    upcoming_split   = None
+    info_ex_date     = None
+    info_last_div    = None
+
     try:
         ticker = yf.Ticker(yf_sym)
 
-        # --- calendar (upcoming events) ---
-        upcoming_dividend = None
-        upcoming_split = None
+        # Calendar — Layer 1
         try:
             cal = ticker.calendar
             if cal:
-                if isinstance(cal, dict):
-                    ex_date = cal.get("Ex-Dividend Date") or cal.get("Dividend Date")
-                    div_amt = cal.get("Dividends") or cal.get("Dividend Amount")
-                    if ex_date:
-                        upcoming_dividend = {
-                            "ex_date": str(ex_date) if ex_date else None,
-                            "amount": _safe(div_amt),
-                        }
-                    split_date = cal.get("Split Date")
-                    split_ratio = cal.get("Split Factor") or cal.get("Split Ratio")
-                    if split_date:
-                        upcoming_split = {
-                            "date": str(split_date),
-                            "ratio": str(split_ratio) if split_ratio else None,
-                        }
-                elif hasattr(cal, 'to_dict'):
-                    cal_dict = cal.to_dict()
-                    for col in cal_dict:
-                        low = str(col).lower()
-                        if "dividend" in low:
-                            upcoming_dividend = {"ex_date": None, "amount": _safe(list(cal_dict[col].values())[0]) if cal_dict[col] else None}
-                        if "split" in low:
-                            upcoming_split = {"date": None, "ratio": str(list(cal_dict[col].values())[0]) if cal_dict[col] else None}
+                cal_d = cal if isinstance(cal, dict) else (cal.to_dict() if hasattr(cal, 'to_dict') else {})
+                # flatten one level if values are dicts
+                flat = {}
+                for k, v in cal_d.items():
+                    flat[str(k).lower()] = list(v.values())[0] if isinstance(v, dict) and v else v
+                ex_date_raw = flat.get("ex-dividend date") or flat.get("dividend date") or flat.get("exdividenddate")
+                div_amt_raw = flat.get("dividends") or flat.get("dividend amount") or flat.get("lastdividendvalue")
+                if ex_date_raw:
+                    upcoming_dividend = {
+                        "ex_date": _to_date(ex_date_raw),
+                        "amount": _safe(div_amt_raw),
+                        "source": "yf_calendar",
+                        "confirmed": True,
+                    }
+                split_date_raw  = flat.get("split date") or flat.get("splitdate")
+                split_ratio_raw = flat.get("split factor") or flat.get("split ratio") or flat.get("splitratio")
+                if split_date_raw:
+                    upcoming_split = {
+                        "date": _to_date(split_date_raw),
+                        "ratio": str(_safe(split_ratio_raw)) if split_ratio_raw else None,
+                        "source": "yf_calendar",
+                        "confirmed": True,
+                    }
         except Exception:
             pass
 
-        # --- actions history (dividends + splits) ---
-        dividend_history = []
-        split_history = []
+        # Info — Layer 4 (cross-check / fallback)
+        try:
+            info = ticker.info or {}
+            ex_raw = info.get("exDividendDate")
+            if ex_raw:
+                info_ex_date = _to_date(ex_raw)
+            info_last_div = _safe(info.get("lastDividendValue") or info.get("dividendRate"))
+            # If calendar came back empty but info has ex-date, use it
+            if not upcoming_dividend and info_ex_date:
+                upcoming_dividend = {
+                    "ex_date": info_ex_date,
+                    "amount": info_last_div,
+                    "source": "yf_info",
+                    "confirmed": True,
+                }
+        except Exception:
+            pass
+
+        # History — Layer 2
         try:
             actions = ticker.actions
             if actions is not None and not actions.empty:
-                divs = actions[actions["Dividends"] > 0][["Dividends"]].copy()
-                divs = divs.sort_index(ascending=False).head(20)
-                for idx, row2 in divs.iterrows():
-                    dividend_history.append({
-                        "date": str(idx.date()),
-                        "amount": _safe(row2["Dividends"]),
-                    })
-
-                splits = actions[actions["Stock Splits"] > 0][["Stock Splits"]].copy()
-                splits = splits.sort_index(ascending=False).head(10)
-                for idx, row2 in splits.iterrows():
-                    split_history.append({
-                        "date": str(idx.date()),
-                        "ratio": str(_safe(row2["Stock Splits"])),
-                    })
+                if "Dividends" in actions.columns:
+                    divs = actions[actions["Dividends"] > 0]["Dividends"].sort_index(ascending=False).head(30)
+                    for idx, val in divs.items():
+                        dividend_history.append({"date": str(idx.date()), "amount": round(float(_safe(val)), 4)})
+                if "Stock Splits" in actions.columns:
+                    splits = actions[actions["Stock Splits"] > 0]["Stock Splits"].sort_index(ascending=False).head(10)
+                    for idx, val in splits.items():
+                        split_history.append({"date": str(idx.date()), "ratio": str(_safe(val))})
         except Exception:
             pass
 
-        # fallback: ticker.dividends / ticker.splits
         if not dividend_history:
             try:
                 divs = ticker.dividends
                 if divs is not None and not divs.empty:
-                    for idx, val in divs.sort_index(ascending=False).head(20).items():
-                        dividend_history.append({"date": str(idx.date()), "amount": _safe(val)})
+                    for idx, val in divs.sort_index(ascending=False).head(30).items():
+                        v = _safe(val)
+                        if v and float(v) > 0:
+                            dividend_history.append({"date": str(idx.date()), "amount": round(float(v), 4)})
             except Exception:
                 pass
 
@@ -2954,21 +3000,166 @@ async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db),
                 splits = ticker.splits
                 if splits is not None and not splits.empty:
                     for idx, val in splits.sort_index(ascending=False).head(10).items():
-                        split_history.append({"date": str(idx.date()), "ratio": str(_safe(val))})
+                        v = _safe(val)
+                        if v:
+                            split_history.append({"date": str(idx.date()), "ratio": str(v)})
             except Exception:
                 pass
 
-        return {
-            "symbol": symbol.upper(),
-            "yahoo_symbol": yf_sym,
-            "upcoming_dividend": upcoming_dividend,
-            "upcoming_split": upcoming_split,
-            "dividend_history": dividend_history,
-            "split_history": split_history,
-        }
     except Exception as e:
-        logger.error(f"Corporate actions error for {symbol}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Corporate actions yf fetch error for {symbol}: {e}")
+
+    # ── Layer 3: Algorithmic Prediction Engine ────────────────────────────────
+    prediction = None
+    analytics  = None
+
+    try:
+        if len(dividend_history) >= 2:
+            # Parse dates + amounts in chronological order
+            parsed = []
+            for d in dividend_history:
+                try:
+                    parsed.append((pd.Timestamp(d["date"]), float(d["amount"])))
+                except Exception:
+                    pass
+            parsed.sort(key=lambda x: x[0])  # oldest first
+
+            dates   = [p[0] for p in parsed]
+            amounts = [p[1] for p in parsed]
+
+            # ── Detect payout frequency ──────────────────────────────────────
+            if len(dates) >= 2:
+                gaps_days = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+                median_gap = float(np.median(gaps_days))
+
+                if median_gap < 50:
+                    frequency = "monthly"
+                    freq_days = 30
+                elif median_gap < 120:
+                    frequency = "quarterly"
+                    freq_days = 91
+                elif median_gap < 240:
+                    frequency = "semi-annual"
+                    freq_days = 182
+                else:
+                    frequency = "annual"
+                    freq_days = 365
+            else:
+                frequency = "annual"
+                freq_days = 365
+                median_gap = 365.0
+
+            last_date   = dates[-1]
+            last_amount = amounts[-1]
+            today       = pd.Timestamp.now(tz=last_date.tzinfo)
+
+            # ── Compute analytics ────────────────────────────────────────────
+            recent_3 = amounts[-3:]
+            recent_5 = amounts[-5:] if len(amounts) >= 5 else amounts
+
+            avg_amount      = round(float(np.mean(amounts)), 4)
+            avg_recent      = round(float(np.mean(recent_3)), 4)
+            trend_pct       = round((recent_3[-1] / recent_3[0] - 1) * 100, 2) if len(recent_3) >= 2 and recent_3[0] > 0 else 0.0
+
+            # CAGR of dividend amount over full history
+            div_cagr = None
+            if len(amounts) >= 3 and amounts[0] > 0:
+                years = (dates[-1] - dates[0]).days / 365.25
+                if years > 0.5:
+                    div_cagr = round((amounts[-1] / amounts[0]) ** (1 / years) - 1, 4) * 100
+
+            # Consistency score: % of expected periods that had a dividend
+            expected_periods = max(1, round((dates[-1] - dates[0]).days / freq_days))
+            consistency_pct  = round(min(len(dates) / expected_periods * 100, 100), 1)
+
+            # Payout gaps (was there ever a skipped year?)
+            skipped = sum(1 for g in gaps_days if g > freq_days * 1.8) if len(dates) > 1 else 0
+
+            analytics = {
+                "frequency": frequency,
+                "median_gap_days": round(median_gap, 1),
+                "total_dividends_paid": len(amounts),
+                "avg_dividend": avg_amount,
+                "avg_recent_3": avg_recent,
+                "last_dividend": round(last_amount, 4),
+                "last_date": str(last_date.date()),
+                "trend_pct": trend_pct,
+                "dividend_cagr_pct": round(div_cagr, 2) if div_cagr is not None else None,
+                "consistency_score": consistency_pct,
+                "skipped_cycles": skipped,
+                "years_of_history": round((dates[-1] - dates[0]).days / 365.25, 1) if len(dates) > 1 else 0,
+            }
+
+            # ── Predict next dividend ────────────────────────────────────────
+            days_since_last = (today - last_date).days
+            days_until_next = max(0, freq_days - days_since_last)
+            next_date_est   = (today + pd.Timedelta(days=days_until_next)).date()
+
+            # Estimated amount: weighted avg (recent 3 weighted 2x, trend-adjusted)
+            if len(amounts) >= 3:
+                weights    = [1, 1.5, 2]
+                w_amounts  = amounts[-3:]
+                est_amount = sum(w * a for w, a in zip(weights, w_amounts)) / sum(weights)
+            else:
+                est_amount = avg_amount
+
+            # Apply trend adjustment (cap at ±20% to avoid wild extrapolation)
+            if trend_pct and abs(trend_pct) < 20:
+                est_amount = est_amount * (1 + trend_pct / 100 * 0.5)
+
+            est_amount = round(est_amount, 4)
+            est_low    = round(est_amount * 0.80, 4)
+            est_high   = round(est_amount * 1.20, 4)
+
+            # Confidence: higher if consistent, history > 3yrs, overdue
+            confidence = 50
+            if consistency_pct >= 90:
+                confidence += 20
+            elif consistency_pct >= 70:
+                confidence += 10
+            if analytics["years_of_history"] >= 5:
+                confidence += 15
+            elif analytics["years_of_history"] >= 3:
+                confidence += 8
+            if days_since_last >= freq_days * 0.85:
+                confidence += 10
+            if skipped > 0:
+                confidence -= 15
+            confidence = max(10, min(confidence, 95))
+
+            # Only show prediction if we're not already past the predicted date
+            # and if calendar doesn't already have a confirmed upcoming date
+            already_confirmed = (
+                upcoming_dividend is not None
+                and upcoming_dividend.get("ex_date")
+                and pd.Timestamp(upcoming_dividend["ex_date"]) > today
+            )
+
+            if not already_confirmed and consistency_pct >= 50:
+                prediction = {
+                    "next_ex_date_est": str(next_date_est),
+                    "days_until_est": int(days_until_next),
+                    "amount_est": est_amount,
+                    "amount_range_low": est_low,
+                    "amount_range_high": est_high,
+                    "confidence_pct": confidence,
+                    "basis": f"Based on {len(amounts)} historical dividends ({frequency} pattern)",
+                    "overdue": days_since_last > freq_days * 1.1,
+                }
+
+    except Exception as e:
+        logger.warning(f"Corporate actions prediction engine error for {symbol}: {e}")
+
+    return {
+        "symbol": symbol.upper(),
+        "yahoo_symbol": yf_sym,
+        "upcoming_dividend": upcoming_dividend,
+        "upcoming_split": upcoming_split,
+        "prediction": prediction,
+        "analytics": analytics,
+        "dividend_history": dividend_history,
+        "split_history": split_history,
+    }
 
 
 if __name__ == "__main__":

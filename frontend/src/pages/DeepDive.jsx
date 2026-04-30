@@ -2372,7 +2372,7 @@ export default function DeepDive() {
           )}
           {/* Corporate Actions Tab */}
           {activeTab === 'corporate-actions' && (
-            <div className="space-y-6">
+            <div className="space-y-6 p-1">
               <div className="flex items-center gap-2 mb-2">
                 <CalendarDays size={16} className="text-accent" />
                 <h3 className="text-base font-black text-dark-text uppercase tracking-widest">Corporate Actions</h3>
@@ -2382,11 +2382,18 @@ export default function DeepDive() {
                 <div className="text-center py-16 text-dark-muted text-sm">Loading corporate actions...</div>
               ) : (
                 <>
+                  {/* Row 1: Upcoming Confirmed Events */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Upcoming Dividend */}
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <DollarSign size={14} className="text-signal-buy" />
-                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Upcoming Dividend</span>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={14} className="text-signal-buy" />
+                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Upcoming Dividend</span>
+                        </div>
+                        {corporateActions.upcoming_dividend?.confirmed && (
+                          <span className="text-[9px] bg-signal-buy/20 text-signal-buy border border-signal-buy/30 rounded-full px-2 py-0.5 font-bold uppercase">Confirmed</span>
+                        )}
                       </div>
                       {corporateActions.upcoming_dividend ? (
                         <div className="space-y-2">
@@ -2402,12 +2409,16 @@ export default function DeepDive() {
                               <span className="text-signal-buy font-mono font-bold">₹{Number(corporateActions.upcoming_dividend.amount).toFixed(2)}</span>
                             </div>
                           )}
+                          {corporateActions.upcoming_dividend.source && (
+                            <p className="text-[9px] text-dark-muted/60 mt-1">Source: {corporateActions.upcoming_dividend.source}</p>
+                          )}
                         </div>
                       ) : (
                         <p className="text-xs text-dark-muted italic">No upcoming dividend announced</p>
                       )}
                     </div>
 
+                    {/* Upcoming Split */}
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-3">
                         <GitMerge size={14} className="text-accent" />
@@ -2434,6 +2445,86 @@ export default function DeepDive() {
                     </div>
                   </div>
 
+                  {/* Row 2: Algorithmic Prediction */}
+                  {corporateActions.prediction && (
+                    <div className="bg-gradient-to-br from-accent/10 to-transparent border border-accent/30 rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Brain size={14} className="text-accent" />
+                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">AI Dividend Prediction</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {corporateActions.prediction.overdue && (
+                            <span className="text-[9px] bg-signal-sell/20 text-signal-sell border border-signal-sell/30 rounded-full px-2 py-0.5 font-bold uppercase">Overdue</span>
+                          )}
+                          <span className="text-[9px] bg-accent/20 text-accent border border-accent/30 rounded-full px-2 py-0.5 font-bold uppercase">
+                            {corporateActions.prediction.confidence_pct}% confidence
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <div className="bg-dark-bg/50 rounded-xl p-3">
+                          <p className="text-[9px] text-dark-muted uppercase mb-1">Est. Ex-Date</p>
+                          <p className="text-sm font-bold text-dark-text font-mono">{corporateActions.prediction.next_ex_date_est}</p>
+                          <p className="text-[9px] text-dark-muted mt-0.5">{corporateActions.prediction.days_until_est}d away</p>
+                        </div>
+                        <div className="bg-dark-bg/50 rounded-xl p-3">
+                          <p className="text-[9px] text-dark-muted uppercase mb-1">Est. Amount</p>
+                          <p className="text-sm font-bold text-signal-buy font-mono">₹{corporateActions.prediction.amount_est}</p>
+                          <p className="text-[9px] text-dark-muted mt-0.5">±20% range</p>
+                        </div>
+                        <div className="bg-dark-bg/50 rounded-xl p-3">
+                          <p className="text-[9px] text-dark-muted uppercase mb-1">Range Low</p>
+                          <p className="text-sm font-bold text-dark-text font-mono">₹{corporateActions.prediction.amount_range_low}</p>
+                        </div>
+                        <div className="bg-dark-bg/50 rounded-xl p-3">
+                          <p className="text-[9px] text-dark-muted uppercase mb-1">Range High</p>
+                          <p className="text-sm font-bold text-dark-text font-mono">₹{corporateActions.prediction.amount_range_high}</p>
+                        </div>
+                      </div>
+                      {/* Confidence bar */}
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-[9px] text-dark-muted w-20">Confidence</span>
+                        <div className="flex-1 h-1.5 bg-dark-border rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-accent"
+                            style={{ width: `${corporateActions.prediction.confidence_pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[9px] text-accent font-bold">{corporateActions.prediction.confidence_pct}%</span>
+                      </div>
+                      <p className="text-[9px] text-dark-muted/60 mt-2 italic">{corporateActions.prediction.basis}</p>
+                    </div>
+                  )}
+
+                  {/* Row 3: Analytics */}
+                  {corporateActions.analytics && (
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Activity size={14} className="text-accent" />
+                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Dividend Analytics</span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                          { label: 'Frequency', value: corporateActions.analytics.frequency, capitalize: true },
+                          { label: 'Total Paid', value: `${corporateActions.analytics.total_dividends_paid} dividends` },
+                          { label: 'Avg Dividend', value: `₹${corporateActions.analytics.avg_dividend}` },
+                          { label: 'Last Dividend', value: `₹${corporateActions.analytics.last_dividend}` },
+                          { label: 'Trend (3 cycles)', value: corporateActions.analytics.trend_pct != null ? `${corporateActions.analytics.trend_pct > 0 ? '+' : ''}${corporateActions.analytics.trend_pct}%` : '—', color: corporateActions.analytics.trend_pct > 0 ? 'text-signal-buy' : corporateActions.analytics.trend_pct < 0 ? 'text-signal-sell' : '' },
+                          { label: 'Div CAGR', value: corporateActions.analytics.dividend_cagr_pct != null ? `${corporateActions.analytics.dividend_cagr_pct > 0 ? '+' : ''}${corporateActions.analytics.dividend_cagr_pct}%` : '—', color: corporateActions.analytics.dividend_cagr_pct > 0 ? 'text-signal-buy' : '' },
+                          { label: 'History', value: `${corporateActions.analytics.years_of_history}y` },
+                          { label: 'Consistency', value: `${corporateActions.analytics.consistency_score}%`, color: corporateActions.analytics.consistency_score >= 80 ? 'text-signal-buy' : corporateActions.analytics.consistency_score >= 50 ? 'text-yellow-400' : 'text-signal-sell' },
+                        ].map(({ label, value, color, capitalize }) => (
+                          <div key={label} className="bg-dark-bg/50 rounded-xl p-3">
+                            <p className="text-[9px] text-dark-muted uppercase mb-1">{label}</p>
+                            <p className={`text-sm font-bold font-mono ${color || 'text-dark-text'} ${capitalize ? 'capitalize' : ''}`}>{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 4: Dividend History Table */}
                   {corporateActions.dividend_history && corporateActions.dividend_history.length > 0 && (
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-4">
@@ -2444,13 +2535,15 @@ export default function DeepDive() {
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-dark-border">
-                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Date</th>
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">#</th>
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Ex-Date</th>
                               <th className="px-3 py-2 text-right text-dark-muted font-semibold">Amount (₹)</th>
                             </tr>
                           </thead>
                           <tbody>
                             {corporateActions.dividend_history.map((d, i) => (
                               <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                <td className="px-3 py-2 text-dark-muted/50 font-mono">{corporateActions.dividend_history.length - i}</td>
                                 <td className="px-3 py-2 text-dark-muted font-mono">{d.date}</td>
                                 <td className="px-3 py-2 text-right text-signal-buy font-mono font-semibold">
                                   {d.amount != null ? Number(d.amount).toFixed(2) : '—'}
@@ -2463,6 +2556,7 @@ export default function DeepDive() {
                     </div>
                   )}
 
+                  {/* Row 5: Split History */}
                   {corporateActions.split_history && corporateActions.split_history.length > 0 && (
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-4">
@@ -2490,7 +2584,7 @@ export default function DeepDive() {
                     </div>
                   )}
 
-                  {!corporateActions.upcoming_dividend && !corporateActions.upcoming_split
+                  {!corporateActions.upcoming_dividend && !corporateActions.upcoming_split && !corporateActions.prediction
                     && (!corporateActions.dividend_history || corporateActions.dividend_history.length === 0)
                     && (!corporateActions.split_history || corporateActions.split_history.length === 0) && (
                     <div className="text-center py-16 text-dark-muted text-sm">No corporate action data available for this stock.</div>
@@ -2499,6 +2593,7 @@ export default function DeepDive() {
               )}
             </div>
           )}
+
 
         </div>
       </div>
