@@ -2370,9 +2370,6 @@ export default function DeepDive() {
               )}
             </div>
           )}
-        </div>
-      </div>
-
           {/* Corporate Actions Tab */}
           {activeTab === 'corporate-actions' && (
             <div className="space-y-6">
@@ -2502,6 +2499,9 @@ export default function DeepDive() {
               )}
             </div>
           )}
+
+        </div>
+      </div>
 
       {/* Manual Edit Modal */}
       {isEditModalOpen && (
