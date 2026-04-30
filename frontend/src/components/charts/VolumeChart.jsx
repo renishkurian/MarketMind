@@ -55,7 +55,7 @@ const VolumeChart = ({ data, theme = 'dark' }) => {
     const formattedData = data.map((d, i) => {
       const prevClose = data[i - 1]?.close ?? d.close;
       return {
-        time: Math.floor(new Date(d.date).getTime() / 1000),
+        time: Math.floor(new Date(d.date || d.time).getTime() / 1000),
         value: d.volume,
         color: d.close >= prevClose ? '#10B981' : '#EF4444',
       };

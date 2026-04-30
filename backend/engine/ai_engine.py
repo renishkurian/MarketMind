@@ -215,6 +215,12 @@ def build_chart_chat_system_prompt(symbol: str, context_data: dict) -> str:
     weekly = summary.get("weekly_candles", [])
     weekly_block = json.dumps(weekly[-6:], indent=2) if weekly else "Not available."
 
+    chart_range  = summary.get("chart_range", "3M")
+    range_high   = summary.get("range_high") or summary.get("90d_high")
+    range_low    = summary.get("range_low")  or summary.get("90d_low")
+    range_label  = {"5M": "intraday 5-minute", "1W": "1-week", "1M": "1-month", "3M": "3-month",
+                    "6M": "6-month", "1Y": "1-year", "ALL": "full-history"}.get(chart_range, chart_range)
+
     return f"""You are MarketMind's institutional chart analyst for NSE/BSE Indian equities.
 Your role is to give precise, data-grounded technical analysis backed by live news context.
 
@@ -234,13 +240,15 @@ Close  : ₹{today.get('close', 'N/A')}  (prev close: ₹{today.get('prev_close'
 Change : {today.get('change_pct', 'N/A')}%
 Volume : {today.get('volume', 'N/A')}
 
-═══ 90-DAY PRICE SUMMARY ═══
-Period change   : {summary.get('period_change_pct', 'N/A')}%  ({summary.get('period_start_close')} → {summary.get('period_end_close')})
-90d High / Low  : ₹{summary.get('90d_high')} / ₹{summary.get('90d_low')}
-Avg Daily Volume: {summary.get('avg_volume_90d')}
-SMA 20 / 50 / 90: ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
+═══ {chart_range} PRICE SUMMARY ({range_label} view) ═══
+IMPORTANT: Support and resistance levels below are computed from the {range_label} window.
+Adjust the granularity of your S/R analysis to match this timeframe.
+Period change     : {summary.get('period_change_pct', 'N/A')}%  ({summary.get('period_start_close')} → {summary.get('period_end_close')})
+{chart_range} High / Low : ₹{range_high} / ₹{range_low}
+Avg Daily Volume  : {summary.get('avg_volume_90d')}
+SMA 20 / 50 / 90  : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
 
-Last 5 Daily Bars:
+Last 5 Bars (most recent):
 {bars_block}
 
 Weekly Candle Summary (last 6 weeks):
@@ -248,7 +256,7 @@ Weekly Candle Summary (last 6 weeks):
 
 ═══ CRITICAL CONSTRAINTS — READ BEFORE GENERATING REPLY ═══
 CURRENT CLOSE: ₹{today.get('close', 'N/A')}
-90D LOW: ₹{summary.get('90d_low', 'N/A')}
+{chart_range} LOW: ₹{range_low}
 
 RSI VALUE: {signals.get('ta', {}).get('rsi', 'N/A')}
 RSI RULE (NON-NEGOTIABLE):
@@ -257,7 +265,10 @@ RSI RULE (NON-NEGOTIABLE):
  "RSI is neutral-to-bullish. Only say overbought if RSI > 70."}
 
 ENTRY RULE (NON-NEGOTIABLE):
-Current close is ₹{today.get('close', 'N/A')}. Do NOT suggest entry below ₹{round(float(today.get('close', 0)) * 0.92, 2) if today.get('close') else 'N/A'} (more than 8% below current price) unless you explicitly justify a breakdown scenario. The 90d low of ₹{summary.get('90d_low', 'N/A')} is historical — do not use it as a default entry target if price has already recovered from it.
+Current close is ₹{today.get('close', 'N/A')}. Do NOT suggest entry below ₹{round(float(today.get('close', 0)) * 0.92, 2) if today.get('close') else 'N/A'} (more than 8% below current price) unless you explicitly justify a breakdown scenario. The {chart_range} low of ₹{range_low} is historical — do not use it as a default entry target if price has already recovered from it.
+
+S/R TIMEFRAME RULE:
+The chart is set to {range_label} view. Derive support and resistance ONLY from the {range_label} candles provided. Do NOT reference longer-term structures unless the user specifically asks. Trend lines must span dates within the {chart_range} window.
 
 ═══ INDICATOR SIGNALS ═══
 {json.dumps(signals, indent=2)}
@@ -270,10 +281,10 @@ If no news matches the move, say "appears purely technical."
 ═══ RESPONSE RULES ═══
 1. Reply ONLY as valid JSON — no text outside the JSON object.
 2. Always cite today's verified High/Low when discussing intraday action.
-3. Identify support/resistance from weekly candles and SMA levels.
+3. Identify support/resistance from the {range_label} candles and SMA levels relevant to this timeframe.
 4. State your buy/hold/sell conviction with a specific reason.
 4a. ENTRY POINT RULE: Never suggest an entry price significantly below the current close unless there is a confirmed breakdown. If price has already bounced from lows, the realistic entry is near current price or a minor pullback (5–10%), not a re-test of the prior low.
-4b. EXIT / TARGET RULE: Base exit/target on actual SMA levels and resistance from weekly candles in the data above — do not fabricate levels not present in the data.
+4b. EXIT / TARGET RULE: Base exit/target on actual SMA levels and resistance from the {range_label} candles in the data above — do not fabricate levels not present in the data.
 5. Only include trend_lines that directly answer the question asked.
 5a. CRITICAL: trend_line start_price and end_price MUST equal the exact price level named in the reply. If the reply says support is at ₹143.13, the line must be drawn at 143.13 — never at the current price.
 6. Format all dates as YYYY-MM-DD matching the data above.

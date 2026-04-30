@@ -874,6 +874,62 @@ async def get_stock_history(
     return records[-days:] if days < len(records) else records
 
 
+@app.get("/api/stock/{symbol}/intraday")
+async def get_stock_intraday(
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Return 5-minute OHLCV candles for today from IntradayTicks."""
+    from sqlalchemy import func as sqlfunc
+    from datetime import date as dt_date
+    today = dt_date.today()
+
+    result = await db.execute(
+        select(IntradayTicks)
+        .where(IntradayTicks.symbol == symbol.upper())
+        .where(sqlfunc.date(IntradayTicks.timestamp) == today)
+        .order_by(IntradayTicks.timestamp.asc())
+    )
+    ticks = result.scalars().all()
+    if not ticks:
+        return []
+
+    # Aggregate into 5-minute buckets
+    from datetime import datetime, timedelta
+    candles = []
+    bucket_start = None
+    bucket = []
+
+    def flush_bucket(b_start, b_ticks):
+        return {
+            "time": b_start.isoformat(),
+            "open":   float(b_ticks[0].open  or b_ticks[0].close),
+            "high":   float(max((t.high or t.close) for t in b_ticks)),
+            "low":    float(min((t.low  or t.close) for t in b_ticks)),
+            "close":  float(b_ticks[-1].close),
+            "volume": sum((t.volume or 0) for t in b_ticks),
+        }
+
+    for tick in ticks:
+        ts = tick.timestamp
+        # Floor to 5-min boundary
+        floored = ts.replace(second=0, microsecond=0)
+        floored = floored - timedelta(minutes=floored.minute % 5)
+        if bucket_start is None:
+            bucket_start = floored
+        if floored != bucket_start:
+            candles.append(flush_bucket(bucket_start, bucket))
+            bucket_start = floored
+            bucket = []
+        bucket.append(tick)
+
+    if bucket:
+        candles.append(flush_bucket(bucket_start, bucket))
+
+    return candles
+
+
 @app.get("/api/stock/{symbol}/signals")
 async def get_stock_signals(
     symbol: str, 
@@ -983,18 +1039,24 @@ async def handle_chart_chat(
 ):
     """Handles an interactive chat about the chart, utilizing historical OHLC and Signals as context."""
     chat_history = payload.get("messages", [])
+    chart_range  = payload.get("range", "3M")  # frontend passes selected timeframe
     symbol = symbol.upper()
+
+    # Map range to bar count for context window
+    range_bars = {"5M": 0, "1W": 7, "1M": 21, "3M": 63, "6M": 126, "1Y": 252, "ALL": 500}
+    context_bars = range_bars.get(chart_range, 63)
 
     # Get signals context
     sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
     sig = sig_result.scalars().first()
     
-    # Get last 90 bars of history
+    # Get history scoped to selected range (min 30 bars for S/R accuracy)
+    fetch_bars = max(context_bars, 30) if context_bars > 0 else 90
     hist_result = await db.execute(
         select(PriceHistory)
         .where(PriceHistory.symbol == symbol)
         .order_by(PriceHistory.date.desc())
-        .limit(90)
+        .limit(fetch_bars)
     )
     history = hist_result.scalars().all()
     history.reverse() # chronological order
@@ -1084,10 +1146,13 @@ async def handle_chart_chat(
         return buckets
 
     price_summary = {
+        "chart_range": chart_range,
         "period_days": len(history),
         "period_start_close": round(closes[0], 2) if closes else None,
         "period_end_close":   round(closes[-1], 2) if closes else None,
         "period_change_pct":  round((closes[-1] - closes[0]) / closes[0] * 100, 2) if closes else None,
+        "range_high": round(max(highs), 2) if highs else None,
+        "range_low":  round(min(lows), 2) if lows else None,
         "90d_high": round(max(highs), 2) if highs else None,
         "90d_low":  round(min(lows), 2) if lows else None,
         "avg_volume_90d": round(sum(vols) / len(vols)) if vols else None,
@@ -1608,9 +1673,15 @@ async def handle_skill_chat(
     symbol   = symbol.upper()
     skill_id = payload.get("skill_id", "")
     chat_history = payload.get("messages", [])
+    chart_range  = payload.get("range", "3M")
 
     if not skill_id:
         raise HTTPException(status_code=400, detail="skill_id is required")
+
+    # Map range to bar count
+    range_bars = {"5M": 0, "1W": 7, "1M": 21, "3M": 63, "6M": 126, "1Y": 252, "ALL": 500}
+    context_bars = range_bars.get(chart_range, 63)
+    fetch_bars = max(context_bars, 30) if context_bars > 0 else 90
 
     # Build full context — identical pipeline to chart_chat
     sig_result = await db.execute(select(SignalsCache).where(SignalsCache.symbol == symbol))
@@ -1620,7 +1691,7 @@ async def handle_skill_chat(
         select(PriceHistory)
         .where(PriceHistory.symbol == symbol)
         .order_by(PriceHistory.date.desc())
-        .limit(90)
+        .limit(fetch_bars)
     )
     history = hist_result.scalars().all()
     history.reverse()
@@ -1702,7 +1773,10 @@ async def handle_skill_chat(
             "change_pct": float(sig.change_pct)    if sig and sig.change_pct    else None,
         },
         "price_summary": {
+            "chart_range": chart_range,
             "period_change_pct": round((closes[-1] - closes[0]) / closes[0] * 100, 2) if len(closes) >= 2 else None,
+            "range_high": round(max(highs), 2) if highs else None,
+            "range_low":  round(min(lows),  2) if lows  else None,
             "90d_high":    round(max(highs), 2) if highs else None,
             "90d_low":     round(min(lows),  2) if lows  else None,
             "avg_volume_90d": round(sum(vols) / len(vols)) if vols else None,

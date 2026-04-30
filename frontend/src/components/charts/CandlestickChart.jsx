@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { createChart, ColorType, CandlestickSeries, LineSeries } from 'lightweight-charts';
 
+const getBarDate = d => d.date || d.time;
+
 const calcSMA = (data, period) => {
   return data.reduce((acc, d, i) => {
     if (i < period - 1) return acc;
     const avg = data.slice(i - period + 1, i + 1).reduce((s, x) => s + x.close, 0) / period;
-    acc.push({ time: Math.floor(new Date(d.date).getTime() / 1000), value: avg });
+    acc.push({ time: Math.floor(new Date(getBarDate(d)).getTime() / 1000), value: avg });
     return acc;
   }, []);
 };
@@ -17,7 +19,7 @@ const calcBB = (data, period = 20, stdDev = 2) => {
     const slice = data.slice(i - period + 1, i + 1).map(x => x.close);
     const mean = slice.reduce((s, v) => s + v, 0) / period;
     const std = Math.sqrt(slice.reduce((s, v) => s + (v - mean) ** 2, 0) / period);
-    const t = Math.floor(new Date(d.date).getTime() / 1000);
+    const t = Math.floor(new Date(getBarDate(d)).getTime() / 1000);
     upper.push({ time: t, value: mean + stdDev * std });
     lower.push({ time: t, value: mean - stdDev * std });
   });
@@ -116,11 +118,12 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
     const formattedData = [];
     const seenTimes = new Set();
     
-    // Sort raw data first to ensure we pick the LATEST entry if there are duplicates
-    const sortedRaw = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Support both daily (d.date) and intraday (d.time) data
+    const getDateStr = d => d.date || d.time;
+    const sortedRaw = [...data].sort((a, b) => new Date(getDateStr(a)) - new Date(getDateStr(b)));
 
     sortedRaw.forEach(d => {
-      const t = Math.floor(new Date(d.date).getTime() / 1000);
+      const t = Math.floor(new Date(getDateStr(d)).getTime() / 1000);
       if (t && !seenTimes.has(t)) {
         formattedData.push({
           time: t,
@@ -217,9 +220,10 @@ const CandlestickChart = ({ data, theme = 'dark', trendLines = [], showSMAs = tr
   useEffect(() => {
     if (!chartRef.current || !priceTarget || !data || data.length === 0) return;
     
-    const sortedRaw = [...data].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const getDs = d => d.date || d.time;
+    const sortedRaw = [...data].sort((a, b) => new Date(getDs(a)) - new Date(getDs(b)));
     const lastBar = sortedRaw[sortedRaw.length - 1];
-    const lastTime = Math.floor(new Date(lastBar.date).getTime() / 1000);
+    const lastTime = Math.floor(new Date(getDs(lastBar)).getTime() / 1000);
     const days = priceTarget.horizon === '90d' ? 90 : 30;
     const futureTime = lastTime + (days * 86400);
 

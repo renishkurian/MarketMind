@@ -535,11 +535,33 @@ export default function DeepDive() {
 
   // Chart range filtering
   const [range, setRange] = useState('3M');
-  const rangeMap = { '1W': 7, '1M': 21, '3M': 63, '6M': 126, '1Y': 252, 'ALL': 9999 };
-  const filteredHistory = history.slice(-(rangeMap[range] ?? 63));
+  const rangeMap = { '5M': -1, '1W': 7, '1M': 21, '3M': 63, '6M': 126, '1Y': 252, 'ALL': 9999 };
+  const [intradayCandles, setIntradayCandles] = useState([]);
+  const [intradayLoading, setIntradayLoading] = useState(false);
+  const filteredHistory = range === '5M' ? [] : history.slice(-(rangeMap[range] ?? 63));
   const fullHistoryForIndicators = history; // always full dataset for RSI/MACD accuracy
 
-  // Volume max for bar scaling
+  // Fetch 5-min intraday candles when 5M range is selected
+  useEffect(() => {
+    if (range !== '5M') return;
+    const fetchIntraday = async () => {
+      setIntradayLoading(true);
+      try {
+        const token = localStorage.getItem('mm_token');
+        const res = await fetch(`${API_URL}/api/stock/${symbol}/intraday`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIntradayCandles(data);
+        }
+      } catch (e) { console.warn('Intraday fetch failed:', e); }
+      finally { setIntradayLoading(false); }
+    };
+    fetchIntraday();
+  }, [range, symbol]);
+
+
   const maxVol = Math.max(...filteredHistory.map(d => d.volume || 0), 1);
 
   // ── Chart Chat (Multi-Session, Persistent) ─────────────────────────────
@@ -678,8 +700,8 @@ export default function DeepDive() {
         : `${API_URL}/api/stock/${symbol}/chart_chat`;
 
       const body = activeSkill
-        ? JSON.stringify({ skill_id: activeSkill.id, messages: updatedMessages })
-        : JSON.stringify({ messages: updatedMessages });
+        ? JSON.stringify({ skill_id: activeSkill.id, messages: updatedMessages, range })
+        : JSON.stringify({ messages: updatedMessages, range });
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -1083,6 +1105,46 @@ export default function DeepDive() {
                   <RefreshCw size={18} className="animate-spin" />
                   <span>Loading price data…</span>
                 </div>
+              ) : range === '5M' ? (
+                intradayLoading ? (
+                  <div className="flex items-center justify-center py-20 gap-2 text-dark-muted">
+                    <RefreshCw size={18} className="animate-spin" />
+                    <span>Loading intraday data…</span>
+                  </div>
+                ) : intradayCandles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3 text-dark-muted">
+                    <Activity size={36} className="opacity-30" />
+                    <p className="text-sm">No intraday data available for today.</p>
+                    <p className="text-xs text-dark-muted/70">Intraday ticks are collected during market hours.</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-4 items-stretch">
+                    <div className={`flex-1 overflow-hidden transition-all duration-300 ${showChartChat ? 'w-2/3' : 'w-full'}`}>
+                      <div className="space-y-4">
+                        <CandlestickChart data={intradayCandles} theme={theme} trendLines={activeTrendLines} priceTarget={null} />
+                        <VolumeChart data={intradayCandles} theme={theme} />
+                      </div>
+                      {intradayCandles.length > 0 && (() => {
+                        const last = intradayCandles[intradayCandles.length - 1];
+                        return (
+                          <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-dark-border text-xs font-mono text-dark-muted">
+                            <span>O: <span className="text-dark-text">₹{last.open?.toFixed(2)}</span></span>
+                            <span>H: <span className="text-signal-buy">₹{last.high?.toFixed(2)}</span></span>
+                            <span>L: <span className="text-signal-sell">₹{last.low?.toFixed(2)}</span></span>
+                            <span>C: <span className="text-dark-text font-bold">₹{last.close?.toFixed(2)}</span></span>
+                            <span>Vol: <span className="text-dark-text">{last.volume?.toLocaleString()}</span></span>
+                            <span className="ml-auto text-dark-muted">{last.time?.slice(0, 16)}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    {showChartChat && (
+                      <div className="w-1/3 min-w-[320px]">
+                        {/* chat panel rendered below */}
+                      </div>
+                    )}
+                  </div>
+                )
               ) : filteredHistory.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3 text-dark-muted">
                   <Activity size={36} className="opacity-30" />
