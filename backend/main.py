@@ -2862,6 +2862,115 @@ def _serialize_signal(signal) -> dict:
         "backtest_win_rate": float(signal.backtest_win_rate) if signal.backtest_win_rate is not None else None,
     }
 
+@app.get("/api/stock/{symbol}/corporate-actions")
+async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    import yfinance as yf
+    import numpy as np
+
+    stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol.upper()))
+    row = stock_res.first()
+    yf_sym = (row.yahoo_symbol if row and row.yahoo_symbol else f"{symbol.upper()}.NS")
+
+    def _safe(v):
+        if v is None:
+            return None
+        if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
+            return None
+        if hasattr(v, 'item'):
+            return v.item()
+        return v
+
+    try:
+        ticker = yf.Ticker(yf_sym)
+
+        # --- calendar (upcoming events) ---
+        upcoming_dividend = None
+        upcoming_split = None
+        try:
+            cal = ticker.calendar
+            if cal:
+                if isinstance(cal, dict):
+                    ex_date = cal.get("Ex-Dividend Date") or cal.get("Dividend Date")
+                    div_amt = cal.get("Dividends") or cal.get("Dividend Amount")
+                    if ex_date:
+                        upcoming_dividend = {
+                            "ex_date": str(ex_date) if ex_date else None,
+                            "amount": _safe(div_amt),
+                        }
+                    split_date = cal.get("Split Date")
+                    split_ratio = cal.get("Split Factor") or cal.get("Split Ratio")
+                    if split_date:
+                        upcoming_split = {
+                            "date": str(split_date),
+                            "ratio": str(split_ratio) if split_ratio else None,
+                        }
+                elif hasattr(cal, 'to_dict'):
+                    cal_dict = cal.to_dict()
+                    for col in cal_dict:
+                        low = str(col).lower()
+                        if "dividend" in low:
+                            upcoming_dividend = {"ex_date": None, "amount": _safe(list(cal_dict[col].values())[0]) if cal_dict[col] else None}
+                        if "split" in low:
+                            upcoming_split = {"date": None, "ratio": str(list(cal_dict[col].values())[0]) if cal_dict[col] else None}
+        except Exception:
+            pass
+
+        # --- actions history (dividends + splits) ---
+        dividend_history = []
+        split_history = []
+        try:
+            actions = ticker.actions
+            if actions is not None and not actions.empty:
+                divs = actions[actions["Dividends"] > 0][["Dividends"]].copy()
+                divs = divs.sort_index(ascending=False).head(20)
+                for idx, row2 in divs.iterrows():
+                    dividend_history.append({
+                        "date": str(idx.date()),
+                        "amount": _safe(row2["Dividends"]),
+                    })
+
+                splits = actions[actions["Stock Splits"] > 0][["Stock Splits"]].copy()
+                splits = splits.sort_index(ascending=False).head(10)
+                for idx, row2 in splits.iterrows():
+                    split_history.append({
+                        "date": str(idx.date()),
+                        "ratio": str(_safe(row2["Stock Splits"])),
+                    })
+        except Exception:
+            pass
+
+        # fallback: ticker.dividends / ticker.splits
+        if not dividend_history:
+            try:
+                divs = ticker.dividends
+                if divs is not None and not divs.empty:
+                    for idx, val in divs.sort_index(ascending=False).head(20).items():
+                        dividend_history.append({"date": str(idx.date()), "amount": _safe(val)})
+            except Exception:
+                pass
+
+        if not split_history:
+            try:
+                splits = ticker.splits
+                if splits is not None and not splits.empty:
+                    for idx, val in splits.sort_index(ascending=False).head(10).items():
+                        split_history.append({"date": str(idx.date()), "ratio": str(_safe(val))})
+            except Exception:
+                pass
+
+        return {
+            "symbol": symbol.upper(),
+            "yahoo_symbol": yf_sym,
+            "upcoming_dividend": upcoming_dividend,
+            "upcoming_split": upcoming_split,
+            "dividend_history": dividend_history,
+            "split_history": split_history,
+        }
+    except Exception as e:
+        logger.error(f"Corporate actions error for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

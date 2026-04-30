@@ -11,7 +11,8 @@ import {
   Zap,
   Star,
   Database,
-  Bell, BellRing, PieChart, Users, TrendingUp as TrendUp
+  Bell, BellRing, PieChart, Users, TrendingUp as TrendUp,
+  CalendarDays, DollarSign, GitMerge
 } from 'lucide-react';
 import HistoricalPricesTable from '../components/HistoricalPricesTable';
 
@@ -187,6 +188,7 @@ export default function DeepDive() {
   const [editData, setEditData] = useState({});
   const [activeTab, setActiveTab] = useState('chart');
   const [screenerData, setScreenerData] = useState(null);
+  const [corporateActions, setCorporateActions] = useState(null);
   const [selectedSkill, setSelectedSkill] = useState(SKILLS[0].id);
   const [signals, setSignals] = useState(null);
   const [fundamentals, setFundamentals] = useState(null);
@@ -228,7 +230,7 @@ export default function DeepDive() {
     const headers = { 'Authorization': `Bearer ${token}` };
 
     // Parallel fetches
-    const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes, screenerRes] = await Promise.allSettled([
+    const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes, screenerRes, corpActRes] = await Promise.allSettled([
       fetch(`${API_URL}/api/stock/${symbol}/history`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/insight`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/signals`, { headers }),
@@ -236,6 +238,7 @@ export default function DeepDive() {
       fetch(`${API_URL}/api/stock/${symbol}/lots`, { headers }),
       fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/screener`, { headers }),
+      fetch(`${API_URL}/api/stock/${symbol}/corporate-actions`, { headers }),
     ]);
 
     if (histRes.status === 'fulfilled' && histRes.value.ok) {
@@ -275,6 +278,10 @@ export default function DeepDive() {
     if (screenerRes.status === 'fulfilled' && screenerRes.value.ok) {
       const sd = await screenerRes.value.json();
       if (sd.available) setScreenerData(sd);
+    }
+
+    if (corpActRes.status === 'fulfilled' && corpActRes.value.ok) {
+      setCorporateActions(await corpActRes.value.json());
     }
 
     // Fetch Full Consensus Analysis if ISIN exists
@@ -830,6 +837,7 @@ export default function DeepDive() {
     { id: 'ai', label: 'AI Insight', Icon: Brain },
     { id: 'historical', label: 'Historical Data', Icon: Database },
     { id: 'screener', label: 'Screener', Icon: PieChart },
+    { id: 'corporate-actions', label: 'Corporate Actions', Icon: CalendarDays },
   ];
 
   return (
@@ -2364,6 +2372,136 @@ export default function DeepDive() {
           )}
         </div>
       </div>
+
+          {/* Corporate Actions Tab */}
+          {activeTab === 'corporate-actions' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarDays size={16} className="text-accent" />
+                <h3 className="text-base font-black text-dark-text uppercase tracking-widest">Corporate Actions</h3>
+              </div>
+
+              {!corporateActions ? (
+                <div className="text-center py-16 text-dark-muted text-sm">Loading corporate actions...</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <DollarSign size={14} className="text-signal-buy" />
+                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Upcoming Dividend</span>
+                      </div>
+                      {corporateActions.upcoming_dividend ? (
+                        <div className="space-y-2">
+                          {corporateActions.upcoming_dividend.ex_date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Ex-Date</span>
+                              <span className="text-dark-text font-mono font-semibold">{corporateActions.upcoming_dividend.ex_date}</span>
+                            </div>
+                          )}
+                          {corporateActions.upcoming_dividend.amount != null && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Amount</span>
+                              <span className="text-signal-buy font-mono font-bold">₹{Number(corporateActions.upcoming_dividend.amount).toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-dark-muted italic">No upcoming dividend announced</p>
+                      )}
+                    </div>
+
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <GitMerge size={14} className="text-accent" />
+                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Upcoming Split</span>
+                      </div>
+                      {corporateActions.upcoming_split ? (
+                        <div className="space-y-2">
+                          {corporateActions.upcoming_split.date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Date</span>
+                              <span className="text-dark-text font-mono font-semibold">{corporateActions.upcoming_split.date}</span>
+                            </div>
+                          )}
+                          {corporateActions.upcoming_split.ratio && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Ratio</span>
+                              <span className="text-accent font-mono font-bold">{corporateActions.upcoming_split.ratio}:1</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-dark-muted italic">No upcoming split announced</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {corporateActions.dividend_history && corporateActions.dividend_history.length > 0 && (
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <DollarSign size={14} className="text-signal-buy" />
+                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Dividend History</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-dark-border">
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Date</th>
+                              <th className="px-3 py-2 text-right text-dark-muted font-semibold">Amount (₹)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {corporateActions.dividend_history.map((d, i) => (
+                              <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                <td className="px-3 py-2 text-dark-muted font-mono">{d.date}</td>
+                                <td className="px-3 py-2 text-right text-signal-buy font-mono font-semibold">
+                                  {d.amount != null ? Number(d.amount).toFixed(2) : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {corporateActions.split_history && corporateActions.split_history.length > 0 && (
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <GitMerge size={14} className="text-accent" />
+                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Split History</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-dark-border">
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Date</th>
+                              <th className="px-3 py-2 text-right text-dark-muted font-semibold">Ratio</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {corporateActions.split_history.map((s, i) => (
+                              <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                <td className="px-3 py-2 text-dark-muted font-mono">{s.date}</td>
+                                <td className="px-3 py-2 text-right text-accent font-mono font-semibold">{s.ratio}:1</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {!corporateActions.upcoming_dividend && !corporateActions.upcoming_split
+                    && (!corporateActions.dividend_history || corporateActions.dividend_history.length === 0)
+                    && (!corporateActions.split_history || corporateActions.split_history.length === 0) && (
+                    <div className="text-center py-16 text-dark-muted text-sm">No corporate action data available for this stock.</div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
       {/* Manual Edit Modal */}
       {isEditModalOpen && (
