@@ -883,33 +883,53 @@ async def get_stock_intraday(
     """Return 5-minute OHLCV candles from IntradayTicks.
     Uses today's ticks if available, otherwise falls back to the most recent date that has ticks."""
     from sqlalchemy import func as sqlfunc
-    from datetime import date as dt_date
+    from datetime import date as dt_date, datetime, timedelta
+    import pytz
+
+    IST = pytz.timezone('Asia/Kolkata')
+
+    def ist_day_bounds(d):
+        """Return (start, end) UTC-aware datetimes for a given IST date."""
+        start = IST.localize(datetime(d.year, d.month, d.day, 0, 0, 0))
+        end   = IST.localize(datetime(d.year, d.month, d.day, 23, 59, 59))
+        return start, end
+
     today = dt_date.today()
+    today_start, today_end = ist_day_bounds(today)
 
     result = await db.execute(
         select(IntradayTicks)
         .where(IntradayTicks.symbol == symbol.upper())
-        .where(sqlfunc.date(IntradayTicks.timestamp) == today)
+        .where(IntradayTicks.timestamp >= today_start)
+        .where(IntradayTicks.timestamp <= today_end)
         .order_by(IntradayTicks.timestamp.asc())
     )
     ticks = result.scalars().all()
 
     # Fall back to the most recent date that actually has ticks
     if not ticks:
-        latest_date_result = await db.execute(
-            select(sqlfunc.date(IntradayTicks.timestamp).label("tick_date"))
+        latest_result = await db.execute(
+            select(IntradayTicks)
             .where(IntradayTicks.symbol == symbol.upper())
-            .order_by(sqlfunc.date(IntradayTicks.timestamp).desc())
+            .order_by(IntradayTicks.timestamp.desc())
             .limit(1)
         )
-        row = latest_date_result.first()
-        if not row:
+        latest_tick = latest_result.scalars().first()
+        if not latest_tick:
             return []
-        latest_date = row[0]
+        # Get the IST date of that tick
+        latest_ts = latest_tick.timestamp
+        if latest_ts.tzinfo is None:
+            latest_ts = IST.localize(latest_ts)
+        else:
+            latest_ts = latest_ts.astimezone(IST)
+        latest_date = latest_ts.date()
+        lb_start, lb_end = ist_day_bounds(latest_date)
         result2 = await db.execute(
             select(IntradayTicks)
             .where(IntradayTicks.symbol == symbol.upper())
-            .where(sqlfunc.date(IntradayTicks.timestamp) == latest_date)
+            .where(IntradayTicks.timestamp >= lb_start)
+            .where(IntradayTicks.timestamp <= lb_end)
             .order_by(IntradayTicks.timestamp.asc())
         )
         ticks = result2.scalars().all()
@@ -917,23 +937,29 @@ async def get_stock_intraday(
             return []
 
     # Aggregate into 5-minute buckets
-    from datetime import datetime, timedelta
     candles = []
     bucket_start = None
     bucket = []
 
+    def to_ist_naive(ts):
+        """Convert any timestamp to naive IST datetime for bucketing."""
+        if ts.tzinfo is None:
+            return IST.localize(ts).replace(tzinfo=None)
+        return ts.astimezone(IST).replace(tzinfo=None)
+
     def flush_bucket(b_start, b_ticks):
         return {
-            "time": b_start.isoformat(),
+            "time": b_start.strftime("%Y-%m-%dT%H:%M:%S"),
             "open":   float(b_ticks[0].open  or b_ticks[0].close),
-            "high":   float(max((t.high or t.close) for t in b_ticks)),
-            "low":    float(min((t.low  or t.close) for t in b_ticks)),
+            "high":   float(max((float(t.high or t.close)) for t in b_ticks)),
+            "low":    float(min((float(t.low  or t.close)) for t in b_ticks)),
             "close":  float(b_ticks[-1].close),
             "volume": sum((t.volume or 0) for t in b_ticks),
         }
 
+    from datetime import timedelta
     for tick in ticks:
-        ts = tick.timestamp
+        ts = to_ist_naive(tick.timestamp)
         # Floor to 5-min boundary
         floored = ts.replace(second=0, microsecond=0)
         floored = floored - timedelta(minutes=floored.minute % 5)
