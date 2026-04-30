@@ -880,7 +880,8 @@ async def get_stock_intraday(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Return 5-minute OHLCV candles for today from IntradayTicks."""
+    """Return 5-minute OHLCV candles from IntradayTicks.
+    Uses today's ticks if available, otherwise falls back to the most recent date that has ticks."""
     from sqlalchemy import func as sqlfunc
     from datetime import date as dt_date
     today = dt_date.today()
@@ -892,8 +893,28 @@ async def get_stock_intraday(
         .order_by(IntradayTicks.timestamp.asc())
     )
     ticks = result.scalars().all()
+
+    # Fall back to the most recent date that actually has ticks
     if not ticks:
-        return []
+        latest_date_result = await db.execute(
+            select(sqlfunc.date(IntradayTicks.timestamp).label("tick_date"))
+            .where(IntradayTicks.symbol == symbol.upper())
+            .order_by(sqlfunc.date(IntradayTicks.timestamp).desc())
+            .limit(1)
+        )
+        row = latest_date_result.first()
+        if not row:
+            return []
+        latest_date = row[0]
+        result2 = await db.execute(
+            select(IntradayTicks)
+            .where(IntradayTicks.symbol == symbol.upper())
+            .where(sqlfunc.date(IntradayTicks.timestamp) == latest_date)
+            .order_by(IntradayTicks.timestamp.asc())
+        )
+        ticks = result2.scalars().all()
+        if not ticks:
+            return []
 
     # Aggregate into 5-minute buckets
     from datetime import datetime, timedelta

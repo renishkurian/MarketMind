@@ -1114,8 +1114,8 @@ export default function DeepDive() {
                 ) : intradayCandles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3 text-dark-muted">
                     <Activity size={36} className="opacity-30" />
-                    <p className="text-sm">No intraday data available for today.</p>
-                    <p className="text-xs text-dark-muted/70">Intraday ticks are collected during market hours.</p>
+                    <p className="text-sm">No intraday tick data found for {symbol}.</p>
+                    <p className="text-xs text-dark-muted/70">Ticks are collected by the intraday scheduler. Check that it is running.</p>
                   </div>
                 ) : (
                   <div className="flex gap-4 items-stretch">
