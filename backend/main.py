@@ -882,20 +882,14 @@ async def get_stock_intraday(
 ):
     """Return 5-minute OHLCV candles from IntradayTicks.
     Uses today's ticks if available, otherwise falls back to the most recent date that has ticks."""
-    from sqlalchemy import func as sqlfunc
     from datetime import date as dt_date, datetime, timedelta
-    import pytz
 
-    IST = pytz.timezone('Asia/Kolkata')
-
-    def ist_day_bounds(d):
-        """Return (start, end) UTC-aware datetimes for a given IST date."""
-        start = IST.localize(datetime(d.year, d.month, d.day, 0, 0, 0))
-        end   = IST.localize(datetime(d.year, d.month, d.day, 23, 59, 59))
-        return start, end
+    def day_bounds(d):
+        """Naive datetime bounds for a date — matches DB storage (IST naive)."""
+        return datetime(d.year, d.month, d.day, 0, 0, 0), datetime(d.year, d.month, d.day, 23, 59, 59)
 
     today = dt_date.today()
-    today_start, today_end = ist_day_bounds(today)
+    today_start, today_end = day_bounds(today)
 
     result = await db.execute(
         select(IntradayTicks)
@@ -917,14 +911,13 @@ async def get_stock_intraday(
         latest_tick = latest_result.scalars().first()
         if not latest_tick:
             return []
-        # Get the IST date of that tick
         latest_ts = latest_tick.timestamp
-        if latest_ts.tzinfo is None:
-            latest_ts = IST.localize(latest_ts)
-        else:
-            latest_ts = latest_ts.astimezone(IST)
+        # Strip tzinfo if present so .date() is consistent
+        if hasattr(latest_ts, 'tzinfo') and latest_ts.tzinfo is not None:
+            import pytz
+            latest_ts = latest_ts.astimezone(pytz.timezone('Asia/Kolkata')).replace(tzinfo=None)
         latest_date = latest_ts.date()
-        lb_start, lb_end = ist_day_bounds(latest_date)
+        lb_start, lb_end = day_bounds(latest_date)
         result2 = await db.execute(
             select(IntradayTicks)
             .where(IntradayTicks.symbol == symbol.upper())
@@ -942,10 +935,11 @@ async def get_stock_intraday(
     bucket = []
 
     def to_ist_naive(ts):
-        """Convert any timestamp to naive IST datetime for bucketing."""
+        """DB stores naive IST datetimes — return as-is; strip tzinfo if somehow present."""
         if ts.tzinfo is None:
-            return IST.localize(ts).replace(tzinfo=None)
-        return ts.astimezone(IST).replace(tzinfo=None)
+            return ts
+        import pytz
+        return ts.astimezone(pytz.timezone('Asia/Kolkata')).replace(tzinfo=None)
 
     def flush_bucket(b_start, b_ticks):
         return {
