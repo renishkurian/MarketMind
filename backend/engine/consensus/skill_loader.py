@@ -145,9 +145,16 @@ class StockMeta:
 
     # Phase 4 v3.0 additions
     roce: Optional[float] = None
+    revenue_cagr_5yr: Optional[float] = None
+    profit_cagr_5yr: Optional[float] = None
+    cash_conversion_cycle: Optional[float] = None
     cfo_pat_ratio: Optional[float] = None
     fii_trend_direction: Optional[str] = None
+    fii_trend_quarters: Optional[int] = None
     earnings_velocity: Optional[str] = None
+    screener_pros: Optional[list] = None
+    screener_cons: Optional[list] = None
+    upcoming_corporate_action: Optional[str] = None
 
     def fmt(self, value: Optional[float], decimals: int = 1, suffix: str = "") -> str:
         if value is None:
@@ -321,9 +328,16 @@ class SkillLoader:
 
             # Phase 4 v3.0 additions
             "ROCE": f(m.roce),
+            "REVENUE_CAGR_5YR": f(m.revenue_cagr_5yr),
+            "PROFIT_CAGR_5YR": f(m.profit_cagr_5yr),
+            "CASH_CONVERSION_CYCLE": f(m.cash_conversion_cycle, 0),
             "CFO_PAT_RATIO": f(m.cfo_pat_ratio, 2),
-            "FII_TREND": m.fii_trend_direction or "N/A",
-            "EARNINGS_VELOCITY": m.earnings_velocity or "N/A",
+            "FII_TREND": m.fii_trend_direction or "UNKNOWN",
+            "FII_TREND_QUARTERS": str(m.fii_trend_quarters or 0),
+            "EARNINGS_VELOCITY": m.earnings_velocity or "UNKNOWN",
+            "SCREENER_PROS": "\n".join(f"  ✓ {p}" for p in (m.screener_pros or [])) or "  Not available",
+            "SCREENER_CONS": "\n".join(f"  ✗ {c}" for c in (m.screener_cons or [])) or "  Not available",
+            "CORPORATE_ACTION_ALERT": m.upcoming_corporate_action or "None upcoming in next 30 days",
 
             # Promoter flags
             "PROMOTER_HOLDING_FLAG": self._holding_flag(m.promoter_holding),

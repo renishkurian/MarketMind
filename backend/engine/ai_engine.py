@@ -152,12 +152,21 @@ def _build_fallback_prompt(
     pledge  = fundamentals.get("promoter_pledge_pct", "N/A")
     sector  = signals.get("sector") or fundamentals.get("sector", "Unknown")
 
+    roce    = fundamentals.get("roce", "N/A")
+    cfo_pat = fundamentals.get("cfo_pat_ratio", "N/A")
+    fii_dir = signals.get("fii_trend_direction") or fundamentals.get("fii_trend_direction", "N/A")
+    earn_v  = signals.get("earnings_velocity", "N/A")
+    pros    = fundamentals.get("screener_pros") or []
+    cons    = fundamentals.get("screener_cons") or []
+    pros_str = ", ".join(pros[:3]) if pros else "Not available"
+    cons_str = ", ".join(cons[:3]) if cons else "Not available"
+
     return f"""You are a senior equity analyst at an institutional fund focused on Indian markets (NSE/BSE).
 
 STOCK: {company_name} ({symbol}) | SECTOR: {sector} | PRICE: ₹{price}
 TRIGGER: {trigger_reason}
 
-SCORING ENGINE OUTPUT (MarketMind v2.1):
+SCORING ENGINE OUTPUT (MarketMind v3.0):
   Composite Score    : {comp}/100
   Fundamental Score  : {fa_s}/100  |  Technical: {ta_s}/100  |  Momentum: {mom_s}/100
   Sector Percentile  : {pctile}th (beats this % of sector peers)
@@ -168,12 +177,22 @@ KEY FUNDAMENTALS:
   Revenue CAGR (3yr): {rev_g}%  |  PAT CAGR (3yr): {pat_g}%
   Operating Margin: {margin}%  |  Promoter Pledge: {pledge}%
 
+CAPITAL EFFICIENCY & CASH FLOW:
+  ROCE: {roce}%  |  CFO/PAT Ratio: {cfo_pat}  (>1.0 = high quality earnings)
+  FII Trend: {fii_dir}  |  Earnings Velocity: {earn_v}
+
+SCREENER.IN QUALITATIVE SIGNALS:
+  Pros: {pros_str}
+  Cons: {cons_str}
+
 ANALYSIS INSTRUCTIONS:
 1. Evaluate the scoring engine output — is the composite score justified by the fundamentals?
 2. Identify the single biggest opportunity and single biggest risk for a 3-year horizon.
 3. Give a clear verdict: BUY / HOLD / SELL with one specific reason.
 4. Flag the promoter pledge if above 20% as a governance risk.
 5. Reference India-specific context (sector tailwinds, regulatory environment, GST/formalization).
+5b. If CFO/PAT ratio < 0.5, flag it as an earnings quality risk (PAT may not be converting to cash).
+5c. Reference FII trend as smart money signal — ACCUMULATING = tailwind, REDUCING = headwind.
 
 Return ONLY valid JSON — no markdown outside the reply field:
 {{
