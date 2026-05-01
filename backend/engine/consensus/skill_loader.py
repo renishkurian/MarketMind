@@ -143,6 +143,12 @@ class StockMeta:
     roc_60: Optional[float] = None
     volume_ratio_20_90: Optional[float] = None
 
+    # Phase 4 v3.0 additions
+    roce: Optional[float] = None
+    cfo_pat_ratio: Optional[float] = None
+    fii_trend_direction: Optional[str] = None
+    earnings_velocity: Optional[str] = None
+
     def fmt(self, value: Optional[float], decimals: int = 1, suffix: str = "") -> str:
         if value is None:
             return "N/A"
@@ -312,6 +318,12 @@ class SkillLoader:
             "ROC_252": f(m.roc_252),
             "ROC_60": f(m.roc_60),
             "VOLUME_RATIO": f(m.volume_ratio_20_90, 2),
+
+            # Phase 4 v3.0 additions
+            "ROCE": f(m.roce),
+            "CFO_PAT_RATIO": f(m.cfo_pat_ratio, 2),
+            "FII_TREND": m.fii_trend_direction or "N/A",
+            "EARNINGS_VELOCITY": m.earnings_velocity or "N/A",
 
             # Promoter flags
             "PROMOTER_HOLDING_FLAG": self._holding_flag(m.promoter_holding),

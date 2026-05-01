@@ -27,13 +27,17 @@ bullishness's sake — if the business fails Buffett's tests, say so plainly.
 | PE Ratio | {{PE_RATIO}} | — |
 | PE vs 5yr avg | {{PE_RATIO}} vs {{PE_5YR_AVG}} | {{FA_PE_SCORE}} |
 | ROE | {{ROE}}% | {{FA_ROE_SCORE}} |
+| ROCE (v3) | {{ROCE}}% | — |
 | ROE 3yr avg | {{ROE_3YR_AVG}}% | — |
 | Debt/Equity | {{DEBT_EQUITY}} | {{FA_DE_SCORE}} |
 | Revenue CAGR (3yr) | {{REVENUE_GROWTH_3YR}}% | {{FA_REVENUE_SCORE}} |
 | PAT CAGR (3yr) | {{PAT_GROWTH_3YR}}% | {{FA_PAT_SCORE}} |
+| CFO / PAT Ratio | {{CFO_PAT_RATIO}}x | — |
+| Earnings Velocity | {{EARNINGS_VELOCITY}} | — |
 | Operating Margin | {{OPERATING_MARGIN}}% | {{FA_MARGIN_SCORE}} |
 | Promoter Holding | {{PROMOTER_HOLDING}}% | — |
 | Promoter Pledge | {{PROMOTER_PLEDGE_PCT}}% | — |
+| FII Trend | {{FII_TREND}} | — |
 
 **Composite Fundamental Score**: {{FUNDAMENTAL_SCORE}}/100
 **Sector Percentile**: {{SECTOR_PERCENTILE}}th ({{SECTOR}} peers)

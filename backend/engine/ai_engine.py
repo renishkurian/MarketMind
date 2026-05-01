@@ -697,6 +697,12 @@ async def generate_insight(
             promoter_holding=fundamentals.get("promoter_holding"),
             promoter_pledge_pct=fundamentals.get("promoter_pledge_pct"),
 
+            # ── Phase 4 v3.0 Additions ──
+            roce=fundamentals.get("roce"),
+            cfo_pat_ratio=fundamentals.get("cfo_pat_ratio"),
+            fii_trend_direction=fundamentals.get("fii_trend_direction"),
+            earnings_velocity=signals.get("momentum_breakdown", {}).get("earnings_velocity"),
+
             # ── Momentum (from signals cache) ──
             roc_252=signals.get("momentum_breakdown", {}).get("roc_1yr"),
             roc_60=signals.get("momentum_breakdown", {}).get("roc_60d"),

@@ -80,7 +80,7 @@ class SignalBuilder:
         if fc is None:
             return FundamentalData()  # all None — score will be neutral
 
-        return FundamentalData(
+        fa = FundamentalData(
             pe_ratio=_to_float(fc.pe_ratio),
             pe_5yr_avg=_to_float(fc.pe_5yr_avg),
             roe=_to_float(fc.roe),
@@ -93,6 +93,26 @@ class SignalBuilder:
             promoter_holding=_to_float(fc.promoter_holding),
             promoter_pledge_pct=_to_float(fc.promoter_pledge_pct),
         )
+
+        from backend.data.db import ScreenerCache
+        sc_result = await self.db.execute(
+            select(ScreenerCache).where(ScreenerCache.symbol == symbol)
+        )
+        sc: Optional[ScreenerCache] = sc_result.scalar_one_or_none()
+
+        if sc:
+            fa.roce = _to_float(sc.roce)
+            fa.revenue_cagr_5yr = _to_float(sc.revenue_cagr_5yr)
+            fa.revenue_cagr_10yr = _to_float(sc.revenue_cagr_10yr)
+            fa.profit_cagr_5yr = _to_float(sc.profit_cagr_5yr)
+            fa.profit_cagr_10yr = _to_float(sc.profit_cagr_10yr)
+            fa.debtor_days = _to_float(sc.debtor_days)
+            fa.cash_conversion_cycle = _to_float(sc.cash_conversion_cycle)
+
+            fa.cfo_pat_ratio = _derive_cfo_pat(sc.annual_cashflows, sc.annual_pnl)
+            fa.fii_trend_direction, fa.fii_trend_quarters = _derive_fii_trend(sc.shareholding_history)
+
+        return fa
 
     # ------------------------------------------------------------------
     # Technical Data — from PriceHistory (last 252 bars)
@@ -233,6 +253,41 @@ class SignalBuilder:
                 if nifty_return > 0:
                     mom.relative_strength_nifty = stock_return / nifty_return
 
+        from backend.data.db import ScreenerCache, CorporateAction
+
+        sc_result = await self.db.execute(
+            select(ScreenerCache.quarterly_results).where(ScreenerCache.symbol == symbol)
+        )
+        sc_row = sc_result.first()
+        if sc_row and sc_row[0]:
+            mom.earnings_velocity, mom.earnings_velocity_quarters = _derive_earnings_velocity(sc_row[0])
+
+        today = as_of_date
+        window_end = today + timedelta(days=30)
+        ca_result = await self.db.execute(
+            select(CorporateAction)
+            .where(
+                and_(
+                    CorporateAction.symbol == symbol,
+                    CorporateAction.ex_date >= today,
+                    CorporateAction.ex_date <= window_end,
+                )
+            )
+            .order_by(CorporateAction.ex_date.asc())
+            .limit(1)
+        )
+        ca = ca_result.scalar_one_or_none()
+        if ca:
+            days_away = (ca.ex_date - today).days
+            mom.corporate_action_days = days_away
+            purpose_lower = (ca.purpose or "").lower()
+            if "dividend" in purpose_lower or "div" in purpose_lower:
+                mom.corporate_action_proximity = "DIVIDEND_SOON"
+            elif "bonus" in purpose_lower:
+                mom.corporate_action_proximity = "BONUS_SOON"
+            elif "split" in purpose_lower:
+                mom.corporate_action_proximity = "SPLIT_SOON"
+
         return mom
 
     # ------------------------------------------------------------------
@@ -327,26 +382,43 @@ async def build_sector_data(
     )
     peer_funds = {row.symbol: row for row in funds_result.fetchall()}
 
+    from backend.data.db import ScreenerCache
+    screener_result = await db.execute(
+        select(
+            ScreenerCache.symbol,
+            ScreenerCache.roce,
+        )
+        .where(ScreenerCache.symbol.in_(peer_symbols))
+    )
+    peer_screener = {row.symbol: row for row in screener_result.fetchall()}
+
     # Build peer lists
     roe_list: list[float] = []
     rev_list: list[float] = []
     mom_list: list[float] = []
+    roce_list: list[float] = []
 
     for sym in peer_symbols:
         fd = peer_funds.get(sym)
         sg = peer_signals.get(sym)
+        sc = peer_screener.get(sym)
+        
         if fd and fd.roe is not None:
             roe_list.append(float(fd.roe))
         if fd and fd.revenue_growth_3yr is not None:
             rev_list.append(float(fd.revenue_growth_3yr))
         if sg and sg.momentum_score is not None:
             mom_list.append(float(sg.momentum_score))
+        if sc and sc.roce is not None:
+            try: roce_list.append(float(sc.roce))
+            except: pass
 
     return SectorData(
         sector=sector,
         sector_roe_list=roe_list,
         sector_revenue_growth_list=rev_list,
         sector_momentum_list=mom_list,
+        sector_roce_list=roce_list,
     )
 
 
@@ -487,3 +559,134 @@ def _to_float(value) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+def _derive_cfo_pat(cashflows_json, pnl_json) -> Optional[float]:
+    """
+    Parse annual_cashflows and annual_pnl JSON from ScreenerCache.
+    Returns CFO / Net Profit for the most recent full year.
+    Returns None if data is missing or net profit is 0/negative.
+    """
+    try:
+        if not cashflows_json or not pnl_json:
+            return None
+        cf_list = cashflows_json if isinstance(cashflows_json, list) else []
+        pnl_list = pnl_json if isinstance(pnl_json, list) else []
+
+        # Build lookup by report date
+        cfo_by_date = {}
+        for row in cf_list:
+            rd = row.get("Report Date") or row.get("report_date")
+            cfo = row.get("Cash from Operating Activity +") or row.get("CFO")
+            if rd and cfo is not None:
+                try: cfo_by_date[rd] = float(cfo)
+                except: pass
+
+        for row in sorted(pnl_list, key=lambda x: x.get("Report Date",""), reverse=True):
+            rd = row.get("Report Date") or row.get("report_date")
+            pat = row.get("Net Profit +") or row.get("Net Profit")
+            if rd and pat is not None and rd in cfo_by_date:
+                try:
+                    pat_f = float(pat)
+                    if pat_f <= 0:
+                        return None
+                    return round(cfo_by_date[rd] / pat_f, 3)
+                except:
+                    pass
+        return None
+    except:
+        return None
+
+def _derive_fii_trend(shareholding_history_json) -> tuple[Optional[str], Optional[int]]:
+    """
+    Parse shareholding_history JSON from ScreenerCache.
+    Returns (direction, consecutive_quarters).
+    """
+    try:
+        if not shareholding_history_json:
+            return None, None
+        history = shareholding_history_json if isinstance(shareholding_history_json, list) else []
+
+        # Extract FII % per quarter — try multiple key names
+        fii_vals = []
+        for row in history[:6]:  # last 6 quarters max
+            for key in ["FII", "fii", "FII Holding", "fii_holding"]:
+                v = row.get(key)
+                if v is not None:
+                    try:
+                        fii_vals.append(float(v))
+                        break
+                    except:
+                        pass
+
+        if len(fii_vals) < 2:
+            return None, None
+
+        # Deltas: positive = accumulating (newer data is index 0 = most recent)
+        deltas = [fii_vals[i-1] - fii_vals[i] for i in range(1, len(fii_vals))]
+
+        # Count consecutive streak from most recent quarter
+        if not deltas:
+            return "STABLE", 0
+
+        direction_sign = 1 if deltas[0] > 0 else (-1 if deltas[0] < 0 else 0)
+        streak = 0
+        for d in deltas:
+            d_sign = 1 if d > 0.05 else (-1 if d < -0.05 else 0)  # 0.05% threshold to avoid noise
+            if d_sign == direction_sign and direction_sign != 0:
+                streak += 1
+            else:
+                break
+
+        if direction_sign == 1 and streak >= 2:
+            return "ACCUMULATING", streak
+        elif direction_sign == -1 and streak >= 2:
+            return "REDUCING", streak
+        else:
+            return "STABLE", 0
+    except:
+        return None, None
+
+def _derive_earnings_velocity(quarterly_results_json) -> tuple[Optional[str], Optional[int]]:
+    """
+    Parse quarterly_results JSON from ScreenerCache.
+    Returns (velocity, consecutive_quarters).
+    """
+    try:
+        if not quarterly_results_json:
+            return None, None
+        rows = quarterly_results_json if isinstance(quarterly_results_json, list) else []
+
+        profits = []
+        for row in rows[:6]:
+            for key in ["Net Profit +", "Net Profit", "net_profit"]:
+                v = row.get(key)
+                if v is not None:
+                    try:
+                        profits.append(float(v))
+                        break
+                    except:
+                        pass
+
+        if len(profits) < 4:
+            return None, None
+
+        # Deltas newest-first: positive = this quarter better than previous
+        deltas = [profits[i-1] - profits[i] for i in range(1, len(profits))]
+
+        direction_sign = 1 if deltas[0] > 0 else (-1 if deltas[0] < 0 else 0)
+        streak = 0
+        for d in deltas:
+            d_sign = 1 if d > 0 else (-1 if d < 0 else 0)
+            if d_sign == direction_sign and direction_sign != 0:
+                streak += 1
+            else:
+                break
+
+        if direction_sign == 1 and streak >= 3:
+            return "ACCELERATING", streak
+        elif direction_sign == -1 and streak >= 3:
+            return "DECELERATING", streak
+        else:
+            return "STABLE", 0
+    except:
+        return None, None

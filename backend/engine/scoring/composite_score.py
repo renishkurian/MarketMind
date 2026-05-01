@@ -66,7 +66,7 @@ import numpy as np
 # Version
 # ---------------------------------------------------------------------------
 
-SCORE_VERSION = "2.1"
+SCORE_VERSION = "3.0"
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -173,6 +173,18 @@ class FundamentalData:
     total_debt: Optional[float] = None
     current_ratio: Optional[float] = None
 
+    # -- V3.0 Screener-sourced fields --
+    roce: Optional[float] = None
+    revenue_cagr_5yr: Optional[float] = None
+    revenue_cagr_10yr: Optional[float] = None
+    profit_cagr_5yr: Optional[float] = None
+    profit_cagr_10yr: Optional[float] = None
+    debtor_days: Optional[float] = None
+    cash_conversion_cycle: Optional[float] = None
+    cfo_pat_ratio: Optional[float] = None
+    fii_trend_direction: Optional[str] = None
+    fii_trend_quarters: Optional[int] = None
+
 
 @dataclass
 class TechnicalData:
@@ -220,6 +232,12 @@ class MomentumData:
     fifty_two_week_change: Optional[float] = None
     beta: Optional[float] = None
 
+    # -- V3.0 fields --
+    earnings_velocity: Optional[str] = None
+    earnings_velocity_quarters: Optional[int] = None
+    corporate_action_proximity: Optional[str] = None
+    corporate_action_days: Optional[int] = None
+
 
 @dataclass
 class SectorData:
@@ -231,6 +249,7 @@ class SectorData:
     sector_roe_list: list[float] = field(default_factory=list)
     sector_revenue_growth_list: list[float] = field(default_factory=list)
     sector_momentum_list: list[float] = field(default_factory=list)
+    sector_roce_list: list[float] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -482,18 +501,57 @@ class CompositeScorer:
 
         # Final Weighted Average
         raw = (
-            pe_score    * 10
-            + peg_score   * 10
+            pe_score    * 8
+            + peg_score   * 8
             + roe_score   * 15
             + de_score    * 5
             + rev_score   * 10
             + pat_score   * 10
             + om_score    * 10
-            + inst_score  * 10
-            + val_filter  * 5
-            + sent_score  * 10
-            + health_score * 5
-        ) / 100.0
+            + inst_score  * 8
+            + val_filter  * 4
+            + sent_score  * 8
+            + health_score * 4
+        )
+        
+        # -- Phase 4 / v3.0 Additions --
+        # 12. ROCE quality (5 pts)
+        roce_present = fa.roce is not None
+        roce_score = _clamp(_linear_scale(fa.roce, 8.0, 30.0, 0, 100), 0, 100) if roce_present else 50.0
+
+        # 13. Cash flow quality — CFO/PAT ratio (5 pts)
+        cfo_present = fa.cfo_pat_ratio is not None
+        if cfo_present:
+            if fa.cfo_pat_ratio >= 1.0:   cfo_score = _clamp(_linear_scale(fa.cfo_pat_ratio, 1.0, 2.0, 75, 100), 0, 100)
+            elif fa.cfo_pat_ratio >= 0.5: cfo_score = _clamp(_linear_scale(fa.cfo_pat_ratio, 0.5, 1.0, 40, 75), 0, 100)
+            else:                         cfo_score = _clamp(_linear_scale(fa.cfo_pat_ratio, -0.5, 0.5, 0, 40), 0, 100)
+        else:
+            cfo_score = 50.0
+
+        # 14. CAGR durability (5 pts)
+        dur_present = fa.revenue_cagr_5yr is not None or fa.profit_cagr_5yr is not None
+        if dur_present:
+            vals = [v for v in [fa.revenue_growth_3yr, fa.revenue_cagr_5yr, fa.revenue_cagr_10yr,
+                                 fa.pat_growth_3yr, fa.profit_cagr_5yr, fa.profit_cagr_10yr] if v is not None]
+            if vals:
+                avg_cagr = sum(vals) / len(vals)
+                variance_penalty = (max(vals) - min(vals)) / max(abs(avg_cagr) + 1, 1) * 10
+                dur_score = _clamp(_linear_scale(avg_cagr, -5.0, 25.0, 0, 100) - variance_penalty, 0, 100)
+            else:
+                dur_score = 50.0
+        else:
+            dur_score = 50.0
+
+        # 15. FII trend (5 pts)
+        fii_present = fa.fii_trend_direction is not None
+        fii_map = {"ACCUMULATING": 85, "STABLE": 55, "REDUCING": 25}
+        fii_score = fii_map.get(fa.fii_trend_direction, 50.0) if fii_present else 50.0
+        if fii_present and fa.fii_trend_direction == "ACCUMULATING" and (fa.fii_trend_quarters or 0) >= 3:
+            fii_score = min(fii_score + 10, 100)
+
+        # Add to raw
+        raw += (roce_score * 5 + cfo_score * 5 + dur_score * 5 + fii_score * 5)
+        raw /= 110.0
 
         breakdown: dict = {
             "pe_vs_5yr":            round(pe_score, 1)  if pe_present  else None,
@@ -506,7 +564,14 @@ class CompositeScorer:
             "institutional_hold":   round(inst_score, 1) if inst_present else None,
             "valuation_filter":     round(val_filter, 1),
             "analyst_sentiment":    round(sent_score, 1) if sent_present else None,
-            "balance_sheet_health": round(health_score, 1) if health_present else None
+            "balance_sheet_health": round(health_score, 1) if health_present else None,
+            
+            "roce_quality":         round(roce_score, 1) if roce_present else None,
+            "cash_flow_quality":    round(cfo_score, 1) if cfo_present else None,
+            "cagr_durability":      round(dur_score, 1) if dur_present else None,
+            "fii_trend":            round(fii_score, 1) if fii_present else None,
+            "fii_trend_direction":  fa.fii_trend_direction,
+            "fii_trend_quarters":   fa.fii_trend_quarters,
         }
         if fa.promoter_pledge_pct is not None and fa.promoter_pledge_pct > 20.0:
             penalty = min((fa.promoter_pledge_pct - 20.0) * 0.5, 20.0)
@@ -514,8 +579,9 @@ class CompositeScorer:
 
         n_present = sum([pe_present, peg_present, roe_present, de_present,
                          rev_present, pat_present, om_present, inst_present,
-                         sent_present, health_present])
-        coverage = round(n_present / 10.0, 3)
+                         sent_present, health_present, roce_present, cfo_present, 
+                         dur_present, fii_present])
+        coverage = round(n_present / 14.0, 3)
 
         return round(_clamp(raw, 0, 100), 2), breakdown, coverage
 
@@ -709,6 +775,11 @@ class CompositeScorer:
             + rs_score     * 10
         ) / 100.0
 
+        if m.earnings_velocity == "ACCELERATING":
+            raw = _clamp(raw + 5, 0, 100)
+        elif m.earnings_velocity == "DECELERATING":
+            raw = _clamp(raw - 5, 0, 100)
+
         breakdown: dict = {
             "roc_1yr":          round(roc252_score, 1) if roc252_present else None,
             "roc_60d":          round(roc60_score, 1)  if roc60_present  else None,
@@ -718,7 +789,10 @@ class CompositeScorer:
             "rs_vs_nifty":      round(rs_score, 1)     if rs_present     else None,
             "beta":             round(m.beta, 2)       if m.beta is not None else None,
             "52w_high":         round(m.fifty_two_week_high, 2) if m.fifty_two_week_high else None,
-            "52w_low":          round(m.fifty_two_week_low, 2)  if m.fifty_two_week_low  else None
+            "52w_low":          round(m.fifty_two_week_low, 2)  if m.fifty_two_week_low  else None,
+            "earnings_velocity":          m.earnings_velocity,
+            "earnings_velocity_quarters": m.earnings_velocity_quarters,
+            "corporate_action":           m.corporate_action_proximity,
         }
 
         n_present = sum([roc252_present, roc60_present, roc20_present,
@@ -759,6 +833,10 @@ class CompositeScorer:
         if m.roc_252 is not None and len(sector.sector_momentum_list) >= MIN_SECTOR_PEERS:
             own_vector.append(m.roc_252)
             peer_matrix.append(sector.sector_momentum_list)
+
+        if fa.roce is not None and len(sector.sector_roce_list) >= MIN_SECTOR_PEERS:
+            own_vector.append(fa.roce)
+            peer_matrix.append(sector.sector_roce_list)
 
         peer_count = max((len(lst) for lst in peer_matrix), default=0)
 
@@ -965,7 +1043,7 @@ def _build_ui_breakdown(r: CompositeScoreResult) -> dict:
     
     # Mix momentum
     for k, v in r.momentum_breakdown.items():
-        if k in ["roc_20d", "roc_60d", "volume_trend", "trade_activity"]:
+        if k in ["roc_20d", "roc_60d", "volume_trend", "trade_activity", "earnings_velocity", "earnings_velocity_quarters", "corporate_action"]:
             if isinstance(v, (int, float)) and not isinstance(v, bool):
                 st[k] = {"score": v, "max": 100}
             else:
