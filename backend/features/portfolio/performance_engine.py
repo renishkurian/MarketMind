@@ -25,6 +25,71 @@ class PerformanceEngine:
         s.index = pd.to_datetime(s.index).tz_localize(None)
         return s.sort_index().dropna().rename("benchmark")
 
+    async def _sync_missing_prices(self, symbols: list[str]):
+        """Syncs recent missing prices up to today from Yahoo Finance into PriceHistory"""
+        if not symbols: return
+        try:
+            from sqlalchemy import func
+            
+            # 1. Find max date in PriceHistory for these symbols
+            stmt = select(func.max(PriceHistory.date)).where(PriceHistory.symbol.in_(symbols))
+            res = await self.db.execute(stmt)
+            max_date = res.scalar()
+            
+            today = date.today()
+            if not max_date:
+                max_date = today - timedelta(days=7) # fallback
+                
+            if max_date >= today:
+                return # Already up to date
+                
+            start_str = max_date.strftime('%Y-%m-%d')
+            end_str = (today + timedelta(days=1)).strftime('%Y-%m-%d')
+            
+            yf_symbols = [f"{s}.NS" if "^" not in s and "." not in s else s for s in symbols]
+            
+            logger.info(f"Syncing missing prices for {len(symbols)} symbols from {start_str} to {end_str}")
+            data = await asyncio.to_thread(
+                yf.download, yf_symbols, start=start_str, end=end_str, progress=False, auto_adjust=False, threads=False
+            )
+            
+            if data.empty: return
+            
+            close_data = data['Close']
+            if isinstance(close_data, pd.Series):
+                close_data = close_data.to_frame()
+                close_data.columns = [yf_symbols[0]]
+                
+            records = []
+            for d, row in close_data.iterrows():
+                d_date = d.date()
+                if d_date <= max_date: continue
+                for yf_sym, val in row.items():
+                    if pd.isna(val): continue
+                    sym = yf_sym.replace(".NS", "")
+                    records.append({
+                        "symbol": sym,
+                        "exchange": "NSE",
+                        "date": d_date,
+                        "close": float(val),
+                        "open": float(val),
+                        "high": float(val),
+                        "low": float(val),
+                        "volume": 0
+                    })
+            
+            if records:
+                upsert_stmt = insert(PriceHistory).values(records)
+                upsert_stmt = upsert_stmt.on_duplicate_key_update(
+                    close=upsert_stmt.inserted.close
+                )
+                await self.db.execute(upsert_stmt)
+                await self.db.commit()
+                logger.info(f"Synced {len(records)} missing price records.")
+                
+        except Exception as e:
+            logger.error(f"Failed to sync missing prices during regeneration: {e}")
+
     async def get_benchmark_comparison(self, user_id: int, timeframe: str = "yearly", benchmark_symbol: str = "^NSEI", force_refresh: bool = False):
         """
         Calculates the historical portfolio value vs a selected benchmark.
@@ -617,6 +682,9 @@ class PerformanceEngine:
             return {"error": "Portfolio is empty"}
 
         symbols = [s.symbol for s in stocks]
+
+        if force_refresh:
+            await self._sync_missing_prices(symbols)
         
         # B. Timing setup
         today = date.today()

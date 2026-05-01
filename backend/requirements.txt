@@ -28,3 +28,5 @@ shap>=0.40.0
 hmmlearn>=0.3.0
 vectorbt>=0.20.0
 arch>=6.0.0
+cachetools
+nse

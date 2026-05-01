@@ -7,6 +7,7 @@ import { Briefcase, TrendingUp, BarChart, ArrowDown, Upload, IndianRupee, Activi
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
+import MarketIndicesTicker from '../components/MarketIndicesTicker';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -17,7 +18,6 @@ export default function Portfolio() {
   React.useEffect(() => {
     fetchPortfolio();
   }, [fetchPortfolio]);
-
 
   const fileInputRef = useRef(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -138,9 +138,12 @@ export default function Portfolio() {
   // Show loader while initial sync is happening
   if (Object.keys(stocks).length === 0 && !isConnected) {
     return (
-      <div className="flex flex-col items-center justify-center h-[70vh] gap-6 animate-in fade-in duration-500">
-        <Loader size="lg" />
-      </div>
+      <>
+        <MarketIndicesTicker />
+        <div className="flex flex-col items-center justify-center h-[70vh] gap-6 animate-in fade-in duration-500">
+          <Loader size="lg" />
+        </div>
+      </>
     );
   }
 
@@ -228,7 +231,9 @@ export default function Portfolio() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen p-6 space-y-6">
+    <>
+      <MarketIndicesTicker />
+      <div className="flex flex-col min-h-screen p-6 space-y-6">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-extrabold tracking-tight text-dark-text">Portfolio</h2>
@@ -589,5 +594,6 @@ export default function Portfolio() {
         </div>
       )}
     </div>
+    </>
   );
 }

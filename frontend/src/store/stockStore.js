@@ -7,6 +7,13 @@ export const useStockStore = create((set, get) => ({
   alerts: [],
   theme: localStorage.getItem('theme') || 'dark',
   isConnected: false,
+  tickerEnabled: localStorage.getItem('mm_ticker_enabled') !== 'false',
+
+  toggleTicker: () => {
+    const newState = !get().tickerEnabled;
+    localStorage.setItem('mm_ticker_enabled', String(newState));
+    set({ tickerEnabled: newState });
+  },
 
   setStocks: (stocksArray) => {
     const newStocks = {};

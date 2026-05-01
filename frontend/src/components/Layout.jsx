@@ -4,7 +4,7 @@ import {
   Activity, BarChart2, Eye, Zap, Brain, Info,
   Sun, Moon, Wifi, WifiOff, Settings, LogOut,
   Menu, X, ChevronLeft, Users, PieChart, LayoutDashboard, Trophy,
-  Shield
+  Shield, Terminal
 } from 'lucide-react';
 import { useStockStore } from '../store/stockStore';
 import { useAuthStore } from '../store/authStore';
@@ -19,6 +19,7 @@ const NAV_SECTIONS = [
       { path: '/benchmark',     label: 'Performance',   Icon: BarChart2  },
       { path: '/performance-heatmap', label: 'Alpha Heatmap', Icon: Trophy },
       { path: '/performance-center', label: 'Performance Center', Icon: Activity },
+      { path: '/nse-actions',   label: 'NSE Actions',   Icon: Zap        },
     ]
   },
   {
@@ -42,11 +43,22 @@ const NAV_SECTIONS = [
 ];
 
 export default function Layout({ children }) {
-  const { marketStatus, theme, toggleTheme, isConnected, lastUpdate } = useStockStore();
+  const { marketStatus, theme, toggleTheme, isConnected, lastUpdate, tickerEnabled, toggleTicker } = useStockStore();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const isOpen = marketStatus === 'OPEN';
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('mm_sidebar_open');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const toggleSidebar = () => {
+    setSidebarOpen(prev => {
+      const newState = !prev;
+      localStorage.setItem('mm_sidebar_open', JSON.stringify(newState));
+      return newState;
+    });
+  };
 
   return (
     <div className="flex flex-col h-screen bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text font-sans transition-colors duration-500 overflow-hidden">
@@ -55,7 +67,7 @@ export default function Layout({ children }) {
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 border-b border-light-border dark:border-dark-border bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl transition-all duration-300">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setSidebarOpen(p => !p)}
+            onClick={toggleSidebar}
             className="p-2 rounded-lg hover:bg-accent/10 text-dark-muted hover:text-accent transition-all"
             aria-label="Toggle sidebar"
           >
@@ -77,6 +89,14 @@ export default function Layout({ children }) {
             {isConnected ? <Wifi size={13} /> : <WifiOff size={13} />}
             <span className="hidden sm:inline">{isConnected ? 'Live' : 'Offline'}</span>
           </div>
+
+          <button 
+            onClick={toggleTicker} 
+            className={`p-2 rounded-lg transition-all ${tickerEnabled ? 'text-accent bg-accent/10' : 'text-dark-muted hover:bg-accent/10 hover:text-accent'}`}
+            title={tickerEnabled ? "Disable Ticker" : "Enable Ticker"}
+          >
+            <Activity size={17} />
+          </button>
           
           <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-accent/10 text-dark-muted hover:text-accent transition-all">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
@@ -176,6 +196,22 @@ export default function Layout({ children }) {
                 </NavLink>
               </div>
             )}
+            
+            {/* Documentation / External Link Section */}
+            <div className="pt-4 mt-4 border-t border-dark-border/30">
+              <p className="px-4 mb-3 text-[10px] font-black text-dark-muted/50 uppercase tracking-[0.2em]">
+                Documentation
+              </p>
+              <a
+                href="http://127.0.0.1:8000/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all group text-dark-muted hover:bg-accent/10 hover:text-accent"
+              >
+                <Terminal size={18} className="shrink-0 transition-transform group-hover:scale-110" />
+                <span>API Docs</span>
+              </a>
+            </div>
           </nav>
 
           {/* Stats Bar */}

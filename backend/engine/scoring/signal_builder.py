@@ -140,9 +140,16 @@ class SignalBuilder:
         st_inds = compute_short_term_indicators(df)
         lt_inds = compute_long_term_indicators(df)
         
+        from backend.engine.scoring.composite_score import calculate_adx, calculate_atr
+        
+        adx_info = calculate_adx(highs, lows, closes)
+        ta.adx = adx_info["adx"]
+        ta.plus_di = adx_info["plus_di"]
+        ta.minus_di = adx_info["minus_di"]
+        ta.atr = calculate_atr(highs, lows, closes)
+
         ta.rsi_14 = st_inds.get("rsi")
         ta.macd_signal = st_inds.get("macd_signal")
-        ta.adx = lt_inds.get("adx")
         ta.ema_crossover = st_inds.get("ema_crossover")
         ta.macd_crossover = st_inds.get("macd_crossover")
         ta.overall_trend = st_inds.get("overall_trend")

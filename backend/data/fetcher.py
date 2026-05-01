@@ -420,7 +420,7 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
       3. lowercase symbol as fallback
     """
     result: Dict[str, Any] = {}
-    slug = screener_symbol or _SCREENER_SLUG_MAP.get(symbol.upper()) or symbol.lower()
+    slug = screener_symbol or symbol.upper()
     urls = [
         f"https://www.screener.in/company/{slug}/consolidated/",
         f"https://www.screener.in/company/{slug}/",
@@ -543,46 +543,34 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
         if result.get("current_ratio") is None:
             result["current_ratio"] = _re_val(r'Current [Rr]atio[^<]*</span>\s*<span[^>]*>\s*([\d.]+)')
 
-        # ── Strategy 3: Promoter holdings ────────────────────────────────
-        # Find the latest promoter holding from the shareholding table
-        # Screener format: Promoters button inside td, then td cells with percentages (newest last)
-        prom_row = re.search(
-            r'Promoters.*?</tr>',
-            html, re.DOTALL | re.IGNORECASE
-        )
-        if prom_row:
-            prom_vals = re.findall(r'<td[^>]*>([\d.]+)%?</td>', prom_row.group(0))
-            if prom_vals:
-                try:
-                    v = float(prom_vals[-1])
-                    if 0 < v <= 100:
-                        result["promoter_holding"] = v
-                except (ValueError, TypeError):
-                    pass
-        if not result.get("promoter_holding"):
-            prom_patterns = [
-                r'Promoters\s*</td>\s*(?:<td[^>]*>[\d.]*%?\s*</td>\s*)*<td[^>]*>([\d.]+)\s*%?',
-                r'"Promoters"\s*[,:{]\s*"?([\d.]+)',
-            ]
-            for pat in prom_patterns:
-                m = re.search(pat, html, re.IGNORECASE)
-                if m:
-                    try:
-                        v = float(m.group(1))
-                        if 0 < v <= 100:
-                            result["promoter_holding"] = v
-                            break
-                    except (ValueError, TypeError):
-                        pass
+        # ── Strategy 3: Shareholding Pattern (Promoter, FII, DII, Public) ──
+        def _extract_shareholding(label_re: str) -> Optional[float]:
+            # Search for the label followed by the rest of the row
+            # Use non-greedy match to stay within one row
+            row_match = re.search(r'<tr[^>]*>.*?' + label_re + r'.*?</tr>', html, re.DOTALL | re.IGNORECASE)
+            if row_match:
+                # Find all percentages in that row
+                row_html = row_match.group(0)
+                vals = re.findall(r'<td[^>]*>\s*([\d.]+)\s*%?\s*</td>', row_html)
+                if vals:
+                    try: return float(vals[-1])
+                    except: pass
+            return None
+
+        result["promoter_holding"] = _extract_shareholding(r'Promoters?')
+        result["fii_holding"]      = _extract_shareholding(r'FIIs?')
+        result["dii_holding"]      = _extract_shareholding(r'DIIs?')
+        result["public_holding"]   = _extract_shareholding(r'Public')
 
         # Pledged %
         pledge_patterns = [
             r'[Pp]ledged\s+[Pp]ercentage[^<]*</td>\s*<td[^>]*>([\d.]+)',
             r'[Pp]ledged[^<]*</td>\s*(?:<td[^>]*>[\d.]*\s*</td>\s*)*<td[^>]*>([\d.]+)',
             r'[Pp]ledge[^<]*:\s*([\d.]+)\s*%',
+            r'>\s*Pledged\s*percentage.*?<td[^>]*>\s*([\d.]+)',
         ]
         for pat in pledge_patterns:
-            m = re.search(pat, html, re.IGNORECASE)
+            m = re.search(pat, html, re.IGNORECASE | re.DOTALL)
             if m:
                 try:
                     result["promoter_pledge_pct"] = float(m.group(1))
@@ -591,53 +579,81 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
                     pass
 
         # ── Strategy 4: CAGR growth from compounded tables ───────────────
-        def _extract_cagr(label_re: str) -> Optional[float]:
-            # Try: "3 Years: X %" inline format
-            m = re.search(label_re + r'.*?3\s+Years?\s*[:\-]\s*([\d.]+)\s*%', html, re.DOTALL | re.IGNORECASE)
-            if m:
-                try: return float(m.group(1))
-                except: pass
-            # Try: table format with "3 Years:" cell (colon inside td — actual Screener format)
-            m = re.search(label_re + r'.*?<td[^>]*>\s*3\s+[Yy]ears?:?\s*</td>\s*<td[^>]*>\s*([\d.]+)', html, re.DOTALL | re.IGNORECASE)
-            if m:
-                try: return float(m.group(1))
-                except: pass
-            # Try: "3 Yrs" variant
-            m = re.search(label_re + r'.*?3\s+[Yy]rs?\s*[:\-]?\s*([\d.]+)\s*%', html, re.DOTALL | re.IGNORECASE)
-            if m:
-                try: return float(m.group(1))
-                except: pass
+        def _extract_cagr(label_re: str, years_list: List[int]) -> Dict[str, float]:
+            extracted = {}
+            for yr in years_list:
+                # Try various patterns for each year
+                patterns = [
+                    label_re + r'.*?' + str(yr) + r'\s+Years?\s*[:\-]\s*([\d.]+)\s*%',
+                    label_re + r'.*?<td[^>]*>\s*' + str(yr) + r'\s+[Yy]ears?:?\s*</td>\s*<td[^>]*>\s*([\d.]+)',
+                    label_re + r'.*?' + str(yr) + r'\s+[Yy]rs?\s*[:\-]?\s*([\d.]+)\s*%',
+                ]
+                for pat in patterns:
+                    m = re.search(pat, html, re.DOTALL | re.IGNORECASE)
+                    if m:
+                        try:
+                            extracted[yr] = float(m.group(1))
+                            break
+                        except: pass
+            return extracted
+
+        sales_cagr = _extract_cagr(r'[Cc]ompounded\s+[Ss]ales\s+[Gg]rowth', [3, 5, 10])
+        result["revenue_growth_3yr"] = sales_cagr.get(3)
+        result["revenue_cagr_3yr"]   = sales_cagr.get(3)
+        result["revenue_cagr_5yr"]   = sales_cagr.get(5)
+        result["revenue_cagr_10yr"]  = sales_cagr.get(10)
+
+        profit_cagr = _extract_cagr(r'[Cc]ompounded\s+[Pp]rofit\s+[Gg]rowth', [3, 5, 10])
+        result["pat_growth_3yr"]  = profit_cagr.get(3)
+        result["profit_cagr_3yr"] = profit_cagr.get(3)
+        result["profit_cagr_5yr"] = profit_cagr.get(5)
+        result["profit_cagr_10yr"] = profit_cagr.get(10)
+
+        price_cagr = _extract_cagr(r'[Ss]tock\s+[Pp]rice\s+CAGR', [1, 3, 5, 10])
+        result["price_cagr_1yr"]  = price_cagr.get(1)
+        result["price_cagr_3yr"]  = price_cagr.get(3)
+        result["price_cagr_5yr"]  = price_cagr.get(5)
+        result["price_cagr_10yr"] = price_cagr.get(10)
+
+        roe_cagr = _extract_cagr(r'[Rr]eturn\s+on\s+[Ee]quity', [3, 5, 10])
+        result["roe_3yr_avg"]  = roe_cagr.get(3)
+        result["roe_avg_3yr"]  = roe_cagr.get(3)
+        result["roe_avg_5yr"]  = roe_cagr.get(5)
+        result["roe_avg_10yr"] = roe_cagr.get(10)
+
+        # ── Strategy 5: Enhanced Ratios (Dividend, Face Value, Efficiency) ──
+        result["dividend_yield"]  = _f("dividend yield", "div yield")
+        result["dividend_payout"] = _f("dividend payout", "div payout")
+        result["face_value"]      = _f("face value")
+        result["debtor_days"]     = _f("debtor days")
+        result["inventory_days"]  = _f("inventory days")
+        result["days_payable"]    = _f("days payable", "payable days")
+        result["working_capital_days"] = _f("working capital days", "wc days")
+        result["cash_conversion_cycle"] = _f("cash conversion cycle", "ccc")
+
+        # Fallback from ANY table if missing from top summary
+        def _extract_from_any_table(label_re: str) -> Optional[float]:
+            # Search for the label in any table row
+            row_match = re.search(r'<tr[^>]*>.*?>(?:' + label_re + r').*?</tr>', html, re.DOTALL | re.IGNORECASE)
+            if row_match:
+                # Find all numbers in that row (usually percentages or days)
+                vals = re.findall(r'<td[^>]*>\s*([\d.]+)\s*%?\s*</td>', row_match.group(0))
+                if vals:
+                    # Usually the last value is the most recent (TTM or last FY)
+                    try: return float(vals[-1])
+                    except: pass
             return None
 
-        if not result.get("revenue_growth_3yr"):
-            result["revenue_growth_3yr"] = _extract_cagr(r'[Cc]ompounded\s+[Ss]ales\s+[Gg]rowth')
-        if not result.get("pat_growth_3yr"):
-            result["pat_growth_3yr"] = _extract_cagr(r'[Cc]ompounded\s+[Pp]rofit\s+[Gg]rowth')
+        if result.get("debtor_days") is None:
+            result["debtor_days"] = _extract_from_any_table(r'Debtor\s+Days')
+        if result.get("inventory_days") is None:
+            result["inventory_days"] = _extract_from_any_table(r'Inventory\s+Days')
+        if result.get("working_capital_days") is None:
+            result["working_capital_days"] = _extract_from_any_table(r'Working\s+Capital\s+Days')
+        if result.get("dividend_payout") is None:
+            result["dividend_payout"] = _extract_from_any_table(r'Dividend\s+Payout\s*%')
 
-        # ── Strategy 5: ROE 3yr avg from annual table ─────────────────────
-        if not result.get("roe_3yr_avg"):
-            # Find ROE values in the annual P&L or ratios section
-            roe_vals = re.findall(
-                r'[Rr]eturn on [Ee]quity[^%]*?(\d{4})[^%\d]*([\d.]+)\s*%[^%\d]*(\d{4})[^%\d]*([\d.]+)\s*%[^%\d]*(\d{4})[^%\d]*([\d.]+)\s*%',
-                html, re.DOTALL
-            )
-            if roe_vals:
-                try:
-                    vals = [float(roe_vals[0][i]) for i in (1, 3, 5)]
-                    result["roe_3yr_avg"] = round(sum(vals) / 3, 2)
-                except: pass
-            if not result.get("roe_3yr_avg"):
-                # Simpler: find 3+ numbers in ROE row
-                roe_row = re.search(r'[Rr]eturn on [Ee]quity.*?(<tr.*?</tr>)', html, re.DOTALL)
-                if roe_row:
-                    nums = re.findall(r'<td[^>]*>\s*([\d.]+)\s*</td>', roe_row.group(1))
-                    if len(nums) >= 3:
-                        try:
-                            vals = [float(x) for x in nums[-3:]]
-                            result["roe_3yr_avg"] = round(sum(vals) / 3, 2)
-                        except: pass
-
-        # ── Strategy 6: PE 5yr avg ────────────────────────────────────────
+        # ── Strategy 6: PE 5yr avg fallback (if not in ratios) ─────────────
         if not result.get("pe_5yr_avg"):
             pe_hist = re.findall(r'Price to [Ee]arn(?:ing|ings?).*?<td[^>]*>([\d.]+)</td>', html, re.DOTALL)
             if len(pe_hist) >= 5:
@@ -811,3 +827,255 @@ async def fetch_screener_fundamentals(symbol: str, screener_symbol: str = None) 
 
     result = {k: v for k, v in result.items() if v is not None}
     return result
+
+
+# ── NSE Corporate Actions (Layer 0) ──────────────────────────────────────────
+import time as _time
+import re as _re
+
+# In-memory cache: { "data": [...], "fetched_at": float }
+_NSE_CORP_CACHE: Dict[str, Any] = {}
+_NSE_CORP_CACHE_TTL = 6 * 3600  # 6 hours
+
+_NSE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.nseindia.com/",
+    "X-Requested-With": "XMLHttpRequest",
+}
+
+
+async def _fetch_nse_corp_actions_raw() -> List[Dict[str, Any]]:
+    """
+    Fetch the full NSE corporate actions calendar (all equities).
+    Requires a two-step request: seed session cookies via homepage, then
+    call the API endpoint. Results are cached for _NSE_CORP_CACHE_TTL seconds.
+    """
+    now = _time.monotonic()
+    cached = _NSE_CORP_CACHE.get("data")
+    fetched_at = _NSE_CORP_CACHE.get("fetched_at", 0)
+    if cached is not None and (now - fetched_at) < _NSE_CORP_CACHE_TTL:
+        return cached
+
+    api_url = "https://www.nseindia.com/api/corporates-corporateActions?index=equities"
+    try:
+        async with httpx.AsyncClient(
+            timeout=20.0,
+            follow_redirects=True,
+            headers=_NSE_HEADERS,
+        ) as client:
+            # Step 1: seed session cookies
+            await client.get("https://www.nseindia.com", timeout=10.0)
+            # Step 2: fetch corporate actions
+            resp = await client.get(api_url)
+            if resp.status_code != 200:
+                logger.warning(f"NSE corporate actions API returned {resp.status_code}")
+                return cached or []
+            data = resp.json()
+            if not isinstance(data, list):
+                logger.warning("NSE corporate actions: unexpected response format")
+                return cached or []
+
+        _NSE_CORP_CACHE["data"] = data
+        _NSE_CORP_CACHE["fetched_at"] = now
+        logger.info(f"NSE corporate actions: fetched {len(data)} records, cached for {_NSE_CORP_CACHE_TTL//3600}h")
+        return data
+
+    except Exception as e:
+        logger.warning(f"NSE corporate actions fetch failed: {e!r}")
+        return cached or []
+
+
+def _parse_nse_date(date_str: Optional[str]) -> Optional[str]:
+    """Convert NSE date strings like '10-Apr-2026' to ISO '2026-04-10'."""
+    if not date_str or date_str.strip() in ("-", ""):
+        return None
+    try:
+        from datetime import datetime as _dt
+        for fmt in ("%d-%b-%Y", "%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                return _dt.strptime(date_str.strip(), fmt).date().isoformat()
+            except ValueError:
+                continue
+    except Exception:
+        pass
+    return date_str.strip()
+
+
+def _classify_nse_action(purpose: str) -> str:
+    """Classify a free-text NSE purpose string into a canonical action type."""
+    p = (purpose or "").lower()
+    if "dividend" in p or "interim dividend" in p or "final dividend" in p:
+        return "DIVIDEND"
+    if "bonus" in p:
+        return "BONUS"
+    if "split" in p or "sub-division" in p or "sub division" in p:
+        return "SPLIT"
+    if "buyback" in p or "buy-back" in p or "buy back" in p:
+        return "BUYBACK"
+    if "rights" in p:
+        return "RIGHTS"
+    return "OTHER"
+
+
+def _extract_dividend_amount(purpose: str) -> Optional[float]:
+    """Extract rupee amount from strings like 'Dividend - Rs 10 Per Share'."""
+    if not purpose:
+        return None
+    m = _re.search(r'(?:rs\.?|re\.?|₹)\s*([\d,]+(?:\.\d+)?)', purpose, _re.IGNORECASE)
+    if m:
+        try:
+            return float(m.group(1).replace(",", ""))
+        except ValueError:
+            pass
+    # Try plain number after dash  e.g. "Dividend - 5.00"
+    m = _re.search(r'-\s*([\d]+(?:\.\d+)?)', purpose)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def _extract_bonus_ratio(purpose: str) -> Optional[str]:
+    """Extract bonus ratio from strings like 'Bonus Issue  - 1:1' or '2:3'."""
+    if not purpose:
+        return None
+    m = _re.search(r'(\d+)\s*:\s*(\d+)', purpose)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}"
+    return None
+
+
+async def fetch_nse_corporate_actions(symbol: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch and filter NSE corporate actions for a specific symbol using the 'nse' library.
+
+    Returns a dict with:
+      - upcoming_dividend  : closest future dividend (ex_date, amount, purpose, source)
+      - upcoming_bonus     : closest future bonus issue (ex_date, ratio, purpose, source)
+      - upcoming_split     : closest future split (ex_date, ratio, purpose, source)
+      - upcoming_buyback   : closest future buyback (ex_date, purpose, source)
+      - recent_actions     : last 10 actions of any type (sorted newest first)
+      - raw_nse_actions    : full filtered list for the symbol
+
+    Returns None on total failure.
+    """
+    from datetime import date as _date, timedelta
+    from nse import NSE
+    import os
+
+    try:
+        sym_upper = symbol.upper().strip()
+        
+        # We fetch for a wide range: 1 year back to 6 months forward to cover recent and upcoming
+        today_obj = _date.today()
+        d_from = today_obj - timedelta(days=365)
+        d_to = today_obj + timedelta(days=180)
+
+        # Use a local cache directory for the nse library
+        nse_cache_dir = os.path.join(os.getcwd(), ".nse_cache")
+        os.makedirs(nse_cache_dir, exist_ok=True)
+
+        with NSE(download_folder=nse_cache_dir) as nse:
+            # We fetch specifically for this symbol
+            raw_actions = nse.actions(
+                segment='equities', 
+                symbol=sym_upper, 
+                from_date=d_from, 
+                to_date=d_to
+            )
+
+        if not raw_actions:
+            logger.debug(f"NSE corporate actions: no records found for {sym_upper}")
+            return None
+
+        today_iso = today_obj.isoformat()
+        upcoming_dividend = None
+        upcoming_bonus    = None
+        upcoming_split    = None
+        upcoming_buyback  = None
+        all_parsed        = []
+
+        for a in raw_actions:
+            # Field mapping from nse library:
+            # 'subject' = description
+            # 'exDate'  = ex-date
+            # 'recDate' = record date
+            purpose   = a.get("subject") or ""
+            ex_date   = _parse_nse_date(a.get("exDate"))
+            rec_date  = _parse_nse_date(a.get("recDate"))
+            bc_start  = _parse_nse_date(a.get("bcStartDate"))
+            bc_end    = _parse_nse_date(a.get("bcEndDate"))
+            action_type = _classify_nse_action(purpose)
+
+            parsed = {
+                "symbol":      sym_upper,
+                "company":     a.get("comp", ""),
+                "purpose":     purpose,
+                "action_type": action_type,
+                "ex_date":     ex_date,
+                "record_date": rec_date,
+                "bc_start":    bc_start,
+                "bc_end":      bc_end,
+                "source":      "NSE",
+            }
+
+            # Enrich by type
+            if action_type == "DIVIDEND":
+                parsed["amount"] = _extract_dividend_amount(purpose)
+            elif action_type in ("BONUS", "SPLIT"):
+                parsed["ratio"] = _extract_bonus_ratio(purpose)
+
+            all_parsed.append(parsed)
+
+        # Sort all actions: future first (ascending ex_date), then past (descending)
+        def _sort_key(a):
+            d = a.get("ex_date") or "0000-00-00"
+            is_future = d >= today_iso
+            return (0 if is_future else 1, d if is_future else "9999" + d)
+
+        all_parsed.sort(key=_sort_key)
+
+        # Pick closest upcoming for each type
+        for a in all_parsed:
+            d = a.get("ex_date") or ""
+            if d < today_iso:
+                break  # We've passed future items, no point continuing
+            at = a["action_type"]
+            if at == "DIVIDEND" and upcoming_dividend is None:
+                upcoming_dividend = {k: a[k] for k in ("ex_date", "record_date", "amount", "purpose", "source") if k in a}
+                upcoming_dividend["confirmed"] = True
+            elif at == "BONUS" and upcoming_bonus is None:
+                upcoming_bonus = {k: a[k] for k in ("ex_date", "record_date", "ratio", "purpose", "source") if k in a}
+                upcoming_bonus["confirmed"] = True
+            elif at == "SPLIT" and upcoming_split is None:
+                upcoming_split = {k: a[k] for k in ("ex_date", "record_date", "ratio", "purpose", "source") if k in a}
+                upcoming_split["confirmed"] = True
+            elif at == "BUYBACK" and upcoming_buyback is None:
+                upcoming_buyback = {k: a[k] for k in ("ex_date", "record_date", "purpose", "source") if k in a}
+                upcoming_buyback["confirmed"] = True
+
+        # Recent actions — last 10 by ex_date descending (past events)
+        past = [a for a in all_parsed if (a.get("ex_date") or "") < today_iso]
+        past.sort(key=lambda a: a.get("ex_date") or "", reverse=True)
+        recent_actions = past[:10]
+
+        return {
+            "upcoming_dividend": upcoming_dividend,
+            "upcoming_bonus":    upcoming_bonus,
+            "upcoming_split":    upcoming_split,
+            "upcoming_buyback":  upcoming_buyback,
+            "recent_actions":    recent_actions,
+            "raw_nse_actions":   all_parsed,
+        }
+
+    except Exception as e:
+        logger.warning(f"fetch_nse_corporate_actions failed for {symbol}: {e!r}")
+        return None

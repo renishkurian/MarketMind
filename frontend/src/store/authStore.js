@@ -58,15 +58,17 @@ export const useAuthStore = create((set, get) => ({
   },
 
   checkAuth: async () => {
-    const { token } = get();
-    if (!token) return;
+    const { token, loading } = get();
+    if (!token || loading) return;
 
+    set({ loading: true });
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     try {
       const res = await axios.get(`${API_URL}/api/auth/verify`);
-      set({ user: res.data.user, isAuthenticated: true });
+      set({ user: res.data.user, isAuthenticated: true, loading: false });
     } catch (err) {
       // Token expired or invalid
+      set({ loading: false });
       get().logout();
     }
   }

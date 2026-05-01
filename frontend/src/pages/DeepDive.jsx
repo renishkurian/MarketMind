@@ -195,6 +195,10 @@ export default function DeepDive() {
   const [lots, setLots] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [loadedTabs, setLoadedTabs] = useState(new Set(['chart']));
+  
+  const lastFetchedSymbol = useRef(null);
+  const fetchInProgress = useRef(false);
 
   const stock = stocks[symbol];
   const sig = stock?.signal || {};
@@ -223,39 +227,22 @@ export default function DeepDive() {
 
   const fetchData = useCallback(async () => {
     setHistoryLoading(true);
-    setInsightLoading(true);
-    setInsightError(false);
 
     const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}` };
 
-    // Parallel fetches
-    const [histRes, insightRes, signalsRes, fundRes, lotsRes, historyRes, screenerRes, corpActRes] = await Promise.allSettled([
+    // Parallel fetches for CORE data only
+    const [histRes, signalsRes, fundRes, lotsRes] = await Promise.allSettled([
       fetch(`${API_URL}/api/stock/${symbol}/history`, { headers }),
-      fetch(`${API_URL}/api/stock/${symbol}/insight`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/signals`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/fundamentals`, { headers }),
       fetch(`${API_URL}/api/stock/${symbol}/lots`, { headers }),
-      fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`, { headers }),
-      fetch(`${API_URL}/api/stock/${symbol}/screener`, { headers }),
-      fetch(`${API_URL}/api/stock/${symbol}/corporate-actions`, { headers }),
     ]);
 
     if (histRes.status === 'fulfilled' && histRes.value.ok) {
       setHistory(await histRes.value.json());
     } else { setHistory([]); }
     setHistoryLoading(false);
-
-    if (insightRes.status === 'fulfilled') {
-      if (insightRes.value.ok) {
-        setInsight(await insightRes.value.json());
-        setInsightError(false);
-      } else if (insightRes.value.status === 404) {
-        setInsight(null);
-        setInsightError(true);
-      }
-    } else { setInsight(null); setInsightError(true); }
-    setInsightLoading(false);
 
     if (signalsRes.status === 'fulfilled' && signalsRes.value.ok) {
       setSignals(await signalsRes.value.json());
@@ -268,39 +255,7 @@ export default function DeepDive() {
     } else {
       setLots([]);
     }
-
-    if (historyRes.status === 'fulfilled' && historyRes.value.ok) {
-      setInsightHistory(await historyRes.value.json());
-    } else {
-      setInsightHistory([]);
-    }
-
-    if (screenerRes.status === 'fulfilled' && screenerRes.value.ok) {
-      const sd = await screenerRes.value.json();
-      if (sd.available) setScreenerData(sd);
-    }
-
-    if (corpActRes.status === 'fulfilled' && corpActRes.value.ok) {
-      setCorporateActions(await corpActRes.value.json());
-    }
-
-    // Fetch Full Consensus Analysis if ISIN exists
-    if (stock?.isin) {
-      setAnalysisLoading(true);
-      try {
-        const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
-        const aRes = await fetch(`${API_URL}/api/analysis/${stock.isin}/full`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (aRes.ok) {
-          setAnalysis(await aRes.json());
-        }
-      } catch (e) {
-        console.error("Analysis fetch failed:", e);
-      }
-      setAnalysisLoading(false);
-    }
-  }, [symbol, stock?.isin]);
+  }, [symbol]);
 
   const handleGenerateInsight = async () => {
     try {
@@ -533,12 +488,80 @@ export default function DeepDive() {
   }, [symbol]);
 
   useEffect(() => {
+    // Prevent double fetch on mount or symbol change
+    if (lastFetchedSymbol.current === symbol) return;
+    
     fetchData();
     fetchPatterns();
     fetchStockAlerts();
+    
+    lastFetchedSymbol.current = symbol;
+    setLoadedTabs(new Set(['chart'])); // Reset loaded tabs on symbol change
+    
     window.addEventListener('generate-insight', handleGenerateInsight);
     return () => window.removeEventListener('generate-insight', handleGenerateInsight);
   }, [fetchData, fetchPatterns, fetchStockAlerts, symbol]);
+
+  // Tab-based lazy loading
+  useEffect(() => {
+    if (loadedTabs.has(activeTab)) return;
+    
+    const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    if (activeTab === 'ai') {
+      const fetchAIData = async () => {
+        setInsightLoading(true);
+        const [insightRes, historyRes] = await Promise.allSettled([
+          fetch(`${API_URL}/api/stock/${symbol}/insight`, { headers }),
+          fetch(`${API_URL}/api/ai-logs?symbol=${symbol}&limit=50`, { headers }),
+        ]);
+
+        if (insightRes.status === 'fulfilled') {
+          if (insightRes.value.ok) {
+            setInsight(await insightRes.value.json());
+            setInsightError(false);
+          } else if (insightRes.value.status === 404) {
+            setInsight(null);
+            setInsightError(true);
+          }
+        }
+        if (historyRes.status === 'fulfilled' && historyRes.value.ok) {
+          setInsightHistory(await historyRes.value.json());
+        }
+        setInsightLoading(false);
+
+        if (stock?.isin) {
+          setAnalysisLoading(true);
+          try {
+            const aRes = await fetch(`${API_URL}/api/analysis/${stock.isin}/full`, { headers });
+            if (aRes.ok) setAnalysis(await aRes.json());
+          } catch (e) { console.error("Analysis fetch failed:", e); }
+          finally { setAnalysisLoading(false); }
+        }
+      };
+      fetchAIData();
+      setLoadedTabs(prev => new Set([...prev, 'ai']));
+    }
+
+    if (activeTab === 'fundamentals' || activeTab === 'screener') {
+      const fetchFundamentalsTab = async () => {
+        const [screenerRes, corpActRes] = await Promise.allSettled([
+          fetch(`${API_URL}/api/stock/${symbol}/screener`, { headers }),
+          fetch(`${API_URL}/api/stock/${symbol}/corporate-actions`, { headers }),
+        ]);
+        if (screenerRes.status === 'fulfilled' && screenerRes.value.ok) {
+          const sd = await screenerRes.value.json();
+          if (sd.available) setScreenerData(sd);
+        }
+        if (corpActRes.status === 'fulfilled' && corpActRes.value.ok) {
+          setCorporateActions(await corpActRes.value.json());
+        }
+      };
+      fetchFundamentalsTab();
+      setLoadedTabs(prev => new Set([...prev, 'fundamentals', 'screener']));
+    }
+  }, [activeTab, symbol, stock?.isin, loadedTabs]);
 
   // Chart range filtering
   const [range, setRange] = useState('3M');
@@ -1625,40 +1648,78 @@ export default function DeepDive() {
                           <div className="space-y-2">
                             {Object.entries(breakdown).map(([name, data]) => {
                               const LABEL_MAP = {
-                                rsi: "RSI", macd: "MACD", price_vs_sma200: "SMA 200", price_vs_sma50: "SMA 50", adx: "ADX Trend", bb_position: "Bollinger", trade_activity: "Vol Shock",
+                                rsi: "RSI", macd: "MACD", price_vs_sma200: "SMA 200", price_vs_sma50: "SMA 50", adx_score: "ADX Score", bb_position: "Bollinger", trade_activity: "Vol Shock",
                                 roc_1yr: "1Y ROC", roc_60d: "60d ROC", roc_20d: "20d ROC", volume_trend: "Vol Trend", "52w_rank": "52W Rank", rs_vs_nifty: "RS vs Nifty", "52w_high": "52W High", "52w_low": "52W Low", beta: "Beta",
                                 pe_vs_5yr: "PE vs 5Y", roe_quality: "ROE", debt_equity: "D/E", revenue_growth_3yr: "Rev Growth", pat_growth_3yr: "PAT Growth", operating_margin: "Margin", pledge_penalty_on_roe: "Pledge Pnlty",
                                 institutional_hold: "Institutional", analyst_sentiment: "Analyst", balance_sheet_health: "Bal Sheet", peg_ratio: "PEG Ratio"
                               };
-                                const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
-                                const isLabel = data.label !== undefined;
-                                const isMissing = !isLabel && data.score === null;
-                                const pct = (!isLabel && !isMissing && data.max > 0) ? (data.score / data.max) * 100 : 0;
-                                const barColor = isLabel ? 'bg-indigo-500/50' : (isMissing ? 'bg-gray-800' : (pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell'));
-                                
-                                // Format value display
-                                let valDisplay = '—';
-                                if (isLabel) {
-                                  if (name.includes('cross')) {
-                                    valDisplay = data.label === 1 ? 'Bull 📈' : data.label === -1 ? 'Bear 📉' : 'None';
-                                  } else {
-                                    valDisplay = data.label || '—';
-                                  }
-                                } else if (!isMissing) {
-                                  valDisplay = `${Math.round(data.score)}/${Math.round(data.max)}`;
-                                }
 
+                              // Special Case: ATR
+                              if (name === 'atr' && data.value !== undefined) {
                                 return (
                                   <div key={name} className="flex items-center gap-3">
-                                    <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title={displayName}>{displayName}</span>
-                                    <div className="flex-1 h-1.5 bg-gray-700/30 rounded-full overflow-hidden">
-                                      <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${isMissing ? 0 : (isLabel ? 100 : pct)}%` }} />
+                                    <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title="Average True Range">ATR(14)</span>
+                                    <div className="flex-1 h-1.5 bg-orange-500/10 rounded-full border border-orange-500/20 px-1 flex items-center">
+                                      <span className="text-[8px] text-orange-400/60 uppercase font-bold tracking-tighter">Volatility measure — stop-loss sizing</span>
                                     </div>
-                                    <span className={`font-mono text-[10px] text-right w-16 truncate ${isLabel ? 'text-indigo-400 font-bold' : 'text-dark-muted'}`}>
-                                      {isMissing ? 'N/A' : valDisplay}
+                                    <span className="font-mono text-[10px] text-right w-16 truncate text-orange-400 font-bold">
+                                      {data.value}
                                     </span>
                                   </div>
                                 );
+                              }
+
+                              // Special Case: ADX
+                              if (name === 'adx' && data.value !== undefined) {
+                                return (
+                                  <div key={name} className="flex items-center gap-3">
+                                    <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title="Trend Strength">ADX</span>
+                                    <div className="flex-1 flex items-center gap-2">
+                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${data.trend_strength === 'Strong' ? 'bg-signal-buy text-white' : 'bg-gray-800 text-dark-muted'}`}>
+                                        {data.value} {data.trend_strength}
+                                      </span>
+                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${data.direction === 'Bullish' ? 'bg-signal-buy/20 text-signal-buy' : 'bg-signal-sell/20 text-signal-sell'}`}>
+                                        {data.direction}
+                                      </span>
+                                    </div>
+                                    <span className="font-mono text-[10px] text-right w-16 truncate text-dark-muted">
+                                      {data.plus_di}/{data.minus_di}
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              if (name === 'adx_raw') return null; // Hide the raw value, handled by special 'adx' row
+
+                              const displayName = LABEL_MAP[name] || name.replace(/_/g, ' ');
+                              const isLabel = data.label !== undefined;
+                              const isMissing = !isLabel && data.score === null;
+                              const pct = (!isLabel && !isMissing && data.max > 0) ? (data.score / data.max) * 100 : 0;
+                              const barColor = isLabel ? 'bg-indigo-500/50' : (isMissing ? 'bg-gray-800' : (pct >= 66 ? 'bg-signal-buy' : pct >= 33 ? 'bg-signal-hold' : 'bg-signal-sell'));
+                              
+                              // Format value display
+                              let valDisplay = '—';
+                              if (isLabel) {
+                                if (name.includes('cross')) {
+                                  valDisplay = data.label === 1 ? 'Bull 📈' : data.label === -1 ? 'Bear 📉' : 'None';
+                                } else {
+                                  valDisplay = data.label || '—';
+                                }
+                              } else if (!isMissing) {
+                                valDisplay = `${Math.round(data.score)}/${Math.round(data.max)}`;
+                              }
+
+                              return (
+                                <div key={name} className="flex items-center gap-3">
+                                  <span className="text-[10px] font-mono text-dark-muted w-24 shrink-0 truncate uppercase tracking-wider" title={displayName}>{displayName}</span>
+                                  <div className="flex-1 h-1.5 bg-gray-700/30 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${isMissing ? 0 : (isLabel ? 100 : pct)}%` }} />
+                                  </div>
+                                  <span className={`font-mono text-[10px] text-right w-16 truncate ${isLabel ? 'text-indigo-400 font-bold' : 'text-dark-muted'}`}>
+                                    {isMissing ? 'N/A' : valDisplay}
+                                  </span>
+                                </div>
+                              );
                             })}
                           </div>
                         </div>
@@ -1682,7 +1743,7 @@ export default function DeepDive() {
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-[10px] font-bold text-dark-muted hover:border-dark-text hover:text-dark-text transition-all disabled:opacity-50"
                   >
                     <RefreshCw size={12} className={fundSyncLoading ? 'animate-spin' : ''} />
-                    Sync Yahoo
+                    Sync Yahoo & NSE
                   </button>
                   <button
                     onClick={handleScreenerSync}
@@ -1734,7 +1795,8 @@ export default function DeepDive() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <>
+                  <div className="space-y-4">
                   {fundamentals.data_quality === 'AI_RESEARCHED' && (
                     <div className="flex items-center gap-2 p-3 bg-yellow-400/10 border border-yellow-400/20 rounded-xl mb-2">
                        <AlertTriangle size={14} className="text-yellow-400" />
@@ -1767,7 +1829,12 @@ export default function DeepDive() {
                       { label: 'Analyst Rating', value: fundamentals.analyst_rating?.toFixed(2) ?? '—', sub: fundamentals.recommendation_key || 'No Consensus', highlight: fundamentals.recommendation_key === 'strong_buy' },
                       { label: 'Beta (5Y)', value: fundamentals.beta?.toFixed(2) ?? sig?.beta?.toFixed(2) ?? '—', sub: 'Market Volatility' },
                       { label: 'EV / EBITDA', value: fundamentals.ev_ebitda?.toFixed(1) ?? '—', sub: 'Value Multiple' },
+                      { label: 'Book Value', value: fundamentals.book_value?.toFixed(2) ?? '—', sub: 'Net Asset Value' },
+                      { label: 'Div Yield', value: screenerData?.dividend_yield != null ? `${screenerData.dividend_yield}%` : '—', sub: 'Annualized' },
                       { label: 'Institutional Hold', value: fundamentals.held_percent_institutions != null ? `${fundamentals.held_percent_institutions.toFixed(1)}%` : '—', sub: 'Held by Big Money' },
+                      { label: 'Promoter Hold', value: screenerData?.promoter_holding != null ? `${screenerData.promoter_holding}%` : '—', sub: 'Owner Stake' },
+                      { label: 'FII Holding', value: screenerData?.fii_holding != null ? `${screenerData.fii_holding}%` : '—', sub: 'Foreign Instit.' },
+                      { label: 'DII Holding', value: screenerData?.dii_holding != null ? `${screenerData.dii_holding}%` : '—', sub: 'Domestic Instit.' },
                       { label: 'Total Cash', value: fundamentals.total_cash ? `₹${(fundamentals.total_cash / 1e7).toFixed(1)}Cr` : '—', sub: 'Cash Balance' },
                       { label: 'Total Debt', value: fundamentals.total_debt ? `₹${(fundamentals.total_debt / 1e7).toFixed(1)}Cr` : '—', sub: 'Liabilities' },
                       { label: 'Revenue Growth', value: fundamentals.revenue_growth != null ? `${(fundamentals.revenue_growth * 100).toFixed(1)}%` : '—', sub: 'YoY' },
@@ -1779,6 +1846,87 @@ export default function DeepDive() {
                         <p className="text-xs text-dark-muted/70 mt-1 uppercase text-[10px] font-bold tracking-tight">{sub}</p>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Shareholding Pattern Table (In Fundamentals Tab too) */}
+                  {screenerData?.shareholding_history?.length > 0 && (() => {
+                    const rows = screenerData.shareholding_history;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="mt-8">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Users size={14} className="text-accent" />
+                          <h4 className="text-xs font-black text-dark-muted uppercase tracking-[0.2em]">Ownership History (Quarters)</h4>
+                        </div>
+                        <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[10px]">
+                              <thead>
+                                <tr className="border-b border-dark-border bg-dark-bg/50">
+                                  {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-bold whitespace-nowrap uppercase tracking-tighter">{h}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {rows.map((row, i) => (
+                                  <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                    {visibleHeaders.map(h => (
+                                      <td key={h} className={`px-3 py-2 font-mono whitespace-nowrap ${h.toLowerCase().includes('quarter') || h.toLowerCase().includes('date') ? 'text-dark-muted' : 'text-dark-text font-bold'}`}>
+                                        {row[h] || '—'}
+                                        {(!h.toLowerCase().includes('quarter') && !h.toLowerCase().includes('date') && row[h]) ? '%' : ''}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* NSE Trade Intelligence Enrichment */}
+                  {fundamentals.nse_trade_info && (
+                    <div className="mt-8 pt-8 border-t border-dark-border/50">
+                      <div className="flex items-center gap-2 mb-5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                        <h4 className="text-xs font-black text-dark-muted uppercase tracking-[0.2em]">Official NSE Trade Intelligence</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {[
+                          { label: 'Delivery %', value: fundamentals.nse_trade_info.delivery_pct != null ? `${fundamentals.nse_trade_info.delivery_pct}%` : '—', sub: 'Last Session' },
+                          { label: '52W High', value: fundamentals.nse_trade_info.high_52w ? `₹${fundamentals.nse_trade_info.high_52w.toLocaleString()}` : '—', sub: 'Record High' },
+                          { label: '52W Low', value: fundamentals.nse_trade_info.low_52w ? `₹${fundamentals.nse_trade_info.low_52w.toLocaleString()}` : '—', sub: 'Record Low' },
+                          { label: 'Upper Circuit', value: fundamentals.nse_trade_info.upper_circuit ? `₹${fundamentals.nse_trade_info.upper_circuit.toLocaleString()}` : '—', sub: 'Limit Up' },
+                          { label: 'Lower Circuit', value: fundamentals.nse_trade_info.lower_circuit ? `₹${fundamentals.nse_trade_info.lower_circuit.toLocaleString()}` : '—', sub: 'Limit Down' },
+                          { label: 'Market Cap', value: fundamentals.nse_trade_info.total_market_cap ? `₹${Math.round(fundamentals.nse_trade_info.total_market_cap).toLocaleString()} Cr` : '—', sub: 'Total Value' },
+                          { label: 'Free Float', value: fundamentals.nse_trade_info.ff_market_cap ? `₹${Math.round(fundamentals.nse_trade_info.ff_market_cap).toLocaleString()} Cr` : '—', sub: 'Investable Cap' },
+                          { label: 'F&O Eligible', value: fundamentals.nse_trade_info.is_fno ? 'YES' : 'NO', sub: 'Derivatives', highlight: fundamentals.nse_trade_info.is_fno },
+                          { label: 'Listing Date', value: fundamentals.nse_trade_info.listing_date || '—', sub: 'IPO Date' },
+                          { label: 'ISIN', value: fundamentals.nse_trade_info.isin || '—', sub: 'Security ID' },
+                        ].map(({ label, value, sub, highlight }) => (
+                          <div key={label} className="bg-dark-card border border-dark-border rounded-xl p-3 hover:border-accent/40 transition-colors">
+                            <p className="text-[10px] text-dark-muted mb-1 font-bold">{label}</p>
+                            <p className={`text-sm font-black font-mono ${highlight ? 'text-accent' : 'text-dark-text'}`}>{value}</p>
+                            <p className="text-[9px] text-dark-muted/60 mt-1 uppercase">{sub}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 p-3 bg-accent/5 border border-accent/20 rounded-xl flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                           <span className="text-[10px] font-black text-accent uppercase tracking-tighter">Industry:</span>
+                           <span className="text-xs font-bold text-dark-text">{fundamentals.nse_trade_info.industry || 'N/A'}</span>
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <span className="text-[10px] font-black text-accent uppercase tracking-tighter">Series:</span>
+                           <span className="text-xs font-bold text-dark-text">{fundamentals.nse_trade_info.series || 'EQ'}</span>
+                         </div>
+                      </div>
+                    </div>
+                  )}
+
                     <div className="col-span-full mt-4 p-5 bg-dark-bg border border-dark-border rounded-2xl">
                       <h4 className="text-[10px] font-black text-dark-muted uppercase tracking-widest mb-4 flex items-center gap-2">
                         <Zap size={10} className="text-accent" />
@@ -1801,13 +1949,13 @@ export default function DeepDive() {
                       </p>
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           )}
 
           {/* AI Insight Tab */}
-          {activeTab === 'ai' && (
+          {activeTab === 'ai' &&
             <div className="space-y-6">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-gray-900/50 border border-dark-border rounded-xl">
                 <div className="flex-1">
@@ -1982,10 +2130,10 @@ export default function DeepDive() {
                     </div>
                   )}
                 </div>
-                </div>
               </div>
             </div>
-          )}
+          </div>
+        }
 
           {/* ── Historical Data Tab ───────────────────────────────────── */}
           {activeTab === 'historical' && (
@@ -2366,6 +2514,38 @@ export default function DeepDive() {
                       </div>
                     );
                   })()}
+
+                  {/* Shareholding Pattern Table */}
+                  {screenerData.shareholding_history?.length > 0 && (() => {
+                    const rows = screenerData.shareholding_history;
+                    const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+                    const visibleHeaders = headers.slice(0, 9);
+                    return (
+                      <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-dark-border">
+                          <h4 className="text-xs font-bold text-dark-muted uppercase tracking-widest">Shareholding Pattern History</h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-dark-border">
+                                {visibleHeaders.map(h => <th key={h} className="px-3 py-2 text-left text-dark-muted font-semibold whitespace-nowrap">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  {visibleHeaders.map(h => (
+                                    <td key={h} className="px-3 py-2 text-dark-text font-mono whitespace-nowrap">{row[h] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>
@@ -2373,27 +2553,41 @@ export default function DeepDive() {
           {/* Corporate Actions Tab */}
           {activeTab === 'corporate-actions' && (
             <div className="space-y-6 p-1">
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarDays size={16} className="text-accent" />
-                <h3 className="text-base font-black text-dark-text uppercase tracking-widest">Corporate Actions</h3>
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <CalendarDays size={16} className="text-accent" />
+                  <h3 className="text-base font-black text-dark-text uppercase tracking-widest">Corporate Actions</h3>
+                </div>
+                {corporateActions?.nse_actions && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-signal-buy/10 border border-signal-buy/25">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-buy animate-pulse" />
+                    <span className="text-[10px] font-bold text-signal-buy uppercase tracking-wider">Live NSE Data</span>
+                  </div>
+                )}
               </div>
 
               {!corporateActions ? (
                 <div className="text-center py-16 text-dark-muted text-sm">Loading corporate actions...</div>
               ) : (
                 <>
-                  {/* Row 1: Upcoming Confirmed Events */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Row 1: Upcoming Confirmed Events — 2×2 grid */}
+                  <div className="grid grid-cols-2 gap-4">
                     {/* Upcoming Dividend */}
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <DollarSign size={14} className="text-signal-buy" />
-                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Upcoming Dividend</span>
+                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Dividend</span>
                         </div>
-                        {corporateActions.upcoming_dividend?.confirmed && (
-                          <span className="text-[9px] bg-signal-buy/20 text-signal-buy border border-signal-buy/30 rounded-full px-2 py-0.5 font-bold uppercase">Confirmed</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {corporateActions.upcoming_dividend?.confirmed && (
+                            <span className="text-[9px] bg-signal-buy/20 text-signal-buy border border-signal-buy/30 rounded-full px-2 py-0.5 font-bold uppercase">Confirmed</span>
+                          )}
+                          {corporateActions.upcoming_dividend?.source === 'NSE' && (
+                            <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full px-2 py-0.5 font-bold uppercase">NSE</span>
+                          )}
+                        </div>
                       </div>
                       {corporateActions.upcoming_dividend ? (
                         <div className="space-y-2">
@@ -2403,13 +2597,22 @@ export default function DeepDive() {
                               <span className="text-dark-text font-mono font-semibold">{corporateActions.upcoming_dividend.ex_date}</span>
                             </div>
                           )}
+                          {corporateActions.upcoming_dividend.record_date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Record Date</span>
+                              <span className="text-dark-muted font-mono">{corporateActions.upcoming_dividend.record_date}</span>
+                            </div>
+                          )}
                           {corporateActions.upcoming_dividend.amount != null && (
                             <div className="flex justify-between text-xs">
                               <span className="text-dark-muted">Amount</span>
                               <span className="text-signal-buy font-mono font-bold">₹{Number(corporateActions.upcoming_dividend.amount).toFixed(2)}</span>
                             </div>
                           )}
-                          {corporateActions.upcoming_dividend.source && (
+                          {corporateActions.upcoming_dividend.purpose && (
+                            <p className="text-[9px] text-dark-muted/70 mt-1 leading-tight">{corporateActions.upcoming_dividend.purpose}</p>
+                          )}
+                          {!corporateActions.upcoming_dividend.purpose && corporateActions.upcoming_dividend.source && (
                             <p className="text-[9px] text-dark-muted/60 mt-1">Source: {corporateActions.upcoming_dividend.source}</p>
                           )}
                         </div>
@@ -2420,32 +2623,160 @@ export default function DeepDive() {
 
                     {/* Upcoming Split */}
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <GitMerge size={14} className="text-accent" />
-                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Upcoming Split</span>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <GitMerge size={14} className="text-accent" />
+                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Stock Split</span>
+                        </div>
+                        {corporateActions.upcoming_split?.source === 'NSE' && (
+                          <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full px-2 py-0.5 font-bold uppercase">NSE</span>
+                        )}
                       </div>
                       {corporateActions.upcoming_split ? (
                         <div className="space-y-2">
-                          {corporateActions.upcoming_split.date && (
+                          {(corporateActions.upcoming_split.ex_date || corporateActions.upcoming_split.date) && (
                             <div className="flex justify-between text-xs">
-                              <span className="text-dark-muted">Date</span>
-                              <span className="text-dark-text font-mono font-semibold">{corporateActions.upcoming_split.date}</span>
+                              <span className="text-dark-muted">Ex-Date</span>
+                              <span className="text-dark-text font-mono font-semibold">{corporateActions.upcoming_split.ex_date || corporateActions.upcoming_split.date}</span>
                             </div>
                           )}
                           {corporateActions.upcoming_split.ratio && (
                             <div className="flex justify-between text-xs">
                               <span className="text-dark-muted">Ratio</span>
-                              <span className="text-accent font-mono font-bold">{corporateActions.upcoming_split.ratio}:1</span>
+                              <span className="text-accent font-mono font-bold">{corporateActions.upcoming_split.ratio}</span>
                             </div>
+                          )}
+                          {corporateActions.upcoming_split.purpose && (
+                            <p className="text-[9px] text-dark-muted/70 mt-1 leading-tight">{corporateActions.upcoming_split.purpose}</p>
                           )}
                         </div>
                       ) : (
                         <p className="text-xs text-dark-muted italic">No upcoming split announced</p>
                       )}
                     </div>
+
+                    {/* Upcoming Bonus (NSE) */}
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Star size={14} className="text-yellow-400" />
+                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Bonus Issue</span>
+                        </div>
+                        {corporateActions.nse_actions?.upcoming_bonus && (
+                          <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full px-2 py-0.5 font-bold uppercase">NSE</span>
+                        )}
+                      </div>
+                      {corporateActions.nse_actions?.upcoming_bonus ? (
+                        <div className="space-y-2">
+                          {corporateActions.nse_actions.upcoming_bonus.ex_date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Ex-Date</span>
+                              <span className="text-dark-text font-mono font-semibold">{corporateActions.nse_actions.upcoming_bonus.ex_date}</span>
+                            </div>
+                          )}
+                          {corporateActions.nse_actions.upcoming_bonus.record_date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Record Date</span>
+                              <span className="text-dark-muted font-mono">{corporateActions.nse_actions.upcoming_bonus.record_date}</span>
+                            </div>
+                          )}
+                          {corporateActions.nse_actions.upcoming_bonus.ratio && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Ratio</span>
+                              <span className="text-yellow-400 font-mono font-bold">{corporateActions.nse_actions.upcoming_bonus.ratio}</span>
+                            </div>
+                          )}
+                          {corporateActions.nse_actions.upcoming_bonus.purpose && (
+                            <p className="text-[9px] text-dark-muted/70 mt-1 leading-tight">{corporateActions.nse_actions.upcoming_bonus.purpose}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-dark-muted italic">No upcoming bonus issue announced</p>
+                      )}
+                    </div>
+
+                    {/* Upcoming Buyback (NSE) */}
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp size={14} className="text-purple-400" />
+                          <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Buyback</span>
+                        </div>
+                        {corporateActions.nse_actions?.upcoming_buyback && (
+                          <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full px-2 py-0.5 font-bold uppercase">NSE</span>
+                        )}
+                      </div>
+                      {corporateActions.nse_actions?.upcoming_buyback ? (
+                        <div className="space-y-2">
+                          {corporateActions.nse_actions.upcoming_buyback.ex_date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Ex-Date</span>
+                              <span className="text-dark-text font-mono font-semibold">{corporateActions.nse_actions.upcoming_buyback.ex_date}</span>
+                            </div>
+                          )}
+                          {corporateActions.nse_actions.upcoming_buyback.record_date && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-dark-muted">Record Date</span>
+                              <span className="text-dark-muted font-mono">{corporateActions.nse_actions.upcoming_buyback.record_date}</span>
+                            </div>
+                          )}
+                          {corporateActions.nse_actions.upcoming_buyback.purpose && (
+                            <p className="text-[9px] text-dark-muted/70 mt-1 leading-tight">{corporateActions.nse_actions.upcoming_buyback.purpose}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-dark-muted italic">No upcoming buyback announced</p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Row 2: Algorithmic Prediction */}
+                  {/* Row 2: Recent NSE Actions Table */}
+                  {corporateActions.nse_actions?.recent_actions?.length > 0 && (
+                    <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Database size={14} className="text-emerald-400" />
+                        <span className="text-xs font-bold text-dark-text uppercase tracking-widest">Recent NSE Corporate Actions</span>
+                        <span className="ml-auto text-[9px] text-dark-muted/60 italic">Last {corporateActions.nse_actions.recent_actions.length} events</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-dark-border">
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Ex-Date</th>
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Type</th>
+                              <th className="px-3 py-2 text-left text-dark-muted font-semibold">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {corporateActions.nse_actions.recent_actions.map((a, i) => {
+                              const typeStyles = {
+                                DIVIDEND: { bg: 'bg-signal-buy/15', text: 'text-signal-buy', border: 'border-signal-buy/25', label: '₹ Dividend' },
+                                BONUS:    { bg: 'bg-yellow-400/15', text: 'text-yellow-400', border: 'border-yellow-400/25', label: '★ Bonus' },
+                                SPLIT:    { bg: 'bg-accent/15',     text: 'text-accent',     border: 'border-accent/25',     label: '⇌ Split' },
+                                BUYBACK:  { bg: 'bg-purple-400/15', text: 'text-purple-400', border: 'border-purple-400/25', label: '↩ Buyback' },
+                                RIGHTS:   { bg: 'bg-orange-400/15', text: 'text-orange-400', border: 'border-orange-400/25', label: '⊕ Rights' },
+                                OTHER:    { bg: 'bg-dark-border/30',text: 'text-dark-muted', border: 'border-dark-border',   label: '• Other' },
+                              };
+                              const ts = typeStyles[a.action_type] || typeStyles.OTHER;
+                              return (
+                                <tr key={i} className={`border-b border-dark-border/50 hover:bg-dark-border/20 ${i % 2 === 0 ? '' : 'bg-dark-border/10'}`}>
+                                  <td className="px-3 py-2.5 text-dark-muted font-mono whitespace-nowrap">{a.ex_date || '—'}</td>
+                                  <td className="px-3 py-2.5">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${ts.bg} ${ts.text} ${ts.border}`}>
+                                      {ts.label}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-dark-muted/80 max-w-[200px] truncate" title={a.purpose}>{a.purpose || '—'}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3: Algorithmic Prediction */}
                   {corporateActions.prediction && (
                     <div className="bg-gradient-to-br from-accent/10 to-transparent border border-accent/30 rounded-2xl p-5">
                       <div className="flex items-center justify-between mb-4">
@@ -2497,7 +2828,7 @@ export default function DeepDive() {
                     </div>
                   )}
 
-                  {/* Row 3: Analytics */}
+                  {/* Row 4: Analytics */}
                   {corporateActions.analytics && (
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-4">
@@ -2524,7 +2855,7 @@ export default function DeepDive() {
                     </div>
                   )}
 
-                  {/* Row 4: Dividend History Table */}
+                  {/* Row 5: Dividend History Table */}
                   {corporateActions.dividend_history && corporateActions.dividend_history.length > 0 && (
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-4">
@@ -2556,7 +2887,7 @@ export default function DeepDive() {
                     </div>
                   )}
 
-                  {/* Row 5: Split History */}
+                  {/* Row 6: Split History */}
                   {corporateActions.split_history && corporateActions.split_history.length > 0 && (
                     <div className="bg-dark-card border border-dark-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-4">
@@ -2585,6 +2916,8 @@ export default function DeepDive() {
                   )}
 
                   {!corporateActions.upcoming_dividend && !corporateActions.upcoming_split && !corporateActions.prediction
+                    && !corporateActions.nse_actions?.upcoming_bonus && !corporateActions.nse_actions?.upcoming_buyback
+                    && (!corporateActions.nse_actions?.recent_actions || corporateActions.nse_actions.recent_actions.length === 0)
                     && (!corporateActions.dividend_history || corporateActions.dividend_history.length === 0)
                     && (!corporateActions.split_history || corporateActions.split_history.length === 0) && (
                     <div className="text-center py-16 text-dark-muted text-sm">No corporate action data available for this stock.</div>
@@ -2597,6 +2930,7 @@ export default function DeepDive() {
 
         </div>
       </div>
+
 
       {/* Manual Edit Modal */}
       {isEditModalOpen && (

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 import SignalBadge from '../components/SignalBadge';
+import MarketIndicesTicker from '../components/MarketIndicesTicker';
 
 export default function Watchlist() {
   const { stocks } = useStockStore();
@@ -46,11 +47,13 @@ export default function Watchlist() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-1">Watchlist</h2>
-        <p className="text-dark-muted text-sm">{watchlistStocks.length} stocks being tracked</p>
-      </div>
+    <>
+      <MarketIndicesTicker />
+      <div className="flex flex-col min-h-screen p-6">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold mb-1">Watchlist</h2>
+          <p className="text-dark-muted text-sm">{watchlistStocks.length} stocks being tracked</p>
+        </div>
 
       {/* Add Stock Form */}
       <form onSubmit={addStock} className="flex items-center gap-3 mb-8">
@@ -153,5 +156,6 @@ export default function Watchlist() {
         </div>
       )}
     </div>
+    </>
   );
 }

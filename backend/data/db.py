@@ -9,11 +9,11 @@ from sqlalchemy.orm import relationship
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import settings
 
-# Sized for Raspberry Pi with max 5 connections
+# Sized for Raspberry Pi with max 10 connections to handle concurrent UI requests
 engine = create_async_engine(
     settings.async_database_url,
-    pool_size=5,
-    max_overflow=2,
+    pool_size=10,
+    max_overflow=5,
     pool_recycle=3600
 )
 
@@ -228,6 +228,7 @@ class FundamentalsCache(Base):
     promoter_holding = Column(Numeric(6,2))
     promoter_pledge_pct = Column(Numeric(6,2))
     data_quality = Column(Enum('FULL', 'PARTIAL', 'MISSING', 'AI_RESEARCHED', 'VERIFIED'), default='FULL')
+    nse_data = Column(JSON, nullable=True) # Enrichment from NSE Scraper
 
 class MLSnapshot(Base):
     __tablename__ = "ml_snapshots"
@@ -432,6 +433,41 @@ class PriceAlert(Base):
     created_at     = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at     = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+
+class CorporateAction(Base):
+    """
+    Store authoritative corporate actions fetched from NSE.
+    Used for market-wide overview and stock-specific lookups.
+    """
+    __tablename__ = "corporate_actions"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    symbol         = Column(String(20), nullable=False, index=True)
+    series         = Column(String(10), nullable=True)
+    ind            = Column(String(50), nullable=True)
+    face_val       = Column(String(20), nullable=True)
+    subject        = Column(Text, nullable=False)
+    ex_date        = Column(Date, nullable=False, index=True)
+    rec_date       = Column(Date, nullable=True)
+    bc_start_date  = Column(Date, nullable=True)
+    bc_end_date    = Column(Date, nullable=True)
+    nd_start_date  = Column(Date, nullable=True)
+    nd_end_date    = Column(Date, nullable=True)
+    comp           = Column(String(255), nullable=True)
+    isin           = Column(String(20), nullable=True, index=True)
+    ca_broadcast_date = Column(Date, nullable=True)
+    payment_date   = Column(Date, nullable=True)
+    action_type    = Column(String(50), nullable=True) # e.g. 'DIVIDEND', 'BONUS'
+    
+    # We use (symbol, ex_date, first 100 chars of subject) to prevent duplicates
+    # Note: Unique constraints on Text columns are tricky in MySQL, so we might need a hash or limited Varchar.
+    # For now, let's just use symbol and ex_date and subject[:200]
+    subject_short  = Column(String(200), nullable=True) 
+
+    __table_args__ = (
+        UniqueConstraint('symbol', 'ex_date', 'subject_short', name='uix_symbol_date_subject'),
+    )
+
 # ── Schema Migrations (safe, idempotent — ADD COLUMN IF NOT EXISTS) ──────────
 async def run_migrations():
     """
@@ -443,6 +479,8 @@ async def run_migrations():
         "ALTER TABLE move_explanations ADD COLUMN IF NOT EXISTS should_act VARCHAR(30) NULL",
         # Feature: stocks_master.screener_symbol — custom screener.in slug per stock
         "ALTER TABLE stocks_master ADD COLUMN IF NOT EXISTS screener_symbol VARCHAR(50) NULL",
+        # Feature: fundamentals_cache.nse_data — stored NSE enrichment
+        "ALTER TABLE fundamentals_cache ADD COLUMN IF NOT EXISTS nse_data JSON NULL",
         # Feature 4: price_alerts — ensure table exists (create_all handles new tables,
         #   but if the table was never created we surface a cleaner error via create_all)
     ]

@@ -10,6 +10,7 @@ import Watchlist from './pages/Watchlist';
 import Opportunities from './pages/Opportunities';
 import AdminUsers from './pages/AdminUsers';
 import DeepDive from './pages/DeepDive';
+import NseActionsPage from './pages/NseActionsPage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Settings from './pages/Settings';
@@ -97,6 +98,9 @@ function AppInner() {
         } />
         <Route path="/benchmark" element={
           <ProtectedRoute><Layout><BenchmarkDashboard /></Layout></ProtectedRoute>
+        } />
+        <Route path="/nse-actions" element={
+          <ProtectedRoute><Layout><NseActionsPage /></Layout></ProtectedRoute>
         } />
         <Route path="/performance-heatmap" element={
           <ProtectedRoute><Layout><StockPerformanceHeatmap /></Layout></ProtectedRoute>

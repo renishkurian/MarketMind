@@ -188,6 +188,9 @@ class TechnicalData:
     price_vs_sma200: Optional[float] = None
     bb_position: Optional[float] = None
     adx: Optional[float] = None
+    plus_di: Optional[float] = None
+    minus_di: Optional[float] = None
+    atr: Optional[float] = None
     avg_trades_20: Optional[float] = None
     trades_shock: Optional[float] = None   # current trades / avg_trades_20
     ema_crossover: Optional[int] = None   # +1, -1, 0
@@ -571,12 +574,20 @@ class CompositeScorer:
             if sma50_present else 50.0
         )
 
-        # 5. ADX (15 pts)
+        # 5. ADX (15 pts) + Trend Adjustment
         adx_present = ta.adx is not None
         adx_score = (
             _clamp(_linear_scale(ta.adx, 15, 40, 30, 100), 0, 100)
             if adx_present else 50.0
         )
+        
+        # Point 3: Trend Strength Adjustment (+/- 8 pts)
+        trend_adj = 0
+        if adx_present and ta.adx >= 25 and ta.plus_di is not None and ta.minus_di is not None:
+            if ta.plus_di > ta.minus_di:
+                trend_adj = 8
+            elif ta.minus_di > ta.plus_di:
+                trend_adj = -8
 
         # 6. Bollinger position (5 pts — reduced from 10, FIX-3)
         bb_present = ta.bb_position is not None
@@ -609,12 +620,19 @@ class CompositeScorer:
             + shock_score  *  5
         ) / 100.0
 
+        # Apply Point 3 Adjustment
+        raw = _clamp(raw + trend_adj, 0, 100)
+
         breakdown: dict = {
             "rsi":              round(rsi_score, 1)    if rsi_present    else None,
             "macd":             round(macd_score, 1)   if macd_present   else None,
             "price_vs_sma200":  round(sma200_score, 1) if sma200_present else None,
             "price_vs_sma50":   round(sma50_score, 1)  if sma50_present  else None,
             "adx":              round(adx_score, 1)    if adx_present    else None,
+            "adx_raw":          round(ta.adx, 2)       if adx_present    else None,
+            "atr":              round(ta.atr, 2)       if ta.atr         else None,
+            "trend_strength":   "Strong" if (ta.adx or 0) >= 25 else ("Weak" if (ta.adx or 0) < 20 else "Moderate"),
+            "trend_direction":  "Bullish" if (ta.plus_di or 0) > (ta.minus_di or 0) else "Bearish" if (ta.adx or 0) >= 20 else "Neutral",
             "bb_position":      round(bb_score, 1)     if bb_present     else None,
             "trade_activity":   round(shock_score, 1)  if shock_present  else None,
             "ema_cross":        ta.ema_crossover,
@@ -799,6 +817,102 @@ def _norm_cdf(z: float) -> float:
     """Standard normal CDF — Abramowitz & Stegun approximation."""
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
+# ---------------------------------------------------------------------------
+# Point 1: ADX & ATR Indicator Logic (Wilder's RMA)
+# ---------------------------------------------------------------------------
+
+def calculate_atr(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float], period: int = 14) -> float:
+    """Average True Range — measures volatility using Wilder's RMA."""
+    if len(closes) < period + 1:
+        return 0.0
+    
+    tr_list = []
+    for i in range(1, len(closes)):
+        tr = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1])
+        )
+        tr_list.append(tr)
+        
+    # First ATR = simple mean
+    atr = sum(tr_list[:period]) / period
+    # Subsequent = Wilder's RMA
+    for i in range(period, len(tr_list)):
+        atr = (atr * (period - 1) + tr_list[i]) / period
+    return round(atr, 4)
+
+def calculate_adx(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float], period: int = 14) -> dict:
+    """Average Directional Index — measures trend strength (0–100)"""
+    if len(closes) < period * 2:
+        return {"adx": 0.0, "plus_di": 0.0, "minus_di": 0.0}
+    
+    tr_list, pdm_list, ndm_list = [], [], []
+    for i in range(1, len(closes)):
+        up_move = highs[i] - highs[i-1]
+        down_move = lows[i-1] - lows[i]
+        
+        pdm = max(up_move, 0.0) if up_move > down_move else 0.0
+        ndm = max(down_move, 0.0) if down_move > up_move else 0.0
+        
+        tr = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i-1]),
+            abs(lows[i] - closes[i-1])
+        )
+        tr_list.append(tr)
+        pdm_list.append(pdm)
+        ndm_list.append(ndm)
+        
+    # Smooth with Wilder's RMA
+    def _rma_series(series, p):
+        smoothed = [sum(series[:p]) / p]
+        for i in range(p, len(series)):
+            smoothed.append((smoothed[-1] * (p - 1) + series[i]) / p)
+        return smoothed
+
+    str_ = _rma_series(tr_list, period)
+    spdm = _rma_series(pdm_list, period)
+    sndm = _rma_series(ndm_list, period)
+    
+    dx_list = []
+    final_pdi = 0.0
+    final_ndi = 0.0
+    
+    for i in range(len(str_)):
+        tr_val = str_[i]
+        if tr_val == 0:
+            dx_list.append(0.0)
+            continue
+            
+        pdi = 100 * spdm[i] / tr_val
+        ndi = 100 * sndm[i] / tr_val
+        
+        if i == len(str_) - 1:
+            final_pdi = pdi
+            final_ndi = ndi
+            
+        denom = pdi + ndi
+        if denom == 0:
+            dx_list.append(0.0)
+        else:
+            dx_list.append(100 * abs(pdi - ndi) / denom)
+            
+    # ADX = RMA of DX
+    if len(dx_list) < period:
+        return {"adx": 0.0, "plus_di": final_pdi, "minus_di": final_ndi}
+        
+    # ADX smoothing (Wilder's RMA applied to DX)
+    adx = sum(dx_list[:period]) / period
+    for i in range(period, len(dx_list)):
+        adx = (adx * (period - 1) + dx_list[i]) / period
+        
+    return {
+        "adx": round(adx, 2),
+        "plus_di": round(final_pdi, 2),
+        "minus_di": round(final_ndi, 2)
+    }
+
 
 # ---------------------------------------------------------------------------
 # Convenience: flat dict for SQLAlchemy SignalsCache bulk update
@@ -861,5 +975,19 @@ def _build_ui_breakdown(r: CompositeScoreResult) -> dict:
                 lt[k] = {"score": v, "max": 100}
             else:
                 lt[k] = {"label": v}
+
+    # Point 5: ADX & ATR specific formatting
+    if r.ta_data:
+        st["atr"] = {
+            "value": round(r.ta_data.atr, 2) if r.ta_data.atr else None,
+            "label": "ATR(14)"
+        }
+        st["adx"] = {
+            "value": round(r.ta_data.adx, 2) if r.ta_data.adx else None,
+            "plus_di": round(r.ta_data.plus_di, 2) if r.ta_data.plus_di else None,
+            "minus_di": round(r.ta_data.minus_di, 2) if r.ta_data.minus_di else None,
+            "trend_strength": r.ta_breakdown.get("trend_strength"),
+            "direction": r.ta_breakdown.get("trend_direction")
+        }
 
     return {"SHORT_TERM": st, "LONG_TERM": lt}

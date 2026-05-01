@@ -12,15 +12,16 @@ from typing import List, Dict, Optional, Any
 import logging
 import os
 import json
-import asyncio
-import pandas as pd
 from datetime import datetime, date, timedelta
+import asyncio
+import time
 
 from backend.data.db import (
     get_db, SessionLocal, run_migrations,
     StockMaster, SignalsCache, AIInsights, PriceHistory, FundamentalsCache, SyncLog,
     PortfolioTransaction, AICallLog, AllocationLog, SystemConfig, IntradayTicks,
-    User, MoveExplanation, PriceAlert, PerformanceCache, ScreenerCache
+    User, MoveExplanation, PriceAlert, PerformanceCache, ScreenerCache,
+    CorporateAction
 )
 from backend.utils.market_hours import get_market_status, get_current_ist_time
 from backend.utils.auth import verify_password, create_access_token, get_current_user, get_current_admin, get_password_hash
@@ -123,6 +124,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "http://localhost:3000",
@@ -333,6 +336,61 @@ async def get_status():
     status = get_market_status()
     now = get_current_ist_time()
     return {"status": status, "last_update": now.isoformat()}
+
+
+from nse import NSE
+from cachetools import TTLCache
+
+indices_cache = TTLCache(maxsize=1, ttl=60)
+
+@app.get("/api/market/indices")
+async def get_market_indices():
+    if "indices" in indices_cache:
+        return indices_cache["indices"]
+    
+    target_indices = [
+        "NIFTY 50", "NIFTY BANK", "NIFTY IT", "NIFTY MIDCAP 100",
+        "NIFTY SMALLCAP 100", "NIFTY FMCG", "NIFTY PHARMA",
+        "NIFTY AUTO", "NIFTY REALTY", "NIFTY METAL", "INDIA VIX"
+    ]
+    
+    try:
+        def fetch_indices():
+            with NSE('.') as nse:
+                return nse.listIndices()
+        
+        # Run synchronous NSE call in a thread to avoid blocking the event loop
+        data = await asyncio.to_thread(fetch_indices)
+        
+        if not data or 'data' not in data:
+            return []
+            
+        result = []
+        for item in data['data']:
+            if item.get('index') in target_indices:
+                change = float(item.get('variation', 0))
+                direction = "flat"
+                if change > 0:
+                    direction = "up"
+                elif change < 0:
+                    direction = "down"
+                    
+                result.append({
+                    "name": item.get('index'),
+                    "last": float(item.get('last', 0)),
+                    "change": change,
+                    "pct_change": float(item.get('percentChange', 0)),
+                    "direction": direction
+                })
+        
+        # Sort according to the target_indices order
+        result.sort(key=lambda x: target_indices.index(x['name']) if x['name'] in target_indices else 999)
+        
+        indices_cache["indices"] = result
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch NSE indices: {e}")
+        return []
 
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
@@ -849,10 +907,13 @@ async def get_stock_history(
     
     last_hist_date = history[-1].date if history else None
     if last_hist_date:
+        from datetime import datetime, time
+        # Start from the beginning of the next day after last_hist_date
+        next_day_start = datetime.combine(last_hist_date + timedelta(days=1), time.min)
         intra_res = await db.execute(
             select(IntradayTicks)
             .where(IntradayTicks.symbol == symbol.upper())
-            .where(func.date(IntradayTicks.timestamp) > last_hist_date)
+            .where(IntradayTicks.timestamp >= next_day_start)
             .order_by(IntradayTicks.timestamp.asc())
         )
         intra_ticks = intra_res.scalars().all()
@@ -1005,41 +1066,45 @@ async def get_stock_fundamentals(
         select(FundamentalsCache).where(FundamentalsCache.symbol == symbol.upper())
     )
     fund = result.scalars().first()
-    # Join or fetch StockMaster metadata too
+    
     stock_res = await db.execute(select(StockMaster.yahoo_symbol, StockMaster.screener_symbol).where(StockMaster.symbol == symbol.upper()))
     stock_row = stock_res.first()
     yahoo_sym = stock_row[0] if stock_row else None
     screener_sym = stock_row[1] if stock_row else None
 
+    # We now pull NSE enrichment directly from the DB cache (populated during manual sync)
+    nse_trade_info = fund.nse_data if fund else None
+
     return {
-        "fetched_at": str(fund.fetched_at),
-        "pe_ratio": float(fund.pe_ratio) if fund.pe_ratio else None,
-        "eps": float(fund.eps) if fund.eps else None,
-        "roe": float(fund.roe) if fund.roe else None,
-        "debt_equity": float(fund.debt_equity) if fund.debt_equity else None,
-        "revenue_growth": float(fund.revenue_growth) if fund.revenue_growth else None,
-        "market_cap": int(fund.market_cap) if fund.market_cap else None,
+        "fetched_at": str(fund.fetched_at) if fund else str(datetime.now()),
+        "pe_ratio": float(fund.pe_ratio) if fund and fund.pe_ratio else None,
+        "eps": float(fund.eps) if fund and fund.eps else None,
+        "roe": float(fund.roe) if fund and fund.roe else None,
+        "debt_equity": float(fund.debt_equity) if fund and fund.debt_equity else None,
+        "revenue_growth": float(fund.revenue_growth) if fund and fund.revenue_growth else None,
+        "market_cap": int(fund.market_cap) if fund and fund.market_cap else None,
         
         # -- Institutional Upgrade --
-        "peg_ratio": float(fund.peg_ratio) if fund.peg_ratio else None,
-        "ps_ratio": float(fund.ps_ratio) if fund.ps_ratio else None,
-        "pb_ratio": float(fund.pb_ratio) if fund.pb_ratio else None,
-        "ev_ebitda": float(fund.ev_ebitda) if fund.ev_ebitda else None,
-        "book_value": float(fund.book_value) if fund.book_value else None,
-        "ebitda": fund.ebitda,
-        "held_percent_institutions": float(fund.held_percent_institutions) if fund.held_percent_institutions else None,
-        "shares_outstanding": fund.shares_outstanding,
+        "peg_ratio": float(fund.peg_ratio) if fund and fund.peg_ratio else None,
+        "ps_ratio": float(fund.ps_ratio) if fund and fund.ps_ratio else None,
+        "pb_ratio": float(fund.pb_ratio) if fund and fund.pb_ratio else None,
+        "ev_ebitda": float(fund.ev_ebitda) if fund and fund.ev_ebitda else None,
+        "book_value": float(fund.book_value) if fund and fund.book_value else None,
+        "ebitda": fund.ebitda if fund else None,
+        "held_percent_institutions": float(fund.held_percent_institutions) if fund and fund.held_percent_institutions else None,
+        "shares_outstanding": fund.shares_outstanding if fund else None,
         
         # -- Phase 3: Health & Sentiment --
-        "analyst_rating": float(fund.analyst_rating) if fund.analyst_rating else None,
-        "recommendation_key": fund.recommendation_key,
-        "total_cash": fund.total_cash,
-        "total_debt": fund.total_debt,
-        "current_ratio": float(fund.current_ratio) if fund.current_ratio else None,
+        "analyst_rating": float(fund.analyst_rating) if fund and fund.analyst_rating else None,
+        "recommendation_key": fund.recommendation_key if fund else None,
+        "total_cash": fund.total_cash if fund else None,
+        "total_debt": fund.total_debt if fund else None,
+        "current_ratio": float(fund.current_ratio) if fund and fund.current_ratio else None,
         
-        "data_quality": fund.data_quality,
+        "data_quality": fund.data_quality if fund else "UNAVAILABLE",
         "yahoo_symbol": yahoo_sym,
         "screener_symbol": screener_sym,
+        "nse_trade_info": nse_trade_info
     }
 
 
@@ -2261,6 +2326,45 @@ async def sync_fundamental_data(
         if screener_data:
             logger.info(f"Screener.in filled {len(screener_data)} missing fields for {symbol}")
 
+    # 2c. Fetch Enrichment from NSE (Deep dive enrichment)
+    nse_trade_info = None
+    try:
+        from nse import NSE
+        import os
+        nse_sym = yf_sym or f"{symbol}.NS"
+        if nse_sym.endswith(".NS"): nse_sym = nse_sym[:-3]
+        
+        nse_cache_dir = os.path.join(os.getcwd(), ".nse_cache")
+        os.makedirs(nse_cache_dir, exist_ok=True)
+        
+        def _fetch():
+            with NSE(download_folder=nse_cache_dir) as nse:
+                q_main = nse.quote(nse_sym)
+                q_trade = nse.quote(nse_sym, section='trade_info')
+                meta = q_main.get('metadata', {}); pinfo = q_main.get('priceInfo', {}); sinfo = q_main.get('securityInfo', {})
+                trade = q_trade.get('marketDeptOrderBook', {}).get('tradeInfo', {})
+                dp = q_trade.get('securityWiseDP', {})
+                return {
+                    "delivery_pct": dp.get("deliveryToTradedQuantity"),
+                    "total_market_cap": trade.get("totalMarketCap"),
+                    "ff_market_cap": trade.get("ffmc"),
+                    "high_52w": pinfo.get("weekHighLow", {}).get("max"),
+                    "low_52w": pinfo.get("weekHighLow", {}).get("min"),
+                    "upper_circuit": pinfo.get("upperCP"),
+                    "lower_circuit": pinfo.get("lowerCP"),
+                    "is_fno": sinfo.get("isFNOSec"),
+                    "listing_date": meta.get("listingDate"),
+                    "industry": meta.get("industry"),
+                    "isin": meta.get("isin"),
+                    "delivery_qty": dp.get("deliveryQuantity"),
+                    "qty_traded": dp.get("quantityTraded"),
+                    "series": meta.get("series")
+                }
+        nse_trade_info = await asyncio.to_thread(_fetch)
+        logger.info(f"NSE Enrichment sync'd for {symbol}")
+    except Exception as e:
+        logger.warning(f"NSE sync failed for {symbol}: {e}")
+
     # Recompute quality after merge
     required_keys = ["pe_ratio", "eps", "roe", "debt_equity", "revenue_growth"]
     missing_count = sum(1 for k in required_keys if not data.get(k))
@@ -2270,31 +2374,42 @@ async def sync_fundamental_data(
         data["data_quality"] = "PARTIAL"
 
     # 3. Persist
-    stmt = mysql_insert(FundamentalsCache).values(
-        symbol=symbol,
-        fetched_at=datetime.now(),
-        pe_ratio=data.get("pe_ratio"),
-        eps=data.get("eps"),
-        roe=data.get("roe"),
-        debt_equity=data.get("debt_equity"),
-        revenue_growth=data.get("revenue_growth"),
-        market_cap=data.get("market_cap"),
-        revenue_growth_3yr=data.get("revenue_growth_3yr"),
-        pat_growth_3yr=data.get("pat_growth_3yr"),
-        operating_margin=data.get("operating_margin"),
-        pe_5yr_avg=data.get("pe_5yr_avg"),
-        roe_3yr_avg=data.get("roe_3yr_avg"),
-        pb_ratio=data.get("pb_ratio"),
-        ev_ebitda=data.get("ev_ebitda"),
-        promoter_holding=data.get("promoter_holding"),
-        promoter_pledge_pct=data.get("promoter_pledge_pct"),
-        data_quality=data.get("data_quality", "FULL")
-    )
+    save_data = {
+        "symbol": symbol,
+        "fetched_at": datetime.now(),
+        "pe_ratio": data.get("pe_ratio"),
+        "eps": data.get("eps"),
+        "roe": data.get("roe"),
+        "debt_equity": data.get("debt_equity"),
+        "revenue_growth": data.get("revenue_growth"),
+        "market_cap": data.get("market_cap"),
+        "revenue_growth_3yr": data.get("revenue_growth_3yr"),
+        "pat_growth_3yr": data.get("pat_growth_3yr"),
+        "operating_margin": data.get("operating_margin"),
+        "pe_5yr_avg": data.get("pe_5yr_avg"),
+        "roe_3yr_avg": data.get("roe_3yr_avg"),
+        "pb_ratio": data.get("pb_ratio"),
+        "ev_ebitda": data.get("ev_ebitda"),
+        "peg_ratio": data.get("peg_ratio"),
+        "ps_ratio": data.get("ps_ratio"),
+        "book_value": data.get("book_value"),
+        "ebitda": data.get("ebitda"),
+        "held_percent_institutions": data.get("held_percent_institutions"),
+        "shares_outstanding": data.get("shares_outstanding"),
+        "analyst_rating": data.get("analyst_rating"),
+        "recommendation_key": data.get("recommendation_key"),
+        "total_cash": data.get("total_cash"),
+        "total_debt": data.get("total_debt"),
+        "current_ratio": data.get("current_ratio"),
+        "promoter_holding": data.get("promoter_holding"),
+        "promoter_pledge_pct": data.get("promoter_pledge_pct"),
+        "data_quality": data.get("data_quality", "FULL"),
+        "nse_data": nse_trade_info
+    }
 
-    cols = ["fetched_at", "pe_ratio", "eps", "roe", "debt_equity", "revenue_growth", "market_cap",
-            "revenue_growth_3yr", "pat_growth_3yr", "operating_margin", "pe_5yr_avg", "roe_3yr_avg",
-            "pb_ratio", "ev_ebitda", "promoter_holding", "promoter_pledge_pct", "data_quality"]
-    stmt = stmt.on_duplicate_key_update(**{c: stmt.inserted[c] for c in cols})
+    stmt = mysql_insert(FundamentalsCache).values(**save_data)
+    update_cols = [c for c in save_data.keys() if c != "symbol"]
+    stmt = stmt.on_duplicate_key_update(**{c: stmt.inserted[c] for c in update_cols})
 
     await db.execute(stmt)
     await db.commit()
@@ -2388,7 +2503,8 @@ async def sync_screener_data(
     row = existing.scalars().first()
     fillable = ["pe_ratio", "roe", "debt_equity", "revenue_growth_3yr", "pat_growth_3yr",
                 "operating_margin", "pe_5yr_avg", "roe_3yr_avg", "pb_ratio", "ev_ebitda",
-                "promoter_holding", "promoter_pledge_pct", "current_ratio"]
+                "promoter_holding", "promoter_pledge_pct", "current_ratio", "book_value",
+                "peg_ratio", "ps_ratio", "ebitda", "total_cash", "total_debt"]
     updates = {}
     for field in fillable:
         current_val = getattr(row, field, None) if row else None
@@ -2416,7 +2532,8 @@ async def sync_screener_data(
     sc_vals = {
         "symbol": symbol, "fetched_at": datetime.now(),
         "roce": sd.get("roce"), "dividend_yield": sd.get("dividend_yield"),
-        "dividend_payout_pct": sd.get("dividend_payout_pct"), "face_value": sd.get("face_value"),
+        "dividend_payout_pct": sd.get("dividend_payout_pct") or sd.get("dividend_payout"), 
+        "face_value": sd.get("face_value"),
         "book_value": sd.get("book_value"),
         "market_cap_cr": sd.get("market_cap_cr") or (sd.get("market_cap") / 1e7 if sd.get("market_cap") else None),
         "promoter_holding": sd.get("promoter_holding"),
@@ -2866,6 +2983,9 @@ def _serialize_signal(signal) -> dict:
 async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     """
     Corporate actions endpoint — layered data strategy:
+      Layer 0: NSE India live API — ground truth for Indian equities
+                 - dividends, bonus, splits, buybacks, rights issues
+                 - 6h in-memory cached to handle NSE bot-protection
       Layer 1: yf.Ticker().calendar  — official upcoming ex-date/amount if Yahoo has it
       Layer 2: yf.Ticker().actions / .dividends / .splits — full history
       Layer 3: Algorithmic prediction engine — uses history to predict next dividend
@@ -2875,9 +2995,23 @@ async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db),
                  - computes dividend CAGR, yield, consistency score
       Layer 4: info fields — exDividendDate, lastDividendValue as cross-check
     """
+    from backend.data.fetcher import fetch_nse_corporate_actions
     import yfinance as yf
     import numpy as np
     from datetime import date as date_cls
+
+    # ── Layer 0: NSE India live corporate actions ─────────────────────────────
+    nse_layer0 = None
+    try:
+        nse_layer0 = await fetch_nse_corporate_actions(symbol)
+        if nse_layer0:
+            logger.info(f"NSE Layer 0: found data for {symbol} — "
+                        f"div={bool(nse_layer0.get('upcoming_dividend'))}, "
+                        f"bonus={bool(nse_layer0.get('upcoming_bonus'))}, "
+                        f"split={bool(nse_layer0.get('upcoming_split'))}, "
+                        f"buyback={bool(nse_layer0.get('upcoming_buyback'))}")
+    except Exception as _nse_exc:
+        logger.warning(f"NSE Layer 0 failed for {symbol}: {_nse_exc!r}")
 
     stock_res = await db.execute(select(StockMaster.yahoo_symbol).where(StockMaster.symbol == symbol.upper()))
     row = stock_res.first()
@@ -3150,6 +3284,25 @@ async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db),
     except Exception as e:
         logger.warning(f"Corporate actions prediction engine error for {symbol}: {e}")
 
+    # ── Layer 0 merge: NSE overrides yfinance when more authoritative ────────
+    nse_actions_payload = None
+    if nse_layer0:
+        # Override upcoming_dividend — NSE is ground truth for Indian equities
+        if nse_layer0.get("upcoming_dividend"):
+            upcoming_dividend = nse_layer0["upcoming_dividend"]
+        # Override upcoming_split from NSE if present
+        if nse_layer0.get("upcoming_split") and not upcoming_split:
+            upcoming_split = nse_layer0["upcoming_split"]
+        elif nse_layer0.get("upcoming_split"):
+            # NSE is more authoritative — prefer it
+            upcoming_split = nse_layer0["upcoming_split"]
+
+        nse_actions_payload = {
+            "upcoming_bonus":    nse_layer0.get("upcoming_bonus"),
+            "upcoming_buyback":  nse_layer0.get("upcoming_buyback"),
+            "recent_actions":    nse_layer0.get("recent_actions", []),
+        }
+
     return {
         "symbol": symbol.upper(),
         "yahoo_symbol": yf_sym,
@@ -3159,7 +3312,184 @@ async def get_corporate_actions(symbol: str, db: AsyncSession = Depends(get_db),
         "analytics": analytics,
         "dividend_history": dividend_history,
         "split_history": split_history,
+        "nse_actions": nse_actions_payload,
     }
+
+
+@app.get("/api/stocks/symbols")
+async def get_all_symbols(db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
+    """Return a list of unique symbols from the StockMaster table for autocomplete."""
+    result = await db.execute(
+        select(StockMaster.symbol, StockMaster.company_name)
+        .where(StockMaster.user_id == current_user.id)
+        .distinct()
+    )
+    return [{"symbol": row.symbol, "name": row.company_name} for row in result]
+
+
+@app.get("/api/corporate-actions")
+async def get_market_corporate_actions(
+    from_date: str,
+    to_date: str,
+    symbol: Optional[str] = None,
+    force_sync: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    Fetch market-wide corporate actions. 
+    By default, it reads from the local DB. If force_sync=true, it fetches from NSE and updates DB.
+    """
+    from datetime import datetime
+    try:
+        d_from = datetime.strptime(from_date, "%d-%m-%Y").date()
+        d_to = datetime.strptime(to_date, "%d-%m-%Y").date()
+
+        if force_sync:
+            await sync_corporate_actions_from_nse(db, d_from, d_to, symbol)
+
+        # Query from DB
+        query = select(CorporateAction).where(
+            CorporateAction.ex_date >= d_from,
+            CorporateAction.ex_date <= d_to
+        )
+        if symbol:
+            query = query.where(CorporateAction.symbol == symbol.upper().strip())
+        
+        query = query.order_by(CorporateAction.ex_date.asc())
+        result = await db.execute(query)
+        actions = result.scalars().all()
+        
+        # Map to expected frontend format (matches nse library keys for compatibility)
+        return [{
+            "symbol": a.symbol,
+            "series": a.series,
+            "ind": a.ind,
+            "faceVal": a.face_val,
+            "subject": a.subject,
+            "exDate": a.ex_date.strftime("%d-%b-%Y") if a.ex_date else None,
+            "recDate": a.rec_date.strftime("%d-%b-%Y") if a.rec_date else None,
+            "bcStartDate": a.bc_start_date.strftime("%d-%b-%Y") if a.bc_start_date else None,
+            "bcEndDate": a.bc_end_date.strftime("%d-%b-%Y") if a.bc_end_date else None,
+            "ndStartDate": a.nd_start_date.strftime("%d-%b-%Y") if a.nd_start_date else None,
+            "ndEndDate": a.nd_end_date.strftime("%d-%b-%Y") if a.nd_end_date else None,
+            "comp": a.comp,
+            "isin": a.isin,
+            "caBroadcastDate": a.ca_broadcast_date.strftime("%d-%b-%Y") if a.ca_broadcast_date else None,
+            "paymentDate": a.payment_date.strftime("%d-%b-%Y") if a.payment_date else None,
+            "action_type": a.action_type
+        } for a in actions]
+
+    except Exception as e:
+        logger.error(f"Error fetching market corporate actions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/corporate-actions/sync")
+async def trigger_corporate_actions_sync(
+    from_date: str,
+    to_date: str,
+    symbol: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_admin) # Admin only for global sync
+):
+    """Trigger manual sync from NSE to DB."""
+    from datetime import datetime
+    try:
+        d_from = datetime.strptime(from_date, "%d-%m-%Y").date()
+        d_to = datetime.strptime(to_date, "%d-%m-%Y").date()
+        
+        count = await sync_corporate_actions_from_nse(db, d_from, d_to, symbol)
+        return {"status": "success", "synced_count": count}
+    except Exception as e:
+        logger.error(f"Sync failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def sync_corporate_actions_from_nse(db: AsyncSession, from_date, to_date, symbol=None):
+    from nse import NSE
+    import os
+    from datetime import datetime
+
+    def _parse_nse_date(d_str):
+        if not d_str or d_str == "-": return None
+        for fmt in ("%d-%b-%Y", "%d-%m-%Y", "%Y-%m-%d"):
+            try: return datetime.strptime(d_str, fmt).date()
+            except: continue
+        return None
+
+    def _classify(purpose):
+        p = purpose.upper()
+        if "DIVIDEND" in p: return "DIVIDEND"
+        if "BONUS" in p: return "BONUS"
+        if "SPLIT" in p: return "SPLIT"
+        if "BUYBACK" in p: return "BUYBACK"
+        if "RIGHTS" in p: return "RIGHTS"
+        return "OTHER"
+
+    nse_cache_dir = os.path.join(os.getcwd(), ".nse_cache")
+    os.makedirs(nse_cache_dir, exist_ok=True)
+
+    with NSE(download_folder=nse_cache_dir) as nse:
+        raw_actions = nse.actions(
+            segment='equities',
+            symbol=symbol if symbol and symbol.strip() else None,
+            from_date=from_date,
+            to_date=to_date
+        )
+
+    if not raw_actions:
+        return 0
+
+    count = 0
+    for a in raw_actions:
+        ex_d = _parse_nse_date(a.get("exDate"))
+        if not ex_d: continue
+        
+        sub = a.get("subject") or ""
+        
+        stmt = mysql_insert(CorporateAction).values(
+            symbol=a.get("symbol"),
+            series=a.get("series"),
+            ind=a.get("ind"),
+            face_val=str(a.get("faceVal")) if a.get("faceVal") is not None else None,
+            subject=sub,
+            subject_short=sub[:200],
+            ex_date=ex_d,
+            rec_date=_parse_nse_date(a.get("recDate")),
+            bc_start_date=_parse_nse_date(a.get("bcStartDate")),
+            bc_end_date=_parse_nse_date(a.get("bcEndDate")),
+            nd_start_date=_parse_nse_date(a.get("ndStartDate")),
+            nd_end_date=_parse_nse_date(a.get("ndEndDate")),
+            comp=a.get("comp"),
+            isin=a.get("isin"),
+            ca_broadcast_date=_parse_nse_date(a.get("caBroadcastDate")),
+            payment_date=_parse_nse_date(a.get("paymentDate")),
+            action_type=_classify(sub)
+        )
+        
+        stmt = stmt.on_duplicate_key_update(
+            series=stmt.inserted.series,
+            ind=stmt.inserted.ind,
+            face_val=stmt.inserted.face_val,
+            subject=stmt.inserted.subject,
+            rec_date=stmt.inserted.rec_date,
+            bc_start_date=stmt.inserted.bc_start_date,
+            bc_end_date=stmt.inserted.bc_end_date,
+            nd_start_date=stmt.inserted.nd_start_date,
+            nd_end_date=stmt.inserted.nd_end_date,
+            comp=stmt.inserted.comp,
+            isin=stmt.inserted.isin,
+            ca_broadcast_date=stmt.inserted.ca_broadcast_date,
+            payment_date=stmt.inserted.payment_date,
+            action_type=stmt.inserted.action_type
+        )
+        await db.execute(stmt)
+        count += 1
+    
+    await db.commit()
+    return count
+
 
 
 if __name__ == "__main__":
