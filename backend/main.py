@@ -1131,6 +1131,58 @@ async def get_stock_lots(symbol: str, db: AsyncSession = Depends(get_db), curren
         for lot in lots
     ]
 
+@app.post("/api/stock/{symbol}/lots")
+async def add_stock_lot(
+    symbol: str, 
+    data: dict = Body(...), 
+    db: AsyncSession = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        qty = float(data.get("quantity", 0))
+        buy_price = float(data.get("buy_price", 0))
+        buy_date_str = data.get("buy_date")
+        
+        if qty <= 0 or buy_price <= 0:
+            raise ValueError("Quantity and Buy Price must be greater than 0")
+
+        if not buy_date_str:
+            buy_date_val = date.today()
+        else:
+            from datetime import datetime
+            buy_date_val = datetime.strptime(buy_date_str, "%Y-%m-%d").date()
+
+        new_lot = PortfolioTransaction(
+            user_id=current_user.id,
+            symbol=symbol.upper(),
+            quantity=qty,
+            buy_price=buy_price,
+            buy_date=buy_date_val,
+            status="OPEN"
+        )
+        db.add(new_lot)
+        
+        # Ensure stock exists in StockMaster so it shows in portfolio views
+        existing_stock = await db.execute(select(StockMaster).where(
+            StockMaster.symbol == symbol.upper(), 
+            StockMaster.user_id == current_user.id
+        ))
+        if not existing_stock.scalars().first():
+            new_stock = StockMaster(
+                user_id=current_user.id,
+                symbol=symbol.upper(),
+                company_name=symbol.upper(),
+                is_active=True
+            )
+            db.add(new_stock)
+
+        await db.commit()
+        return {"status": "success", "id": new_lot.id}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 
 from backend.utils.limiter import limiter
 

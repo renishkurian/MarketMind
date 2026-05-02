@@ -185,6 +185,39 @@ export default function DeepDive() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [fundSyncLoading, setFundSyncLoading] = useState(false);
   const [screenerSyncLoading, setScreenerSyncLoading] = useState(false);
+  const [isAddLotModalOpen, setIsAddLotModalOpen] = useState(false);
+  const [newLotData, setNewLotData] = useState({ buy_date: '', quantity: '', buy_price: '' });
+  const [addLotLoading, setAddLotLoading] = useState(false);
+
+  const handleAddLot = async (e) => {
+    e.preventDefault();
+    try {
+      setAddLotLoading(true);
+      const token = localStorage.getItem('mm_token');
+      const res = await fetch(`${API_URL}/api/stock/${symbol}/lots`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newLotData)
+      });
+      if (res.ok) {
+        toast.success('Tax lot added successfully!');
+        setIsAddLotModalOpen(false);
+        setNewLotData({ buy_date: '', quantity: '', buy_price: '' });
+        fetchData();
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Failed to add lot');
+      }
+    } catch (e) {
+      toast.error('Network error while adding lot');
+    } finally {
+      setAddLotLoading(false);
+    }
+  };
+
   const [editData, setEditData] = useState({});
   const [activeTab, setActiveTab] = useState('chart');
   const [screenerData, setScreenerData] = useState(null);
@@ -1523,6 +1556,15 @@ export default function DeepDive() {
           {/* Positions Tab */}
           {activeTab === 'positions' && (
             <div className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xs font-black text-dark-muted uppercase tracking-widest">Tax Lots</h3>
+                <button
+                  onClick={() => setIsAddLotModalOpen(true)}
+                  className="px-3 py-1.5 bg-accent/20 text-accent border border-accent/40 rounded-lg text-xs font-semibold hover:bg-accent hover:text-white transition-colors"
+                >
+                  + Add Entry
+                </button>
+              </div>
               {lots.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3 text-dark-muted">
                   <Briefcase size={36} className="opacity-30" />
@@ -2931,6 +2973,79 @@ export default function DeepDive() {
         </div>
       </div>
 
+
+      {/* Add Tax Lot Modal */}
+      {isAddLotModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-dark-card border border-dark-border w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-dark-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-dark-text">Add Tax Lot</h3>
+                <p className="text-xs text-dark-muted mt-1">Record a new purchase for {symbol}.</p>
+              </div>
+              <button 
+                onClick={() => setIsAddLotModalOpen(false)}
+                className="p-2 text-dark-muted hover:text-dark-text transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddLot} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Buy Date (Optional)</label>
+                <input 
+                  type="date"
+                  value={newLotData.buy_date}
+                  onChange={(e) => setNewLotData({ ...newLotData, buy_date: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Quantity</label>
+                <input 
+                  type="number"
+                  step="any"
+                  required
+                  min="0.0001"
+                  value={newLotData.quantity}
+                  onChange={(e) => setNewLotData({ ...newLotData, quantity: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Buy Price (₹)</label>
+                <input 
+                  type="number"
+                  step="any"
+                  required
+                  min="0.01"
+                  value={newLotData.buy_price}
+                  onChange={(e) => setNewLotData({ ...newLotData, buy_price: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddLotModalOpen(false)}
+                  className="px-4 py-2 text-sm font-bold text-dark-muted hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addLotLoading}
+                  className="px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-bold shadow-lg shadow-accent/20 transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  {addLotLoading ? <RefreshCw size={14} className="animate-spin" /> : 'Save Lot'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Manual Edit Modal */}
       {isEditModalOpen && (
