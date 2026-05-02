@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # ── Broadcast hooks (injected by main.py at startup) ─────────────────────────
 broadcast_price_update: Callable[[str, float, float], Awaitable[None]] = None
 broadcast_market_status: Callable[[str], Awaitable[None]] = None
+broadcast_alert_notification: Callable[[int, dict], Awaitable[None]] = None
 
 
 async def _safe_broadcast_price(symbol: str, price: float, change_pct: float):
@@ -134,6 +135,56 @@ async def intraday_fetch():
         await session.commit()
 
     logger.info(f"Intraday fetch complete — {len(prices)} symbols updated (Baseline verified).")
+
+    # Intraday alert check — piggybacks on live prices already fetched above
+    # Catches alerts that cross intraday but may close back before EOD
+    if prices:
+        try:
+            async with SessionLocal() as alert_session:
+                from sqlalchemy import and_
+                alert_result = await alert_session.execute(
+                    select(PriceAlert).where(
+                        and_(PriceAlert.is_active == True, PriceAlert.is_triggered == False)
+                    )
+                )
+                live_alerts = alert_result.scalars().all()
+                intraday_triggered = 0
+                for alert in live_alerts:
+                    live_price = prices.get(alert.symbol, {}).get("close")
+                    if live_price is None:
+                        continue
+                    triggered = (
+                        (alert.direction == "ABOVE" and live_price >= alert.price_level) or
+                        (alert.direction == "BELOW" and live_price <= alert.price_level)
+                    )
+                    if triggered:
+                        alert.is_triggered    = True
+                        alert.triggered_at    = datetime.utcnow()
+                        alert.triggered_price = live_price
+                        intraday_triggered += 1
+                        logger.info(
+                            f"INTRADAY ALERT — {alert.symbol} {alert.direction} "
+                            f"₹{alert.price_level} | live: ₹{live_price} | user: {alert.user_id}"
+                        )
+                        try:
+                            if broadcast_alert_notification:
+                                await broadcast_alert_notification(alert.user_id, {
+                                    "id":              alert.id,
+                                    "symbol":          alert.symbol,
+                                    "label":           alert.label,
+                                    "direction":       alert.direction,
+                                    "price_level":     float(alert.price_level),
+                                    "triggered_price": live_price,
+                                    "triggered_at":    datetime.utcnow().isoformat(),
+                                })
+                                alert.notified = True
+                        except Exception as _ne:
+                            logger.warning(f"Intraday alert WS push failed: {_ne}")
+                if intraday_triggered:
+                    await alert_session.commit()
+                    logger.info(f"Intraday alert checker: {intraday_triggered} alert(s) triggered.")
+        except Exception as _ae:
+            logger.error(f"Intraday alert check failed: {_ae}")
 
 
 # ── JOB 2: EOD Consolidation (weekdays 18:00) ────────────────────────────────
@@ -511,6 +562,21 @@ async def check_price_alerts(db: AsyncSession):
                 f"₹{alert.price_level} | current: ₹{current_price} | "
                 f"user: {alert.user_id} | label: {alert.label}"
             )
+            # Push real-time notification to user via WebSocket
+            try:
+                if broadcast_alert_notification:
+                    await broadcast_alert_notification(alert.user_id, {
+                        "id":              alert.id,
+                        "symbol":          alert.symbol,
+                        "label":           alert.label,
+                        "direction":       alert.direction,
+                        "price_level":     float(alert.price_level),
+                        "triggered_price": current_price,
+                        "triggered_at":    datetime.utcnow().isoformat(),
+                    })
+                    alert.notified = True
+            except Exception as _e:
+                logger.warning(f"Alert WS push failed for user {alert.user_id}: {_e}")
 
     if triggered_count:
         await db.commit()

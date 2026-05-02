@@ -1756,29 +1756,57 @@ Return this exact structure:
 Return trend_lines as [] if none apply.
 """
 
-    # Inject fresh data before the latest message (same pattern as chart_chat)
-    today_sc    = context_data.get("today", {})
-    cur_price   = today_sc.get("close") or today_sc.get("prev_close")
-    cur_chg     = today_sc.get("change_pct")
-    refresh_sc  = (
-        f"[LIVE DATA REFRESH — {__import__("datetime").date.today()}] "
+    # Fetch live news and inject (done before message assembly so news_block is current)
+    recent_news = await _fetch_symbol_news(symbol)
+    context_data["recent_news"] = recent_news or ["No recent news found."]
+
+    # Turn 1: full system prompt (~1,500 tokens incl. fa/ta/mom JSON dumps)
+    # Turn 2+: slim ~200-token snapshot — persona stays, heavy JSON blocks dropped
+    is_first_turn = len(chat_history) <= 1
+    if not is_first_turn:
+        rsi_val  = signals.get("ta", {}).get("rsi", "N/A")
+        macd_val = signals.get("ta", {}).get("macd", "N/A")
+        slim_data = (
+            f"SNAPSHOT [{__import__('datetime').date.today()}] {symbol} "
+            f"₹{today.get('close','N/A')} | Score: {comp}/100 | ST: {st_sig} | LT: {lt_sig} | "
+            f"RSI: {rsi_val} | MACD: {macd_val} | "
+            f"90d H/L: ₹{summary.get('90d_high')}/₹{summary.get('90d_low')} | "
+            f"SMA20/50: ₹{summary.get('sma_20')}/₹{summary.get('sma_50')}"
+        )
+        _persona   = skill['persona']
+        _skill_name = skill['name']
+        followup_prompt = (
+            f"{_persona}\n\n"
+            f"Continue analysing {symbol} as {_skill_name}. Stay in character.\n\n"
+            f"{slim_data}\n\n"
+            'Reply ONLY as valid JSON: {"reply": "...", "trend_lines": []}. '
+            "trend_lines only if directly relevant. End with a clear **Verdict** line."
+        )
+        active_prompt = followup_prompt
+    else:
+        active_prompt = system_prompt
+
+    # Cap history to last 6 messages
+    MAX_HISTORY = 6
+    trimmed_history = chat_history[-MAX_HISTORY:] if len(chat_history) > MAX_HISTORY else chat_history
+
+    cur_price = today.get("close") or today.get("prev_close")
+    cur_chg   = today.get("change_pct")
+    refresh_sc = (
+        f"[LIVE DATA REFRESH — {__import__('datetime').date.today()}] "
         f"Current price: ₹{cur_price} ({cur_chg:+.2f}%) | ST: {st_sig} | LT: {lt_sig}. "
         f"Ignore any stale prices from earlier in this conversation."
     ) if cur_price else "[LIVE DATA REFRESH] Use only the latest data from the system prompt."
 
-    if len(chat_history) > 1:
+    if len(trimmed_history) > 1:
         messages = (
-            [{"role": "system", "content": system_prompt}]
-            + chat_history[:-1]
+            [{"role": "system", "content": active_prompt}]
+            + trimmed_history[:-1]
             + [{"role": "system", "content": refresh_sc}]
-            + [chat_history[-1]]
+            + [trimmed_history[-1]]
         )
     else:
-        messages = [{"role": "system", "content": system_prompt}] + chat_history
-
-    # Fetch live news and inject
-    recent_news = await _fetch_symbol_news(symbol)
-    context_data["recent_news"] = recent_news or ["No recent news found."]
+        messages = [{"role": "system", "content": active_prompt}] + trimmed_history
 
     t0 = time.perf_counter()
     status = "SUCCESS"

@@ -430,6 +430,7 @@ class PriceAlert(Base):
     is_triggered   = Column(Boolean, default=False)
     triggered_at   = Column(DateTime, nullable=True)
     triggered_price= Column(Float, nullable=True)
+    notified       = Column(Boolean, default=False)  # True once pushed to user via WS or REST
     created_at     = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at     = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -483,6 +484,8 @@ async def run_migrations():
         "ALTER TABLE fundamentals_cache ADD COLUMN IF NOT EXISTS nse_data JSON NULL",
         # Feature 4: price_alerts — ensure table exists (create_all handles new tables,
         #   but if the table was never created we surface a cleaner error via create_all)
+        # Alert notifications: notified column tracks whether WS push was delivered
+        "ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS notified TINYINT(1) NOT NULL DEFAULT 0",
     ]
     for stmt in migrations:
         try:

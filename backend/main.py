@@ -38,15 +38,24 @@ logging.basicConfig(level=logging.INFO)
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        self.user_connections: dict = {}  # user_id -> List[WebSocket]
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user_id: int = None):
         await websocket.accept()
         self.active_connections.append(websocket)
+        if user_id is not None:
+            self.user_connections.setdefault(user_id, []).append(websocket)
         logger.info(f"WS client connected. Total: {len(self.active_connections)}")
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket, user_id: int = None):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        if user_id is not None and user_id in self.user_connections:
+            conns = self.user_connections[user_id]
+            if websocket in conns:
+                conns.remove(websocket)
+            if not conns:
+                del self.user_connections[user_id]
         logger.info(f"WS client disconnected. Total: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict):
@@ -59,6 +68,16 @@ class ConnectionManager:
         for d in dead:
             self.disconnect(d)
 
+    async def send_to_user(self, user_id: int, message: dict):
+        dead = []
+        for conn in self.user_connections.get(user_id, []):
+            try:
+                await conn.send_json(message)
+            except Exception:
+                dead.append((conn, user_id))
+        for conn, uid in dead:
+            self.disconnect(conn, uid)
+
 manager = ConnectionManager()
 
 # ── Broadcast hook for scheduler ─────────────────────────────────────────────
@@ -70,6 +89,9 @@ async def broadcast_price_update(symbol: str, price: float, change_pct: float):
 
 async def broadcast_market_status(status: str):
     await manager.broadcast({"type": "market_status", "data": {"status": status}})
+
+async def broadcast_alert_notification(user_id: int, alert_data: dict):
+    await manager.send_to_user(user_id, {"type": "alert_triggered", "data": alert_data})
 
 # ── App Lifespan (startup / shutdown) ────────────────────────────────────────
 @asynccontextmanager
@@ -92,6 +114,7 @@ async def lifespan(app: FastAPI):
     from backend import scheduler as sched_module
     sched_module.broadcast_price_update = broadcast_price_update
     sched_module.broadcast_market_status = broadcast_market_status
+    sched_module.broadcast_alert_notification = broadcast_alert_notification
 
     from backend.scheduler import start_scheduler
     scheduler = start_scheduler()
@@ -180,7 +203,7 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
         await websocket.close(code=1008)
         return
 
-    await manager.connect(websocket)
+    await manager.connect(websocket, user_id=user.id)
     try:
         # Send initial snapshot ISOLATED to this user using unified fetcher
         snapshot = await _fetch_user_portfolio_stats(db, user, filter_type=None)
@@ -190,6 +213,29 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
         status = get_market_status()
         await websocket.send_json({"type": "market_status", "data": {"status": status}})
 
+        # Send any pending triggered alerts the user hasn't seen yet
+        from sqlalchemy import and_
+        pending_result = await db.execute(
+            select(PriceAlert).where(
+                and_(
+                    PriceAlert.user_id == user.id,
+                    PriceAlert.is_triggered == True,
+                    PriceAlert.notified == False,
+                )
+            )
+        )
+        pending_alerts = pending_result.scalars().all()
+        for pa in pending_alerts:
+            await websocket.send_json({"type": "alert_triggered", "data": {
+                "id": pa.id, "symbol": pa.symbol, "label": pa.label,
+                "direction": pa.direction, "price_level": float(pa.price_level),
+                "triggered_price": float(pa.triggered_price) if pa.triggered_price else None,
+                "triggered_at": pa.triggered_at.isoformat() if pa.triggered_at else None,
+            }})
+            pa.notified = True
+        if pending_alerts:
+            await db.commit()
+
         # Keep alive / handle client pings
         while True:
             data = await websocket.receive_text()
@@ -198,10 +244,10 @@ async def websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(ge
                 await websocket.send_text("pong")
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, user_id=user.id)
     except Exception as e:
         logger.error(f"WS error: {e}")
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, user_id=user.id)
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
@@ -1802,6 +1848,43 @@ async def get_user_alerts(
         "triggered_price": a.triggered_price,
         "created_at":    a.created_at.isoformat(),
     } for a in alerts]
+
+
+
+@app.get("/api/alerts/triggered")
+@limiter.limit("30/minute")
+async def get_triggered_alerts(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Returns all triggered-but-not-yet-notified alerts for the current user and marks them notified."""
+    from sqlalchemy import and_
+    result = await db.execute(
+        select(PriceAlert).where(
+            and_(
+                PriceAlert.user_id == current_user.id,
+                PriceAlert.is_triggered == True,
+                PriceAlert.notified == False,
+            )
+        ).order_by(PriceAlert.triggered_at.desc())
+    )
+    alerts = result.scalars().all()
+    payload = [{
+        "id":              a.id,
+        "symbol":          a.symbol,
+        "label":           a.label,
+        "alert_type":      a.alert_type,
+        "direction":       a.direction,
+        "price_level":     float(a.price_level),
+        "triggered_price": float(a.triggered_price) if a.triggered_price else None,
+        "triggered_at":    a.triggered_at.isoformat() if a.triggered_at else None,
+    } for a in alerts]
+    for a in alerts:
+        a.notified = True
+    if alerts:
+        await db.commit()
+    return payload
 
 
 @app.delete("/api/alerts/{alert_id}")
