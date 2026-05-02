@@ -343,6 +343,44 @@ confidence_low and confidence_high are absolute price levels, not percentages.
 """
 
 
+def build_chart_chat_followup_prompt(symbol: str, context_data: dict) -> str:
+    """
+    Compact system prompt for chart chat turns 2+.
+    Strips weekly_candles JSON and full indicator dump — only sends a
+    ~200-token snapshot so the model stays grounded without re-paying
+    the full ~1,800-token system prompt on every follow-up message.
+    """
+    today    = context_data.get("today", {})
+    summary  = context_data.get("price_summary", {})
+    signals  = context_data.get("indicators", {})
+    comp     = context_data.get("composite_score", "N/A")
+    st_sig   = context_data.get("current_st_signal", "HOLD")
+    lt_sig   = context_data.get("current_lt_signal", "HOLD")
+    bt       = context_data.get("backtest", {})
+    bt_str   = (f"{bt.get('cagr','N/A')}% CAGR, {bt.get('win_rate','N/A')}% win rate"
+                if bt.get("cagr") else "N/A")
+    chart_range = summary.get("chart_range", "3M")
+    range_high  = summary.get("range_high") or summary.get("90d_high")
+    range_low   = summary.get("range_low")  or summary.get("90d_low")
+    ta          = signals.get("ta", {})
+    rsi_val     = ta.get("rsi", "N/A")
+    rsi_note    = (
+        "OVERSOLD — do NOT say overbought" if isinstance(rsi_val, (int, float)) and rsi_val < 30 else
+        "recovering from lows — not overbought" if isinstance(rsi_val, (int, float)) and rsi_val < 45 else
+        "neutral-to-bullish"
+    )
+    return f"""You are MarketMind's chart analyst for {symbol} (NSE/BSE).
+Continue the conversation using the live data snapshot below. Do not repeat prior analysis.
+
+LIVE SNAPSHOT [{today.get('date','N/A')}]:
+Price: ₹{today.get('close','N/A')} ({today.get('change_pct','N/A')}%) | H: ₹{today.get('high','N/A')} L: ₹{today.get('low','N/A')} Vol: {today.get('volume','N/A')}
+Score: {comp}/100 | ST: {st_sig} | LT: {lt_sig} | Backtest: {bt_str}
+{chart_range} range: ₹{range_low}–₹{range_high} | SMA20/50/90: ₹{summary.get('sma_20')}/₹{summary.get('sma_50')}/₹{summary.get('sma_90')}
+RSI: {rsi_val} ({rsi_note}) | MACD: {ta.get('macd','N/A')} | BB: ₹{summary.get('bb_lower','N/A')}–₹{summary.get('bb_upper','N/A')}
+
+RULES: Reply as valid JSON only. trend_lines prices must match reply exactly. price_target null unless asked about direction/entry/exit."""
+
+
 def build_fundamentals_research_prompt(symbol: str, company_name: str) -> str:
     """
     Grounded fundamentals research prompt.
@@ -970,25 +1008,35 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
     recent_news = await _fetch_symbol_news(symbol)
     context_data["recent_news"] = recent_news if recent_news else ["No recent news found."]
 
-    sys_prompt = build_chart_chat_system_prompt(symbol, context_data)
+    is_first_turn = len(user_messages) <= 1
 
-    # Inject a fresh-data reminder before the latest user message so the AI
-    # always uses current prices, not stale values mentioned in old chat history.
+    # Turn 1: full system prompt with all data (~1,800 tokens)
+    # Turn 2+: slim snapshot prompt (~200 tokens) — saves ~50-60% per follow-up
+    if is_first_turn:
+        sys_prompt = build_chart_chat_system_prompt(symbol, context_data)
+    else:
+        sys_prompt = build_chart_chat_followup_prompt(symbol, context_data)
+
     today = context_data.get("today", {})
     current_price = today.get("close") or today.get("prev_close")
     change_pct    = today.get("change_pct")
     st_signal     = context_data.get("current_st_signal", "HOLD")
     lt_signal     = context_data.get("current_lt_signal", "HOLD")
-    refresh_note  = (
-        f"[LIVE DATA REFRESH — {__import__("datetime").date.today()}] "
+
+    # Cap history to last 6 messages to prevent unbounded token growth
+    MAX_HISTORY = 6
+    trimmed_messages = user_messages[-MAX_HISTORY:] if len(user_messages) > MAX_HISTORY else user_messages
+
+    refresh_note = (
+        f"[LIVE DATA REFRESH — {__import__('datetime').date.today()}] "
         f"Current price: ₹{current_price} ({change_pct:+.2f}%) | ST: {st_signal} | LT: {lt_signal}. "
-        f"Ignore any prices or signals mentioned earlier in this conversation that differ from these values."
+        f"Ignore any stale prices from earlier in this conversation."
     ) if current_price else "[LIVE DATA REFRESH] Use only the latest data from the system prompt."
 
-    # Split messages: history (all but last) + fresh note + last user message
-    if len(user_messages) > 1:
-        history_msgs  = user_messages[:-1]
-        last_msg      = user_messages[-1]
+    # Split messages: history (all but last) + refresh note + last user message
+    if len(trimmed_messages) > 1:
+        history_msgs = trimmed_messages[:-1]
+        last_msg     = trimmed_messages[-1]
         messages = (
             [{"role": "system", "content": sys_prompt}]
             + history_msgs
@@ -996,7 +1044,7 @@ async def generate_chart_chat(symbol: str, user_messages: list, context_data: di
             + [last_msg]
         )
     else:
-        messages = [{"role": "system", "content": sys_prompt}] + user_messages
+        messages = [{"role": "system", "content": sys_prompt}] + trimmed_messages
 
     t0 = time.perf_counter()
     status = "SUCCESS"
@@ -1075,12 +1123,26 @@ async def generate_pattern_recognition(symbol: str, context_data: dict, user_id:
     st_sig    = context_data.get("current_st_signal", "HOLD")
     lt_sig    = context_data.get("current_lt_signal", "HOLD")
 
-    weekly_block = json.dumps(summary.get("weekly_candles", []), indent=2)
-    recent_block = json.dumps(summary.get("recent_5_bars", []), indent=2)
+    # Compact pivot summary replaces raw 90-item arrays (~400 tokens saved)
     daily_lows   = summary.get("daily_lows_90d", [])
     daily_dates  = summary.get("daily_dates_90d", [])
     bb_upper_val = summary.get("bb_upper", "N/A")
     bb_lower_val = summary.get("bb_lower", "N/A")
+
+    # Build pivot table: pick every 5th bar to give structural shape without 90 raw rows
+    pivot_rows = []
+    if daily_dates and daily_lows:
+        step = max(1, len(daily_dates) // 18)
+        for i in range(0, len(daily_dates), step):
+            pivot_rows.append(f"{daily_dates[i]}: low={daily_lows[i]}")
+        # Always include last entry
+        if daily_dates[-1] != pivot_rows[-1].split(":")[0]:
+            pivot_rows.append(f"{daily_dates[-1]}: low={daily_lows[-1]}")
+    pivot_block = "\n".join(pivot_rows) if pivot_rows else "Not available."
+
+    # Weekly candles capped at 12 weeks (was 18) — enough for all multi-week patterns
+    weekly_block = json.dumps(summary.get("weekly_candles", [])[-12:], indent=2)
+    recent_block = json.dumps(summary.get("recent_5_bars", []), indent=2)
 
     system_prompt = f"""You are an expert technical analyst specialising in NSE/BSE chart pattern detection.
 Analyse the provided OHLCV data and identify any ACTIVE chart patterns forming or recently completed.
@@ -1094,11 +1156,10 @@ Current Price   : ₹{today.get('close', 'N/A')}
 SMA 20/50/90    : ₹{summary.get('sma_20')} / ₹{summary.get('sma_50')} / ₹{summary.get('sma_90')}
 BB Upper/Lower  : ₹{bb_upper_val} / ₹{bb_lower_val}
 
-Daily Lows (oldest→newest, use to verify Double Bottom troughs):
-{daily_dates}
-{daily_lows}
+Daily Low Pivots (sampled ~every 5 bars, use to identify trough dates/prices):
+{pivot_block}
 
-Weekly Candles (last 18 weeks):
+Weekly Candles (last 12 weeks):
 {weekly_block}
 
 Recent 5 Daily Bars:
@@ -1129,11 +1190,11 @@ DOUBLE BOTTOM:
   - Confidence >= 60% ONLY if price has ALREADY closed above the neckline (the peak
     between the two troughs). If price is still below the neckline, cap confidence at 45%
     (which means it will be excluded by Rule 1).
-  - Both troughs must be clearly identifiable on the daily_lows_90d array above with
+  - Both troughs must be clearly identifiable on the daily low pivots above with
     distinct dates — you must name the exact two dates. Do not infer a trough from a
     sideways drift or multi-week consolidation zone.
   - If the two troughs differ by MORE than 3% in price, reject entirely regardless of
-    visual appearance. Use the daily_lows_90d values to verify.
+    visual appearance. Use the daily low pivot values to verify.
   - A sideways consolidation base (even 4-6 weeks) is NOT a double bottom — it is a
     Rectangle or Accumulation Zone. Do not mislabel it.
   - Do NOT confuse a V-Bottom Recovery with a Double Bottom. If there is only one sharp
