@@ -15,8 +15,20 @@ export default function Portfolio() {
   const { stocks, isConnected, fetchPortfolio } = useStockStore();
   const navigate = useNavigate();
 
+  const [allSymbols, setAllSymbols] = useState([]);
+
   React.useEffect(() => {
     fetchPortfolio();
+    const fetchSymbols = async () => {
+      try {
+        const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
+        const res = await axios.get(`${API_URL}/api/symbols`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setAllSymbols(res.data);
+      } catch (err) {}
+    };
+    fetchSymbols();
   }, [fetchPortfolio]);
 
   const fileInputRef = useRef(null);
@@ -32,6 +44,34 @@ export default function Portfolio() {
   const [isAllocating, setIsAllocating] = useState(false);
   const [allocationResult, setAllocationResult] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
+  const [newEntryData, setNewEntryData] = useState({ symbol: '', buy_date: '', quantity: '', buy_price: '' });
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+
+  const handleNewEntry = async (e) => {
+    e.preventDefault();
+    if (!newEntryData.symbol) return toast.error("Please select a symbol");
+    try {
+      setIsSubmittingEntry(true);
+      const token = localStorage.getItem('mm_token') || localStorage.getItem('token');
+      const res = await axios.post(`${API_URL}/api/stock/${newEntryData.symbol}/lots`, {
+        buy_date: newEntryData.buy_date,
+        quantity: newEntryData.quantity,
+        buy_price: newEntryData.buy_price
+      }, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      toast.success('New entry added successfully!');
+      setIsNewEntryModalOpen(false);
+      setNewEntryData({ symbol: '', buy_date: '', quantity: '', buy_price: '' });
+      fetchPortfolio(); // Refresh portfolio to pull latest values
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to add new entry');
+    } finally {
+      setIsSubmittingEntry(false);
+    }
+  };
 
   const portfolioStocks = useMemo(() =>
     Object.values(stocks).filter(s => s.type === 'PORTFOLIO' || !s.type),
@@ -272,6 +312,13 @@ export default function Portfolio() {
                <div className="w-4 h-4 border-2 border-accent/40 border-t-accent rounded-full animate-spin" />
             ) : <Upload size={16} />}
             {isImporting ? 'Importing...' : 'Import XLSX'}
+          </button>
+          
+          <button 
+            onClick={() => setIsNewEntryModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-signal-buy/20 border border-signal-buy/40 rounded-xl text-sm font-semibold text-signal-buy hover:bg-signal-buy hover:text-white transition-all"
+          >
+            + New Entry
           </button>
           
           <div className="text-right border-l border-dark-border pl-4">
@@ -593,6 +640,90 @@ export default function Portfolio() {
           </div>
         </div>
       )}
+
+      {/* New Entry Modal */}
+      {isNewEntryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-dark-card border border-dark-border w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-dark-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-dark-text">Add New Entry</h3>
+                <p className="text-xs text-dark-muted mt-1">Record a new purchase.</p>
+              </div>
+              <button 
+                onClick={() => setIsNewEntryModalOpen(false)}
+                className="text-dark-muted hover:text-dark-text transition-colors"
+              >
+                Close
+              </button>
+            </div>
+            
+            <form onSubmit={handleNewEntry} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Symbol</label>
+                <input 
+                  type="text"
+                  required
+                  list="all-symbols-list"
+                  placeholder="Search and select symbol..."
+                  value={newEntryData.symbol}
+                  onChange={(e) => setNewEntryData({ ...newEntryData, symbol: e.target.value.toUpperCase() })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+                <datalist id="all-symbols-list">
+                  {allSymbols.map(sym => (
+                    <option key={sym} value={sym} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Buy Date (Optional)</label>
+                <input 
+                  type="date"
+                  value={newEntryData.buy_date}
+                  onChange={(e) => setNewEntryData({ ...newEntryData, buy_date: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Quantity</label>
+                <input 
+                  type="number"
+                  step="any"
+                  required
+                  min="0.0001"
+                  value={newEntryData.quantity}
+                  onChange={(e) => setNewEntryData({ ...newEntryData, quantity: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-dark-muted uppercase mb-1.5">Buy Price (₹)</label>
+                <input 
+                  type="number"
+                  step="any"
+                  required
+                  min="0.01"
+                  value={newEntryData.buy_price}
+                  onChange={(e) => setNewEntryData({ ...newEntryData, buy_price: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+                />
+              </div>
+
+              <div className="pt-4">
+                <button 
+                  type="submit"
+                  disabled={isSubmittingEntry}
+                  className="w-full bg-signal-buy hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-signal-buy/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmittingEntry ? <RefreshCw size={18} className="animate-spin" /> : 'Save Entry'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
     </>
   );

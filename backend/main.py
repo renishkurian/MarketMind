@@ -840,6 +840,18 @@ async def _bootstrap_new_stock(symbol: str):
         logger.error(f"Bootstrap fetch failed for {symbol}: {e}")
 
 
+@app.get("/api/symbols")
+async def get_all_symbols(db: AsyncSession = Depends(get_db)):
+    """Fetch all unique NSE symbols available in the price history table."""
+    result = await db.execute(
+        select(PriceHistory.symbol)
+        .where(PriceHistory.exchange == 'NSE')
+        .distinct()
+        .order_by(PriceHistory.symbol)
+    )
+    return result.scalars().all()
+
+
 # ── Opportunities ─────────────────────────────────────────────────────────────
 @app.get("/api/opportunities")
 async def get_opportunities(
